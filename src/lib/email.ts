@@ -128,3 +128,32 @@ export async function sendAdminResetPasswordNotification(toEmail: string, userNa
 
   return sendMail({ to: toEmail, subject, html });
 }
+
+/**
+ * Send Self-Registration Confirmation Email
+ */
+export async function sendSelfRegistrationConfirmationEmail(toEmail: string, userName: string) {
+  const subject = `Welcome to StockPulse PRO - Registration Successful`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; background-color: #030407; color: #ffffff; padding: 30px; border-radius: 12px; max-width: 600px; margin: 0 auto; border: 1px solid rgba(255,255,255,0.1);">
+      <h2 style="color: #10b981; margin-top: 0;">Welcome to StockPulse PRO!</h2>
+      <p>Hello <strong>${userName}</strong>,</p>
+      <p>Thank you for registering on <strong>StockPulse PRO</strong>. Your account has been successfully created.</p>
+      
+      <div style="background-color: #0d111d; border: 1px solid rgba(16,185,129,0.3); padding: 15px 20px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 5px 0;"><strong>Registered Account Email:</strong> <span style="color: #38bdf8;">${toEmail}</span></p>
+        <p style="margin: 5px 0;"><strong>Access Level:</strong> <span style="color: #10b981;">PRO Investor Terminal</span></p>
+      </div>
+
+      <p style="font-size: 13px; color: #94a3b8;">You can now manage your stock holdings, track real-time analytics, monitor watchlists, and calculate tax P&L.</p>
+      
+      <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 25px 0;" />
+      <p style="font-size: 11px; color: #64748b; margin: 0;">
+        Sent automatically from StockPulse PRO System (<strong>${SENDER_EMAIL}</strong>).
+      </p>
+    </div>
+  `;
+
+  return sendMail({ to: toEmail, subject, html });
+}
+

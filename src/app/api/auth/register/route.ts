@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
 import bcrypt from 'bcryptjs';
+import { sendSelfRegistrationConfirmationEmail } from '@/lib/email';
 
 // Global fallback user store when MongoDB is connecting
 declare global {
@@ -76,6 +77,9 @@ export async function POST(req: Request) {
           createdAt: newUser.createdAt,
         });
 
+        // Send registration confirmation email
+        await sendSelfRegistrationConfirmationEmail(cleanEmail, name);
+
         return NextResponse.json({
           success: true,
           message: 'Account registered successfully in MongoDB Atlas Cloud DB!',
@@ -113,6 +117,9 @@ export async function POST(req: Request) {
     };
 
     global.fallbackUsersStore?.push(fallbackUser);
+
+    // Send registration confirmation email
+    await sendSelfRegistrationConfirmationEmail(cleanEmail, name);
 
     return NextResponse.json({
       success: true,
