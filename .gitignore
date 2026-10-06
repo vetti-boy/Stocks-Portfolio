@@ -29,3 +29,5 @@ Thumbs.db
 # Vercel & Render temporary deployment files
 .vercel
 .render
+
+.vercel
