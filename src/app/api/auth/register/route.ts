@@ -1,0 +1,136 @@
+import { NextResponse } from 'next/server';
+import { connectToDatabase } from '@/lib/mongodb';
+import { UserModel } from '@/models/User';
+import bcrypt from 'bcryptjs';
+
+// Global fallback user store when MongoDB is connecting
+declare global {
+  // eslint-disable-next-line no-var
+  var fallbackUsersStore: any[] | undefined;
+}
+
+if (!global.fallbackUsersStore) {
+  global.fallbackUsersStore = [
+    {
+      id: 'admin_master',
+      name: 'System Administrator',
+      email: 'admin@stocks.io',
+      passwordHash: '$2a$10$e8wZ3H5X9...demo', // admin123
+      role: 'ADMIN',
+      currency: 'INR',
+      createdAt: new Date().toISOString(),
+    },
+  ];
+}
+
+export async function POST(req: Request) {
+  try {
+    const { name, email, password } = await req.json();
+
+    if (!name || !email || !password) {
+      return NextResponse.json(
+        { error: 'Name, email, and password are required' },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 4) {
+      return NextResponse.json(
+        { error: 'Password must be at least 4 characters long' },
+        { status: 400 }
+      );
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const db = await connectToDatabase();
+
+    if (db && db.connection.readyState === 1) {
+      try {
+        const existingUser = await UserModel.findOne({ email: cleanEmail });
+        if (existingUser) {
+          return NextResponse.json(
+            { error: 'An account with this email already exists. Please log in.' },
+            { status: 409 }
+          );
+        }
+
+        const newUser = await UserModel.create({
+          name,
+          email: cleanEmail,
+          passwordHash,
+          role: 'USER',
+          currency: 'INR',
+        });
+
+        // Sync fallback store
+        global.fallbackUsersStore?.push({
+          id: newUser._id.toString(),
+          name: newUser.name,
+          email: cleanEmail,
+          passwordHash,
+          role: 'USER',
+          currency: 'INR',
+          createdAt: newUser.createdAt,
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Account registered successfully in MongoDB Atlas Cloud DB!',
+          user: {
+            id: newUser._id.toString(),
+            name: newUser.name,
+            email: newUser.email,
+            role: newUser.role,
+            currency: newUser.currency,
+            isGuest: false,
+          },
+        });
+      } catch (dbErr: any) {
+        console.warn('MongoDB query failed during registration:', dbErr.message);
+      }
+    }
+
+    // Fallback in-memory handling
+    const existingFallback = global.fallbackUsersStore?.find((u) => u.email === cleanEmail);
+    if (existingFallback) {
+      return NextResponse.json(
+        { error: 'An account with this email already exists. Please log in.' },
+        { status: 409 }
+      );
+    }
+
+    const fallbackUser = {
+      id: 'usr_' + Date.now(),
+      name,
+      email: cleanEmail,
+      passwordHash,
+      role: 'USER',
+      currency: 'INR',
+      createdAt: new Date().toISOString(),
+    };
+
+    global.fallbackUsersStore?.push(fallbackUser);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Account registered successfully!',
+      user: {
+        id: fallbackUser.id,
+        name: fallbackUser.name,
+        email: fallbackUser.email,
+        role: fallbackUser.role,
+        currency: fallbackUser.currency,
+        isGuest: false,
+      },
+    });
+  } catch (err: any) {
+    console.error('Registration error:', err);
+    return NextResponse.json(
+      { error: err?.message || 'Failed to create account' },
+      { status: 500 }
+    );
+  }
+}
