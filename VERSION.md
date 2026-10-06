@@ -2,6 +2,22 @@
 
 This file maintains a strict chronological record of all application versions, feature updates, bug fixes, and architectural modifications.
 
+## [v1.7.0] - 2026-10-07
+### Dynamic IST Market Schedule, Multi-Broker DP Charges & SMTP Email Dispatcher
+- **Dynamic Real-Time Indian Stock Market Status (`src/utils/marketStatus.ts`)**:
+  - Implemented real-time IST schedule evaluator (`Pre-Open`, `Live Trading Session`, `Post-Market`, `Market Closed` & `Weekend`).
+  - Integrated dynamic badge colors and continuous 30-second session polling into Navbar header and Market Analysis regime status bar.
+- **Dynamic Multi-Broker DP Charges Calculator**:
+  - Integrated editable DP Charge input field and presets for Zerodha (₹15.93), Groww (₹23.60), Angel One (₹23.60), Upstox (₹21.83), ICICI Direct (₹29.50), and Custom.
+- **Gmail SMTP Registration Welcome Email Dispatcher**:
+  - Added `sendSelfRegistrationConfirmationEmail()` to format and send welcome emails to newly registered users.
+  - Configured Gmail SMTP App Password (`SMTP_EMAIL` & `SMTP_PASSWORD`) in `.env.local`.
+- **Authentication Lifecycle & Session Persistence**:
+  - Enforced login modal prompt on page load after logging out, removing auto-login defaults.
+  - Implemented clean `localStorage` session persistence for active logged-in sessions.
+
+---
+
 ## [v1.6.0] - 2026-10-06
 ### Admin Account Lifecycle, Password Visibility Controls & P&L Formatting Update
 - **Admin Account Disabling & Deletion Provisions**:
