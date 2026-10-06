@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 
-const SENDER_EMAIL = process.env.SMTP_EMAIL || '51manoj2004@gmail.com';
+const SENDER_EMAIL = process.env.SMTP_EMAIL || 'mailfortempusage@gmail.com';
 const SENDER_PASS = process.env.SMTP_PASSWORD || '';
 
 // Transporter setup

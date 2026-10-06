@@ -277,7 +277,7 @@ export const AdminPanel: React.FC = () => {
           Administrator.
         </p>
         <p className="text-xs font-mono text-cyan-400">
-          Log in with Admin account (51manoj2004@gmail.com) to manage user access.
+          Log in with Administrator credentials to manage user access.
         </p>
       </div>
     );

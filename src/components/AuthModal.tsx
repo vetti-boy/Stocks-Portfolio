@@ -309,7 +309,7 @@ export const AuthModal: React.FC = () => {
                     <Mail className="h-4 w-4 text-cyan-400" /> Send OTP to {user?.email || email}
                   </span>
                   <p className="text-[11px] text-slate-400">
-                    A 6-digit verification code will be dispatched from <strong>51manoj2004@gmail.com</strong>.
+                    A 6-digit verification code will be dispatched to your registered email address.
                   </p>
                 </div>
 
@@ -498,7 +498,7 @@ export const AuthModal: React.FC = () => {
                   <input
                     type="email"
                     required
-                    placeholder="51manoj2004@gmail.com or user email"
+                    placeholder="name@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full glass-input !pl-10 text-xs"
@@ -553,7 +553,7 @@ export const AuthModal: React.FC = () => {
                 onClick={loginAsAdmin}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 border border-white/10 hover:bg-slate-800 py-2.5 text-xs font-semibold text-slate-200 transition"
               >
-                <ShieldCheck className="h-4 w-4 text-indigo-400" /> Log In as Master Admin (51manoj2004@gmail.com)
+                <ShieldCheck className="h-4 w-4 text-indigo-400" /> Log In as Administrator
               </button>
             </div>
           </>
