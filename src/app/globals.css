@@ -90,6 +90,18 @@
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
 }
 
+/* Fix Browser Autofill Light Theme Override */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #111820 inset !important;
+  -webkit-text-fill-color: #F4F7FA !important;
+  caret-color: #38BDF8 !important;
+  transition: background-color 50000s ease-in-out 0s;
+  border-color: #202A35 !important;
+}
+
 /* OBSIDIAN Action Buttons */
 .pill-btn-primary {
   position: relative;
