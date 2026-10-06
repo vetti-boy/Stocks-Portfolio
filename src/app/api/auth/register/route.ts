@@ -15,7 +15,7 @@ if (!global.fallbackUsersStore) {
     {
       id: 'admin_master',
       name: 'System Administrator',
-      email: 'admin@stocks.io',
+      email: 'mailfortempusage@gmail.com',
       passwordHash: '$2a$10$e8wZ3H5X9...demo', // admin123
       role: 'ADMIN',
       currency: 'INR',

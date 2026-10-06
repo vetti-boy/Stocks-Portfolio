@@ -18,8 +18,8 @@ interface AuthContextType {
 
 const DEFAULT_ADMIN_USER: User = {
   id: 'admin_master',
-  name: 'System Administrator (Manoj)',
-  email: '51manoj2004@gmail.com',
+  name: 'System Administrator',
+  email: 'mailfortempusage@gmail.com',
   role: 'ADMIN',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   currency: 'INR',
