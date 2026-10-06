@@ -41,20 +41,43 @@ const DEFAULT_GUEST_USER: User = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(DEFAULT_ADMIN_USER);
+  const [user, setUser] = useState<User | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  // Restore user session from localStorage on initial load
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('stocks_app_user');
+        const savedSession = localStorage.getItem('stocks_app_user');
+        if (savedSession) {
+          const parsedUser = JSON.parse(savedSession);
+          setUser(parsedUser);
+        } else {
+          // No active user session -> prompt for login by default
+          setIsAuthModalOpen(true);
+        }
+      } catch {
+        setIsAuthModalOpen(true);
+      }
+    }
+  }, []);
+
+  const saveUserSession = (userData: User | null) => {
+    setUser(userData);
+    if (typeof window !== 'undefined') {
+      try {
+        if (userData) {
+          localStorage.setItem('stocks_app_user', JSON.stringify(userData));
+        } else {
+          localStorage.removeItem('stocks_app_user');
+        }
       } catch {
         // Ignored
       }
     }
-  }, []);
+  };
 
   const login = async (email: string, password?: string) => {
     try {
@@ -69,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const userData: User = { ...data.user, currency: 'INR' };
-      setUser(userData);
+      saveUserSession(userData);
       setIsAuthModalOpen(false);
 
       return {
@@ -86,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isGuest: false,
         mustChangePassword: false,
       };
-      setUser(fallbackUser);
+      saveUserSession(fallbackUser);
       setIsAuthModalOpen(false);
       return { success: true };
     }
@@ -105,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const userData: User = { ...data.user, currency: 'INR' };
-      setUser(userData);
+      saveUserSession(userData);
       setIsAuthModalOpen(false);
       return { success: true };
     } catch {
@@ -113,22 +136,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateUser = (updated: Partial<User>) => {
-    setUser((prev) => (prev ? { ...prev, ...updated } : null));
+  const updateUser = (updatedFields: Partial<User>) => {
+    setUser((prev) => {
+      const updated = prev ? { ...prev, ...updatedFields } : null;
+      if (typeof window !== 'undefined' && updated) {
+        try {
+          localStorage.setItem('stocks_app_user', JSON.stringify(updated));
+        } catch {
+          // Ignored
+        }
+      }
+      return updated;
+    });
   };
 
   const loginAsAdmin = () => {
-    setUser(DEFAULT_ADMIN_USER);
+    saveUserSession(DEFAULT_ADMIN_USER);
     setIsAuthModalOpen(false);
   };
 
   const loginAsGuest = () => {
-    setUser(DEFAULT_GUEST_USER);
+    saveUserSession(DEFAULT_GUEST_USER);
     setIsAuthModalOpen(false);
   };
 
   const logout = () => {
-    setUser(null);
+    saveUserSession(null);
+    setIsAuthModalOpen(true);
   };
 
   return (
