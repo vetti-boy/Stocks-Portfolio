@@ -30,4 +30,5 @@ Thumbs.db
 .vercel
 .render
 
-.vercel
+# TypeScript build info
+*.tsbuildinfo

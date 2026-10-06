@@ -151,8 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAsAdmin = () => {
-    saveUserSession(DEFAULT_ADMIN_USER);
-    setIsAuthModalOpen(false);
+    login('mailfortempusage@gmail.com', 'PasswordForAdmin@123!@#');
   };
 
   const loginAsGuest = () => {

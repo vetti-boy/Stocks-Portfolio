@@ -16,7 +16,7 @@ if (!global.fallbackUsersStore) {
       id: 'admin_master',
       name: 'System Administrator',
       email: 'mailfortempusage@gmail.com',
-      passwordHash: '$2a$10$e8wZ3H5X9...demo', // admin123
+      passwordHash: '$2b$10$DpNsqZkqyTzKtl7tCL5lY.CNNt7B0345xZ3AkwvNyfJg5nyClxBu.', // PasswordForAdmin@123!@#
       role: 'ADMIN',
       currency: 'INR',
       createdAt: new Date().toISOString(),

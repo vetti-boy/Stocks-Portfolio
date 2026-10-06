@@ -18,10 +18,10 @@ export async function POST(req: Request) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Default Master Admin account (51manoj2004@gmail.com, mailfortempusage@gmail.com, or admin@stocks.io)
+    // Default Master Admin account (mailfortempusage@gmail.com, 51manoj2004@gmail.com, or admin@stocks.io)
     if (
-      (cleanEmail === '51manoj2004@gmail.com' || cleanEmail === 'mailfortempusage@gmail.com' || cleanEmail === 'admin@stocks.io') &&
-      (password === 'admin123' || password === 'admin')
+      (cleanEmail === 'mailfortempusage@gmail.com' || cleanEmail === '51manoj2004@gmail.com' || cleanEmail === 'admin@stocks.io') &&
+      password === 'PasswordForAdmin@123!@#'
     ) {
       return NextResponse.json({
         user: {

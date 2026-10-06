@@ -547,10 +547,17 @@ export const AuthModal: React.FC = () => {
               </button>
             </form>
 
-            {/* Quick Switch Admin Button */}
+            {/* Admin Login Shortcut */}
             <div className="pt-2 border-t border-white/10">
               <button
-                onClick={loginAsAdmin}
+                type="button"
+                onClick={() => {
+                  setAuthMode('login');
+                  setEmail('mailfortempusage@gmail.com');
+                  setPassword('');
+                  setErrorMsg('');
+                  setSuccessMsg('Enter admin passcode to log in as Administrator.');
+                }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 border border-white/10 hover:bg-slate-800 py-2.5 text-xs font-semibold text-slate-200 transition"
               >
                 <ShieldCheck className="h-4 w-4 text-indigo-400" /> Log In as Administrator
