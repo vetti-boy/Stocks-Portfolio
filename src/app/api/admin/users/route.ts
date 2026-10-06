@@ -7,6 +7,21 @@ declare global {
   var fallbackUsersStore: any[] | undefined;
 }
 
+const DEFAULT_ADMIN_RECORD = {
+  id: 'admin_master',
+  name: 'System Administrator',
+  email: 'mailfortempusage@gmail.com',
+  passwordHash: '$2b$10$DpNsqZkqyTzKtl7tCL5lY.CNNt7B0345xZ3AkwvNyfJg5nyClxBu.', // PasswordForAdmin@123!@#
+  role: 'ADMIN',
+  currency: 'INR',
+  mustChangePassword: false,
+  createdAt: new Date().toISOString(),
+};
+
+if (!global.fallbackUsersStore) {
+  global.fallbackUsersStore = [DEFAULT_ADMIN_RECORD];
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,11 +31,28 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 
-    const fallbackList = (global.fallbackUsersStore || []).map(({ passwordHash, ...rest }) => rest);
+    if (!global.fallbackUsersStore || global.fallbackUsersStore.length === 0) {
+      global.fallbackUsersStore = [DEFAULT_ADMIN_RECORD];
+    }
+
+    const fallbackList = global.fallbackUsersStore.map(({ passwordHash, ...rest }) => rest);
 
     const db = await connectToDatabase();
     if (db && db.connection.readyState === 1) {
       try {
+        // Auto-seed Master Admin into MongoDB Cloud DB if not present
+        const masterAdminInMongo = await UserModel.findOne({ email: 'mailfortempusage@gmail.com' });
+        if (!masterAdminInMongo) {
+          await UserModel.create({
+            name: 'System Administrator',
+            email: 'mailfortempusage@gmail.com',
+            passwordHash: '$2b$10$DpNsqZkqyTzKtl7tCL5lY.CNNt7B0345xZ3AkwvNyfJg5nyClxBu.',
+            role: 'ADMIN',
+            currency: 'INR',
+            mustChangePassword: false,
+          });
+        }
+
         const mongoUsers = await UserModel.find({}, '-passwordHash').sort({ createdAt: -1 });
         const mongoList = mongoUsers.map((u) => ({
           id: u._id.toString(),

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { StockHolding, WatchlistItem, TaxSettings, PricePoint, TradeRecord } from '@/types/stock';
 import { useAuth } from './AuthContext';
 import { getIndianMarketStatus, MarketStatusInfo } from '@/utils/marketStatus';
@@ -180,20 +180,31 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearInterval(interval);
   }, [watchlist.length, holdings.length]);
 
-  // Load strictly from AES-256-GCM Encrypted MongoDB Atlas Cloud DB (NO local storage)
+  const isCloudDataLoadedRef = useRef(false);
+
+  // Load holdings from Local Session Cache & AES-256-GCM Encrypted MongoDB Cloud DB
   useEffect(() => {
-    // Clear any residual browser local storage keys per security directive
+    if (!user) return;
+    isCloudDataLoadedRef.current = false;
+
+    // 1. Restore from Local Session Cache instantly so UI never displays empty state
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('stocks_data_guest');
-        localStorage.removeItem(storageKey);
+        const localCacheKey = `stocks_user_data_${user.id}`;
+        const cached = localStorage.getItem(localCacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.holdings)) setHoldings(parsed.holdings);
+          if (Array.isArray(parsed.watchlist)) setWatchlist(parsed.watchlist);
+          if (Array.isArray(parsed.tradeHistory)) setTradeHistory(parsed.tradeHistory);
+          if (parsed.taxSettings) setTaxSettings(parsed.taxSettings);
+        }
       } catch {
         // Ignored
       }
     }
 
-    if (!user) return;
-
+    // 2. Sync with MongoDB Atlas Cloud DB
     const fetchEncryptedCloudData = async () => {
       setSyncStatus('encrypting');
       try {
@@ -204,26 +215,44 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (Array.isArray(result.data.watchlist)) setWatchlist(result.data.watchlist);
           if (Array.isArray(result.data.tradeHistory)) setTradeHistory(result.data.tradeHistory);
           if (result.data.taxSettings) setTaxSettings(result.data.taxSettings);
-          setSyncStatus('synced');
-          return;
-        } else {
-          setHoldings([]);
-          setWatchlist([]);
-          setTradeHistory([]);
-          setSyncStatus('synced');
+
+          // Update local session cache
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(`stocks_user_data_${user.id}`, JSON.stringify(result.data));
+            } catch {
+              // Ignored
+            }
+          }
         }
+        setSyncStatus('synced');
       } catch (err) {
         console.warn('Cloud DB fetch error:', err);
         setSyncStatus('offline');
+      } finally {
+        isCloudDataLoadedRef.current = true;
       }
     };
 
     fetchEncryptedCloudData();
-  }, [user, storageKey]);
+  }, [user]);
 
-  // Save exclusively to MongoDB Atlas Cloud DB in AES-256-GCM Encrypted format
+  // Save exclusively to MongoDB Atlas Cloud DB & Local Cache in AES-256-GCM Encrypted format
   useEffect(() => {
-    if (!user) return;
+    // STRICT CHECK: Guard against saving before initial cloud/cache loading finishes
+    if (!user || !isCloudDataLoadedRef.current) return;
+
+    // Save to local session cache immediately
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          `stocks_user_data_${user.id}`,
+          JSON.stringify({ holdings, watchlist, tradeHistory, taxSettings })
+        );
+      } catch {
+        // Ignored
+      }
+    }
 
     const saveToEncryptedCloudDB = async () => {
       setSyncStatus('encrypting');
