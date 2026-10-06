@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
 const SENDER_EMAIL = process.env.SMTP_EMAIL || 'mailfortempusage@gmail.com';
-const SENDER_PASS = process.env.SMTP_PASSWORD || '';
+const SENDER_PASS = process.env.SMTP_PASSWORD || 'givd wfuk qibf zckn';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://stocks-portfolio-kappa.vercel.app';
 
 // Transporter setup

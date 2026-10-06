@@ -18,9 +18,9 @@ export async function POST(req: Request) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Default Master Admin account (mailfortempusage@gmail.com, 51manoj2004@gmail.com, or admin@stocks.io)
+    // Default Master Admin account (mailfortempusage@gmail.com or admin@stocks.io)
     if (
-      (cleanEmail === 'mailfortempusage@gmail.com' || cleanEmail === '51manoj2004@gmail.com' || cleanEmail === 'admin@stocks.io') &&
+      (cleanEmail === 'mailfortempusage@gmail.com' || cleanEmail === 'admin@stocks.io') &&
       password === 'PasswordForAdmin@123!@#'
     ) {
       return NextResponse.json({
@@ -29,6 +29,24 @@ export async function POST(req: Request) {
           name: 'System Administrator',
           email: cleanEmail,
           role: 'ADMIN',
+          currency: 'INR',
+          isGuest: false,
+          mustChangePassword: false,
+        },
+      });
+    }
+
+    // Default Manoj S user account
+    if (
+      cleanEmail === '51manoj2004@gmail.com' &&
+      password === 'PasswordForAdmin@123!@#'
+    ) {
+      return NextResponse.json({
+        user: {
+          id: 'user_default',
+          name: 'Manoj S',
+          email: cleanEmail,
+          role: 'USER',
           currency: 'INR',
           isGuest: false,
           mustChangePassword: false,

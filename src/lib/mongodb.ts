@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/stocks-portfolio-db';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/stocks-portfolio?retryWrites=true&w=majority';
 
 interface MongooseCache {
   conn: typeof mongoose | null;
