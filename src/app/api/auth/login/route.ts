@@ -18,49 +18,18 @@ export async function POST(req: Request) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Default Master Admin account (mailfortempusage@gmail.com or admin@stocks.io)
-    if (
-      (cleanEmail === 'mailfortempusage@gmail.com' || cleanEmail === 'admin@stocks.io') &&
-      password === 'PasswordForAdmin@123!@#'
-    ) {
-      return NextResponse.json({
-        user: {
-          id: 'admin_master',
-          name: 'System Administrator',
-          email: cleanEmail,
-          role: 'ADMIN',
-          currency: 'INR',
-          isGuest: false,
-          mustChangePassword: false,
-        },
-      });
-    }
-
-    // Default Manoj S user account
-    if (
-      cleanEmail === '51manoj2004@gmail.com' &&
-      password === 'PasswordForAdmin@123!@#'
-    ) {
-      return NextResponse.json({
-        user: {
-          id: 'user_default',
-          name: 'Manoj S',
-          email: cleanEmail,
-          role: 'USER',
-          currency: 'INR',
-          isGuest: false,
-          mustChangePassword: false,
-        },
-      });
-    }
-
     const db = await connectToDatabase();
 
     if (db && db.connection.readyState === 1) {
       try {
         const users = await UserModel.find({ email: cleanEmail }).sort({ createdAt: -1 });
         for (const user of users) {
-          if (user.isDisabled) continue;
+          if (user.isDisabled) {
+            return NextResponse.json(
+              { error: 'Your account has been disabled by Administrator. Access is blocked.' },
+              { status: 403 }
+            );
+          }
           const isValid = await bcrypt.compare(password, user.passwordHash);
           if (isValid) {
             return NextResponse.json({
@@ -78,16 +47,16 @@ export async function POST(req: Request) {
           }
         }
       } catch (err: any) {
-        console.warn('MongoDB login search failed:', err.message);
+        console.warn('Database login query failed:', err.message);
       }
     }
 
-    // Check fallback user store
+    // Fallback store check if database is temporarily unreachable
     const fallbackUsers = global.fallbackUsersStore?.filter((u) => u.email === cleanEmail) || [];
     for (const fallbackUser of fallbackUsers) {
       if (fallbackUser.isDisabled) continue;
       const isValid = await bcrypt.compare(password, fallbackUser.passwordHash);
-      if (isValid || password === 'admin123' || password === 'defaultpass') {
+      if (isValid) {
         return NextResponse.json({
           user: {
             id: fallbackUser.id,
@@ -112,4 +81,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Internal server error during authentication' }, { status: 500 });
   }
 }
-

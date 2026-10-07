@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "StockPulse",
   description:
-    "Real-time Indian stock portfolio tracker, live market quotes, STCG/LTCG tax breakdown, SEBI charge calculator, and MongoDB Atlas sync.",
+    "Real-time Indian stock portfolio tracker, live market quotes, STCG/LTCG tax breakdown, SEBI charge calculator, and secure data sync.",
   icons: {
     icon: "/icon.svg",
   },

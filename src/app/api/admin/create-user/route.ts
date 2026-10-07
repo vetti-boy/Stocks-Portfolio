@@ -89,7 +89,7 @@ export async function POST(req: Request) {
         sendNewUserWelcomeEmail(cleanEmail, name, cleanPassword).catch((e) => console.warn(e));
 
         return NextResponse.json({
-          message: 'New user account created successfully in MongoDB Atlas. Credentials sent to user email.',
+          message: 'New user account created successfully. Credentials sent to user email.',
           user: {
             id: newUser._id.toString(),
             name: newUser.name,

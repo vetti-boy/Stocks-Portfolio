@@ -185,7 +185,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isCloudDataLoadedRef = useRef(false);
 
-  // Load holdings from Local Session Cache & AES-256-GCM Encrypted MongoDB Cloud DB
+  // Load holdings from Local Session Cache & Server Database
   useEffect(() => {
     isCloudDataLoadedRef.current = false;
     setHoldings([]);
@@ -211,8 +211,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    // 2. Sync with MongoDB Atlas Cloud DB
-    const fetchEncryptedCloudData = async () => {
+    // 2. Sync with Server Database
+    const fetchCloudData = async () => {
       setSyncStatus('encrypting');
       try {
         const res = await fetch(`/api/user/data?userId=${user.id}`);
@@ -232,26 +232,26 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
         } else {
-          // Newly created user or no stored cloud data -> empty portfolio
+          // Newly created user or no stored server data -> empty portfolio
           setHoldings([]);
           setWatchlist([]);
           setTradeHistory([]);
         }
         setSyncStatus('synced');
       } catch (err) {
-        console.warn('Cloud DB fetch error:', err);
+        console.warn('Server data fetch error:', err);
         setSyncStatus('offline');
       } finally {
         isCloudDataLoadedRef.current = true;
       }
     };
 
-    fetchEncryptedCloudData();
+    fetchCloudData();
   }, [user]);
 
-  // Save exclusively to MongoDB Atlas Cloud DB & Local Cache in AES-256-GCM Encrypted format
+  // Save to Server Database & Local Cache
   useEffect(() => {
-    // STRICT CHECK: Guard against saving before initial cloud/cache loading finishes
+    // STRICT CHECK: Guard against saving before initial server data loading finishes
     if (!user || !isCloudDataLoadedRef.current) return;
 
     // Save to local session cache immediately
@@ -266,7 +266,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    const saveToEncryptedCloudDB = async () => {
+    const saveToCloudDB = async () => {
       setSyncStatus('encrypting');
       try {
         await fetch('/api/user/data', {
@@ -287,7 +287,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
-    const timeout = setTimeout(saveToEncryptedCloudDB, 1500);
+    const timeout = setTimeout(saveToCloudDB, 1500);
     return () => clearTimeout(timeout);
   }, [holdings, watchlist, tradeHistory, taxSettings, user]);
 

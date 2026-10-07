@@ -3,7 +3,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { UserDataModel } from '@/models/UserData';
 import { decryptPayload } from '@/lib/encryption';
 
-// SAVE (PLAIN JSON STORED DIRECTLY IN MONGODB CLOUD DB)
+// SAVE (STORE USER PORTFOLIO DATA DIRECTLY IN DATABASE)
 export async function POST(req: Request) {
   try {
     const { userId, userEmail, holdings, watchlist, tradeHistory, taxSettings } = await req.json();
@@ -28,15 +28,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Portfolio holdings saved to Cloud DB successfully.',
+      message: 'Portfolio holdings saved successfully.',
     });
   } catch (err: any) {
-    console.error('Save cloud data error:', err);
-    return NextResponse.json({ error: 'Failed to store data in cloud DB.' }, { status: 500 });
+    console.error('Save user data error:', err);
+    return NextResponse.json({ error: 'Failed to store data on server.' }, { status: 500 });
   }
 }
 
-// FETCH (READ PLAIN JSON FROM CLOUD DB)
+// FETCH (READ USER PORTFOLIO DATA FROM DATABASE)
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -50,10 +50,9 @@ export async function GET(req: Request) {
 
     const record = await UserDataModel.findOne({ userId });
     if (!record || (!record.payload && !record.encryptedPayload)) {
-      return NextResponse.json({ data: null, message: 'No stored cloud data found for user' });
+      return NextResponse.json({ data: null, message: 'No stored data found for user' });
     }
 
-    // Support plain payload or legacy encryptedPayload
     const data = record.payload || decryptPayload(record.encryptedPayload);
 
     return NextResponse.json({
@@ -61,7 +60,7 @@ export async function GET(req: Request) {
       data,
     });
   } catch (err: any) {
-    console.error('Fetch cloud data error:', err);
-    return NextResponse.json({ error: 'Failed to fetch data from cloud DB.' }, { status: 500 });
+    console.error('Fetch user data error:', err);
+    return NextResponse.json({ error: 'Failed to fetch data from server.' }, { status: 500 });
   }
 }

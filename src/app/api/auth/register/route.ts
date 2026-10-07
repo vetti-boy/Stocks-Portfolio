@@ -85,7 +85,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({
           success: true,
-          message: 'Account registered successfully in MongoDB Atlas Cloud DB!',
+          message: 'Account registered successfully!',
           user: {
             id: newUser._id.toString(),
             name: newUser.name,
