@@ -3,6 +3,24 @@ import { TaxSettings, CalculationResult } from '@/types/stock';
 /**
  * Official SEBI Contract Note Calculation Engine for Zerodha & Groww.
  * Calibrated 100.00% to match official Zerodha Kite & Groww Brokerage Calculators.
+ * 
+ * Zerodha Rates (Official Tariff):
+ * - Brokerage: ₹0.00 for Equity Delivery
+ * - STT: 0.1% on Buy & Sell
+ * - Transaction Charges: NSE 0.00307%, BSE 0.00375%
+ * - GST: 18% on (Brokerage + SEBI Charges + Transaction Charges)
+ * - SEBI Charges: ₹10 / crore (0.0001%)
+ * - Stamp Charges: 0.015% (₹1500 / crore) on Buy side
+ * - DP Charges: ₹15.34 per scrip (₹3.5 CDSL fee + ₹9.5 Zerodha fee + ₹2.34 GST) on Sell side
+ * 
+ * Groww Rates (Official Tariff):
+ * - Brokerage: ₹20 or 0.05% max order charge
+ * - STT: 0.1% on Buy & Sell
+ * - Transaction Charges: NSE 0.00297%, BSE 0.00375%
+ * - GST: 18% on (Brokerage + SEBI Charges + Transaction Charges)
+ * - SEBI Charges: ₹10 / crore (0.0001%)
+ * - Stamp Charges: 0.015% on Buy side
+ * - DP Charges: ₹21.54 per scrip (₹18.25 base + ₹3.29 GST) on Sell side
  */
 export function calculateEquityDeliveryBrokerage(params: {
   quantity: number;
@@ -54,9 +72,9 @@ export function calculateEquityDeliveryBrokerage(params: {
 
   // ----------------------------------------------------
   // 3. EXCHANGE TRANSACTION CHARGES
-  // Zerodha NSE: 0.00305% (0.61 for 20k) | Groww NSE: 0.00297% (0.59 for 20k) | BSE: 0.00375%
+  // Zerodha NSE: 0.00307% | Groww NSE: 0.00297% | BSE: 0.00375%
   // ----------------------------------------------------
-  const exchangeTxnRateBuy = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00305;
+  const exchangeTxnRateBuy = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
   const buyExchangeTxn = (buyTurnover * exchangeTxnRateBuy) / 100;
 
   // ----------------------------------------------------
@@ -67,13 +85,13 @@ export function calculateEquityDeliveryBrokerage(params: {
 
   // ----------------------------------------------------
   // 5. GST (Goods & Services Tax @ 18%)
-  // 18% on (Brokerage + Exchange Txn + SEBI Fees)
+  // 18% on (Brokerage + SEBI Charges + Transaction Charges)
   // ----------------------------------------------------
   const buyGst = 0.18 * (buyBrokerage + buyExchangeTxn + buySebi);
 
   // ----------------------------------------------------
   // 6. STAMP DUTY (BUY SIDE ONLY)
-  // 0.015% on Buy Turnover
+  // 0.015% (₹1500 / crore) on Buy Turnover
   // Zerodha rounds up to nearest integer (e.g. ₹1.50 -> ₹2.00)
   // Groww keeps exact float (₹1.50)
   // ----------------------------------------------------
@@ -97,7 +115,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     const sellStt = (sellTurnover * 0.1) / 100;
 
     // SELL SIDE EXCHANGE TXN
-    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00305;
+    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
     const sellExchangeTxn = (sellTurnover * exchangeTxnRateSell) / 100;
 
     // SELL SIDE SEBI
@@ -108,8 +126,8 @@ export function calculateEquityDeliveryBrokerage(params: {
 
     // ----------------------------------------------------
     // 7. DP CHARGES (SELL SIDE ONLY)
-    // Zerodha (CDSL): ₹13.00 + 18% GST = ₹15.34 total
-    // Groww (CDSL): ₹18.25 + 18% GST = ₹21.54 total (₹18.25 base DP fee)
+    // Zerodha: ₹15.34 per scrip (₹3.5 CDSL fee + ₹9.5 Zerodha fee + ₹2.34 GST)
+    // Groww: ₹21.54 per scrip (₹18.25 base fee + ₹3.29 GST)
     // ----------------------------------------------------
     const baseDpCharge = isGroww ? 18.25 : 13.00;
     const dpGst = baseDpCharge * 0.18;
@@ -198,7 +216,7 @@ export function calculateEquityDeliveryBrokerage(params: {
       }
 
       const estSellStt = (estSellTurnover * 0.1) / 100;
-      const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00305;
+      const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
       const estSellExch = (estSellTurnover * exchangeTxnRateSell) / 100;
       const estSellSebi = (estSellTurnover * 0.0001) / 100;
       const estSellGst = 0.18 * (estSellBrokerage + estSellExch + estSellSebi);
@@ -219,7 +237,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     }
 
     const sellStt = (requiredGrossSaleValue * 0.1) / 100;
-    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00305;
+    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
     const sellExchangeTxn = (requiredGrossSaleValue * exchangeTxnRateSell) / 100;
     const sellSebi = (requiredGrossSaleValue * 0.0001) / 100;
     const sellGst = 0.18 * (sellBrokerage + sellExchangeTxn + sellSebi);
