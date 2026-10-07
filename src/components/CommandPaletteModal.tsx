@@ -9,11 +9,8 @@ import {
   Plus,
   Lock,
   Download,
-  Zap,
-  Building2,
   X,
   ArrowRight,
-  TrendingUp,
   Loader2,
 } from 'lucide-react';
 
@@ -33,11 +30,11 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onLockScreen,
 }) => {
   const {
-    taxSettings,
-    updateTaxSettings,
     exportPortfolioJSON,
     addHolding,
     fetchLiveQuotesNow,
+    holdings,
+    setSelectedCalculatorHoldingId,
   } = useStock();
 
   const [query, setQuery] = useState('');
@@ -83,11 +80,20 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Command palette actions
+  // Portfolio holdings matches when typing
+  const portfolioMatches = query.trim()
+    ? holdings.filter(
+        (h) =>
+          h.symbol.toLowerCase().includes(query.toLowerCase()) ||
+          (h.companyName && h.companyName.toLowerCase().includes(query.toLowerCase()))
+      )
+    : [];
+
+  // Streamlined essential shortcuts & actions
   const defaultActions = [
     {
       id: 'nav-portfolio',
-      title: 'Go to Portfolio & Stock Holdings',
+      title: 'Go to Portfolio',
       category: 'Navigation',
       icon: Briefcase,
       action: () => {
@@ -97,7 +103,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     },
     {
       id: 'nav-calculator',
-      title: 'Open Tax P&L Engine & Target Sell Price Calculator',
+      title: 'Open Tax & Target Calculator',
       category: 'Navigation',
       icon: Calculator,
       action: () => {
@@ -116,42 +122,12 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       },
     },
     {
-      id: 'broker-zerodha',
-      title: 'Set Active Broker: Zerodha (₹0 Delivery Brokerage + STT)',
-      category: 'Tax Engine',
-      icon: Zap,
-      active: (taxSettings.brokerPreset || 'ZERODHA') === 'ZERODHA',
+      id: 'action-export',
+      title: 'Export Portfolio Backup',
+      category: 'Data',
+      icon: Download,
       action: () => {
-        updateTaxSettings({
-          brokerPreset: 'ZERODHA',
-          flatBrokerageBuy: 0,
-          flatBrokerageSell: 0,
-          brokeragePercent: 0,
-          sttPercent: 0.1,
-          stampDutyPercent: 0.015,
-          gstPercent: 18,
-          flatDpCharges: 15.93,
-        });
-        onClose();
-      },
-    },
-    {
-      id: 'broker-groww',
-      title: 'Set Active Broker: Groww (0.05% max ₹20 / order)',
-      category: 'Tax Engine',
-      icon: Building2,
-      active: taxSettings.brokerPreset === 'GROWW',
-      action: () => {
-        updateTaxSettings({
-          brokerPreset: 'GROWW',
-          flatBrokerageBuy: 20,
-          flatBrokerageSell: 20,
-          brokeragePercent: 0.05,
-          sttPercent: 0.1,
-          stampDutyPercent: 0.015,
-          gstPercent: 18,
-          flatDpCharges: 23.60,
-        });
+        exportPortfolioJSON();
         onClose();
       },
     },
@@ -165,49 +141,21 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         onClose();
       },
     },
-    {
-      id: 'action-export',
-      title: 'Export Portfolio JSON Backup',
-      category: 'Data',
-      icon: Download,
-      action: () => {
-        exportPortfolioJSON();
-        onClose();
-      },
-    },
   ];
 
-  // Combine live stock results + navigation actions
+  // Filter actions based on search input
   const filteredActions = defaultActions.filter(
     (a) =>
       a.title.toLowerCase().includes(query.toLowerCase()) ||
       a.category.toLowerCase().includes(query.toLowerCase())
   );
 
-  const totalItemsCount = searchResults.length + filteredActions.length;
+  const totalItemsCount = portfolioMatches.length + searchResults.length + filteredActions.length;
 
-  // Keyboard Navigation Handlers
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1 < totalItemsCount ? prev + 1 : 0));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : totalItemsCount - 1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (searchResults.length > 0 && selectedIndex < searchResults.length) {
-        const item = searchResults[selectedIndex];
-        handleSelectStock(item);
-      } else {
-        const actionIdx = selectedIndex - searchResults.length;
-        if (filteredActions[actionIdx]) {
-          filteredActions[actionIdx].action();
-        }
-      }
-    } else if (e.key === 'Escape') {
-      onClose();
-    }
+  const handleSelectPortfolioHolding = (holdingId: string) => {
+    setSelectedCalculatorHoldingId(holdingId);
+    onNavigateTab('calculator');
+    onClose();
   };
 
   const handleSelectStock = (stock: any) => {
@@ -223,6 +171,34 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     });
     onClose();
     setTimeout(() => fetchLiveQuotesNow(), 150);
+  };
+
+  // Keyboard Navigation Handlers
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1 < totalItemsCount ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : totalItemsCount - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (portfolioMatches.length > 0 && selectedIndex < portfolioMatches.length) {
+        handleSelectPortfolioHolding(portfolioMatches[selectedIndex].id);
+      } else {
+        const remainingIdx = selectedIndex - portfolioMatches.length;
+        if (searchResults.length > 0 && remainingIdx < searchResults.length) {
+          handleSelectStock(searchResults[remainingIdx]);
+        } else {
+          const actionIdx = remainingIdx - searchResults.length;
+          if (filteredActions[actionIdx]) {
+            filteredActions[actionIdx].action();
+          }
+        }
+      }
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
@@ -266,19 +242,73 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
 
           {/* Results Area */}
           <div className="max-h-[60vh] overflow-y-auto p-2 divide-y divide-[#202A35]">
+            {/* Owned Portfolio Holding Matches */}
+            {portfolioMatches.length > 0 && (
+              <div className="py-2 space-y-1">
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#22C55E] font-mono">
+                  Your Portfolio Holdings ({portfolioMatches.length})
+                </div>
+                {portfolioMatches.map((holding, idx) => {
+                  const isSelected = selectedIndex === idx;
+                  return (
+                    <button
+                      key={holding.id}
+                      onClick={() => handleSelectPortfolioHolding(holding.id)}
+                      onMouseEnter={() => setSelectedIndex(idx)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition text-left ${
+                        isSelected
+                          ? 'bg-[#111820] border-l-2 border-[#22C55E] text-[#F4F7FA]'
+                          : 'hover:bg-[#111820]/60 text-[#8D99A8]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#080B10] border border-[#202A35] text-[#22C55E] font-mono font-bold text-xs">
+                          {holding.symbol.slice(0, 3)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-[#F4F7FA] font-mono text-sm flex items-center gap-2">
+                            <span>{holding.symbol}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30 font-sans font-semibold">
+                              Owned • {holding.quantity} Qty
+                            </span>
+                          </div>
+                          <div className="text-xs text-[#8D99A8] truncate max-w-[280px]">
+                            {holding.companyName || 'Portfolio Holding'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 font-mono">
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-white">
+                            ₹{holding.currentPrice.toLocaleString('en-IN')}
+                          </div>
+                          <div className="text-[9px] text-[#596574]">CMP</div>
+                        </div>
+                        <span className="text-xs font-semibold text-[#22C55E] flex items-center gap-1">
+                          Open in Calc <ArrowRight className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Live Stock Results */}
             {searchResults.length > 0 && (
               <div className="py-2 space-y-1">
                 <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#38BDF8] font-mono">
-                  Live Stock Matches ({searchResults.length})
+                  Live Stock Search ({searchResults.length})
                 </div>
                 {searchResults.map((stock, idx) => {
-                  const isSelected = selectedIndex === idx;
+                  const globalIdx = portfolioMatches.length + idx;
+                  const isSelected = selectedIndex === globalIdx;
                   return (
                     <button
                       key={stock.symbol}
                       onClick={() => handleSelectStock(stock)}
-                      onMouseEnter={() => setSelectedIndex(idx)}
+                      onMouseEnter={() => setSelectedIndex(globalIdx)}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition text-left ${
                         isSelected
                           ? 'bg-[#111820] border-l-2 border-[#38BDF8] text-[#F4F7FA]'
@@ -311,7 +341,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                             <div className="text-[9px] text-[#596574]">LTP</div>
                           </div>
                         )}
-                        <span className="text-xs font-semibold text-[#38BDF8] flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                        <span className="text-xs font-semibold text-[#38BDF8] flex items-center gap-1">
                           Add <ArrowRight className="h-3.5 w-3.5" />
                         </span>
                       </div>
@@ -321,13 +351,13 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
               </div>
             )}
 
-            {/* Default Quick Actions */}
+            {/* Default Essential Shortcuts */}
             <div className="py-2 space-y-1">
               <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#596574] font-mono">
-                Quick Shortcuts & Actions
+                Quick Shortcuts
               </div>
               {filteredActions.map((action, idx) => {
-                const globalIdx = searchResults.length + idx;
+                const globalIdx = portfolioMatches.length + searchResults.length + idx;
                 const isSelected = selectedIndex === globalIdx;
                 const Icon = action.icon;
 
@@ -349,11 +379,6 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                       <div>
                         <div className="font-semibold text-[#F4F7FA] text-sm flex items-center gap-2">
                           <span>{action.title}</span>
-                          {action.active && (
-                            <span className="text-[10px] font-bold font-mono text-[#22C55E] bg-[#22C55E]/10 px-2 py-0.5 rounded border border-[#22C55E]/20">
-                              Active
-                            </span>
-                          )}
                         </div>
                         <div className="text-xs text-[#8D99A8]">{action.category}</div>
                       </div>
