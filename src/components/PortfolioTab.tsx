@@ -32,6 +32,7 @@ import {
   Eye,
   EyeOff,
   HelpCircle,
+  Calculator,
 } from 'lucide-react';
 import { StockHolding, TradeRecord } from '@/types/stock';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';

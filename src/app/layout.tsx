@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "StockPulse | Stock Portfolio & Net P&L Engine",
+  title: "StockPulse",
   description:
     "Real-time Indian stock portfolio tracker, live market quotes, STCG/LTCG tax breakdown, SEBI charge calculator, and MongoDB Atlas sync.",
   icons: {

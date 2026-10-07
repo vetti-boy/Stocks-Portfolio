@@ -127,7 +127,8 @@ export const CalculatorTab: React.FC = () => {
       setQuantity(selectedHolding.quantity.toString());
       setBuyPrice(selectedHolding.buyPrice.toString());
       setSellPriceInput(selectedHolding.currentPrice.toString());
-      setExchange(selectedHolding.exchange || 'NSE');
+      const safeExchange = selectedHolding.exchange === 'BSE' ? 'BSE' : 'NSE';
+      setExchange(safeExchange);
       setTradeType(selectedHolding.isMTF ? 'MTF' : 'DELIVERY');
       setOwnQtyInput((selectedHolding.ownQuantity ?? selectedHolding.quantity).toString());
 
@@ -137,7 +138,7 @@ export const CalculatorTab: React.FC = () => {
 
       updateTaxSettings({
         brokerPreset: selectedHolding.broker || 'ZERODHA',
-        exchange: selectedHolding.exchange || 'NSE',
+        exchange: safeExchange,
       });
 
       setActiveInput('sellPrice');
