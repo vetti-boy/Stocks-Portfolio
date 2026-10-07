@@ -243,7 +243,7 @@ export const AuthModal: React.FC = () => {
               ? 'Enter the 6-digit OTP code sent to your email to update your password.'
               : user
               ? `Logged in as ${user.name} (${user.role})`
-              : 'Access your encrypted portfolio & live watchlist synced to MongoDB Atlas Cloud.'}
+              : 'Access your stock portfolio & live watchlist synced to MongoDB Atlas Cloud.'}
           </p>
         </div>
 

@@ -3,16 +3,18 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IUserData extends Document {
   userId: string;
   userEmail: string;
-  encryptedPayload: string; // AES-256-GCM encrypted string format "iv:authTag:cipher"
+  payload: any;
+  encryptedPayload?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const UserDataSchema: Schema = new Schema<IUserData>(
   {
-    userId: { type: String, required: true, unique: true },
+    userId: { type: String, required: true },
     userEmail: { type: String, required: true },
-    encryptedPayload: { type: String, required: true },
+    payload: { type: Schema.Types.Mixed },
+    encryptedPayload: { type: String },
   },
   {
     timestamps: true,

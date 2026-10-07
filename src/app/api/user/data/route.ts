@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserDataModel } from '@/models/UserData';
-import { encryptPayload, decryptPayload } from '@/lib/encryption';
+import { decryptPayload } from '@/lib/encryption';
 
-// SAVE (ENCRYPT & WRITE TO CLOUD DB)
+// SAVE (PLAIN JSON STORED DIRECTLY IN MONGODB CLOUD DB)
 export async function POST(req: Request) {
   try {
     const { userId, userEmail, holdings, watchlist, tradeHistory, taxSettings } = await req.json();
@@ -12,13 +12,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
-    // 1. Prepare raw payload JSON object
-    const rawPayload = { holdings, watchlist, tradeHistory, taxSettings, updatedAt: new Date().toISOString() };
+    const payload = { holdings, watchlist, tradeHistory, taxSettings, updatedAt: new Date().toISOString() };
 
-    // 2. ENCRYPT server-side using AES-256-GCM
-    const encryptedString = encryptPayload(rawPayload);
-
-    // 3. STORE in MongoDB Cloud DB in encrypted format
     await connectToDatabase();
 
     await UserDataModel.findOneAndUpdate(
@@ -26,23 +21,22 @@ export async function POST(req: Request) {
       {
         userId,
         userEmail: userEmail || 'user@stocks.io',
-        encryptedPayload: encryptedString,
+        payload,
       },
       { upsert: true, new: true }
     );
 
     return NextResponse.json({
       success: true,
-      message: 'Portfolio holdings encrypted using AES-256-GCM and saved to Cloud DB successfully.',
-      encryptedSnippet: encryptedString.slice(0, 30) + '...',
+      message: 'Portfolio holdings saved to Cloud DB successfully.',
     });
   } catch (err: any) {
-    console.error('Save encrypted data error:', err);
-    return NextResponse.json({ error: 'Failed to encrypt and store data in cloud DB.' }, { status: 500 });
+    console.error('Save cloud data error:', err);
+    return NextResponse.json({ error: 'Failed to store data in cloud DB.' }, { status: 500 });
   }
 }
 
-// FETCH (READ FROM CLOUD DB & DECRYPT IN APPLICATION)
+// FETCH (READ PLAIN JSON FROM CLOUD DB)
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -55,20 +49,19 @@ export async function GET(req: Request) {
     await connectToDatabase();
 
     const record = await UserDataModel.findOne({ userId });
-    if (!record || !record.encryptedPayload) {
+    if (!record || (!record.payload && !record.encryptedPayload)) {
       return NextResponse.json({ data: null, message: 'No stored cloud data found for user' });
     }
 
-    // DECRYPT AES-256-GCM encrypted payload back to application format
-    const decryptedData = decryptPayload(record.encryptedPayload);
+    // Support plain payload or legacy encryptedPayload
+    const data = record.payload || decryptPayload(record.encryptedPayload);
 
     return NextResponse.json({
       success: true,
-      data: decryptedData,
-      isEncryptedSource: true,
+      data,
     });
   } catch (err: any) {
-    console.error('Fetch and decrypt error:', err);
-    return NextResponse.json({ error: 'Failed to fetch and decrypt data from cloud DB.' }, { status: 500 });
+    console.error('Fetch cloud data error:', err);
+    return NextResponse.json({ error: 'Failed to fetch data from cloud DB.' }, { status: 500 });
   }
 }

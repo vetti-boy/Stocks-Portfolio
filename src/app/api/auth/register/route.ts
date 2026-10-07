@@ -49,24 +49,25 @@ export async function POST(req: Request) {
     const db = await connectToDatabase();
 
     if (db && db.connection.readyState === 1) {
-      try {
-        const existingUser = await UserModel.findOne({ email: cleanEmail });
-        if (existingUser) {
-          return NextResponse.json(
-            { error: 'An account with this email already exists. Please log in.' },
-            { status: 409 }
-          );
-        }
+      // 1. Enforce unique email check in MongoDB Atlas
+      const existingUser = await UserModel.findOne({ email: cleanEmail });
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'An account with this email already exists. Please log in.' },
+          { status: 409 }
+        );
+      }
 
+      try {
         const newUser = await UserModel.create({
-          name,
+          name: name.trim(),
           email: cleanEmail,
           passwordHash,
           role: 'USER',
           currency: 'INR',
         });
 
-        // Sync fallback store
+        // Sync to fallback store
         global.fallbackUsersStore?.push({
           id: newUser._id.toString(),
           name: newUser.name,
@@ -77,8 +78,10 @@ export async function POST(req: Request) {
           createdAt: newUser.createdAt,
         });
 
-        // Send registration confirmation email
-        await sendSelfRegistrationConfirmationEmail(cleanEmail, name);
+        // Send registration confirmation email asynchronously
+        sendSelfRegistrationConfirmationEmail(cleanEmail, name).catch((emailErr) => {
+          console.warn('Failed to send registration confirmation email:', emailErr.message);
+        });
 
         return NextResponse.json({
           success: true,
@@ -93,11 +96,21 @@ export async function POST(req: Request) {
           },
         });
       } catch (dbErr: any) {
-        console.warn('MongoDB query failed during registration:', dbErr.message);
+        console.error('MongoDB UserModel.create failed during registration:', dbErr);
+        if (dbErr.code === 11000 || dbErr.message?.includes('duplicate key')) {
+          return NextResponse.json(
+            { error: 'An account with this email already exists. Please log in.' },
+            { status: 409 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'Failed to create user account in database: ' + (dbErr.message || 'Database error') },
+          { status: 500 }
+        );
       }
     }
 
-    // Fallback in-memory handling
+    // Fallback in-memory handling ONLY IF MongoDB connection is down
     const existingFallback = global.fallbackUsersStore?.find((u) => u.email === cleanEmail);
     if (existingFallback) {
       return NextResponse.json(
@@ -108,7 +121,7 @@ export async function POST(req: Request) {
 
     const fallbackUser = {
       id: 'usr_' + Date.now(),
-      name,
+      name: name.trim(),
       email: cleanEmail,
       passwordHash,
       role: 'USER',
@@ -118,8 +131,9 @@ export async function POST(req: Request) {
 
     global.fallbackUsersStore?.push(fallbackUser);
 
-    // Send registration confirmation email
-    await sendSelfRegistrationConfirmationEmail(cleanEmail, name);
+    sendSelfRegistrationConfirmationEmail(cleanEmail, name).catch((emailErr) => {
+      console.warn('Failed to send registration confirmation email:', emailErr.message);
+    });
 
     return NextResponse.json({
       success: true,

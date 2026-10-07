@@ -57,18 +57,15 @@ export async function POST(req: Request) {
 
     const db = await connectToDatabase();
 
-    // Send Welcome Email with credentials to the user's email
-    await sendNewUserWelcomeEmail(cleanEmail, name, cleanPassword);
-
     if (db && db.connection.readyState === 1) {
-      try {
-        const existingUser = await UserModel.findOne({ email: cleanEmail });
-        if (existingUser) {
-          return NextResponse.json({ error: 'User account with this email already exists' }, { status: 409 });
-        }
+      const existingUser = await UserModel.findOne({ email: cleanEmail });
+      if (existingUser) {
+        return NextResponse.json({ error: 'User account with this email already exists' }, { status: 409 });
+      }
 
+      try {
         const newUser = await UserModel.create({
-          name,
+          name: name.trim(),
           email: cleanEmail,
           passwordHash,
           role: role || 'USER',
@@ -89,6 +86,8 @@ export async function POST(req: Request) {
           createdAt: newUser.createdAt,
         });
 
+        sendNewUserWelcomeEmail(cleanEmail, name, cleanPassword).catch((e) => console.warn(e));
+
         return NextResponse.json({
           message: 'New user account created successfully in MongoDB Atlas. Credentials sent to user email.',
           user: {
@@ -102,7 +101,11 @@ export async function POST(req: Request) {
           },
         });
       } catch (dbErr: any) {
-        console.warn('MongoDB query failed, using in-memory store fallback:', dbErr.message);
+        console.error('MongoDB user creation error:', dbErr);
+        if (dbErr.code === 11000 || dbErr.message?.includes('duplicate key')) {
+          return NextResponse.json({ error: 'User account with this email already exists' }, { status: 409 });
+        }
+        return NextResponse.json({ error: dbErr.message || 'Failed to create user account in database' }, { status: 500 });
       }
     }
 
@@ -114,7 +117,7 @@ export async function POST(req: Request) {
 
     const fallbackUser = {
       id: 'usr_' + Date.now(),
-      name,
+      name: name.trim(),
       email: cleanEmail,
       passwordHash,
       role: role || 'USER',
@@ -124,6 +127,8 @@ export async function POST(req: Request) {
     };
 
     global.fallbackUsersStore?.push(fallbackUser);
+
+    sendNewUserWelcomeEmail(cleanEmail, name, cleanPassword).catch((e) => console.warn(e));
 
     return NextResponse.json({
       message: 'New user account created successfully. Credentials sent to user email.',
@@ -142,4 +147,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err?.message || 'Failed to create user account' }, { status: 500 });
   }
 }
-

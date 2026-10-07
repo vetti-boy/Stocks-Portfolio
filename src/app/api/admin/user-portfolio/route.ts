@@ -22,7 +22,7 @@ export async function GET(req: Request) {
     await connectToDatabase();
 
     const record = await UserDataModel.findOne({ userId: targetUserId });
-    if (!record || !record.encryptedPayload) {
+    if (!record || (!record.payload && !record.encryptedPayload)) {
       return NextResponse.json({
         success: true,
         data: null,
@@ -30,18 +30,17 @@ export async function GET(req: Request) {
       });
     }
 
-    // Decrypt AES-256-GCM encrypted user portfolio payload
-    const decryptedData = decryptPayload(record.encryptedPayload);
+    const data = record.payload || decryptPayload(record.encryptedPayload);
 
     return NextResponse.json({
       success: true,
       targetUserId,
       userEmail: record.userEmail,
       updatedAt: record.updatedAt,
-      data: decryptedData,
+      data,
     });
   } catch (err: any) {
     console.error('Admin fetch user portfolio error:', err);
-    return NextResponse.json({ error: 'Failed to retrieve and decrypt user portfolio data.' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to retrieve user portfolio data.' }, { status: 500 });
   }
 }

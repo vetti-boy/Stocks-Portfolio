@@ -58,14 +58,9 @@ export async function POST(req: Request) {
 
     if (db && db.connection.readyState === 1) {
       try {
-        const user = await UserModel.findOne({ email: cleanEmail });
-        if (user) {
-          if (user.isDisabled) {
-            return NextResponse.json(
-              { error: 'Your account has been disabled by Administrator. Access is blocked until re-enabled.' },
-              { status: 403 }
-            );
-          }
+        const users = await UserModel.find({ email: cleanEmail }).sort({ createdAt: -1 });
+        for (const user of users) {
+          if (user.isDisabled) continue;
           const isValid = await bcrypt.compare(password, user.passwordHash);
           if (isValid) {
             return NextResponse.json({
@@ -88,14 +83,9 @@ export async function POST(req: Request) {
     }
 
     // Check fallback user store
-    const fallbackUser = global.fallbackUsersStore?.find((u) => u.email === cleanEmail);
-    if (fallbackUser) {
-      if (fallbackUser.isDisabled) {
-        return NextResponse.json(
-          { error: 'Your account has been disabled by Administrator. Access is blocked until re-enabled.' },
-          { status: 403 }
-        );
-      }
+    const fallbackUsers = global.fallbackUsersStore?.filter((u) => u.email === cleanEmail) || [];
+    for (const fallbackUser of fallbackUsers) {
+      if (fallbackUser.isDisabled) continue;
       const isValid = await bcrypt.compare(password, fallbackUser.passwordHash);
       if (isValid || password === 'admin123' || password === 'defaultpass') {
         return NextResponse.json({

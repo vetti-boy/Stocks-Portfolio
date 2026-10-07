@@ -257,7 +257,7 @@ function DashboardContent() {
         <footer className="border-t border-[#202A35] bg-[#0A0F15] py-4 text-xs text-[#596574] mb-14 md:mb-0">
           <div className="mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="tracking-wide text-center sm:text-left">
-              StockPulse &copy; 2026. Financial Command Center • AES-256 Encrypted Cloud DB.
+              StockPulse &copy; 2026. Financial Command Center • MongoDB Atlas Cloud DB.
             </p>
             <div className="flex items-center gap-2 text-[#8D99A8]">
               <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
