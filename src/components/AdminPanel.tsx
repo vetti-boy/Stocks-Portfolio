@@ -432,7 +432,8 @@ export const AdminPanel: React.FC = () => {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* User Directory Table (Desktop & Tablet) */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left text-xs text-[#8D99A8]">
                 <thead className="bg-[#080B10] uppercase text-[#596574] font-semibold border-b border-[#202A35] font-mono">
                   <tr>
@@ -546,6 +547,73 @@ export const AdminPanel: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* User Directory Mobile Cards (< 640px) */}
+            <div className="block sm:hidden divide-y divide-[#202A35]">
+              {usersList.length === 0 ? (
+                <div className="py-6 text-center text-[#8D99A8] text-xs">
+                  No users provisioned in MongoDB yet.
+                </div>
+              ) : (
+                usersList.map((u, i) => (
+                  <div key={i} className="p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-[#F4F7FA] text-xs flex items-center gap-1.5">
+                          {u.name}
+                          <span className={`rounded px-1.5 py-0.2 text-[9px] font-bold font-mono ${u.role === 'ADMIN' ? 'bg-[#8B5CF6]/20 text-[#8B5CF6]' : 'bg-[#111820] text-[#8D99A8]'}`}>
+                            {u.role}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-[#8D99A8] font-mono">{u.email}</div>
+                      </div>
+                      <div>
+                        {u.isDisabled ? (
+                          <span className="rounded-full bg-[#EF4444]/20 text-[#EF4444] px-2 py-0.5 text-[9px] font-bold">DISABLED</span>
+                        ) : (
+                          <span className="rounded-full bg-[#22C55E]/20 text-[#22C55E] px-2 py-0.5 text-[9px] font-bold">ACTIVE</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <button
+                        onClick={() => handleInspectUserPortfolio(u)}
+                        className="flex items-center gap-1 rounded-lg border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-2.5 py-1 text-[10px] font-semibold text-[#38BDF8] font-mono"
+                      >
+                        <Eye className="h-3 w-3" /> Inspect
+                      </button>
+                      <button
+                        onClick={() => {
+                          setResetTargetUser(u);
+                          setResetPasswordValue('');
+                          setResetStatusMsg(null);
+                        }}
+                        className="flex items-center gap-1 rounded-lg border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 px-2.5 py-1 text-[10px] font-semibold text-[#8B5CF6] font-mono"
+                      >
+                        <KeyRound className="h-3 w-3" /> Reset
+                      </button>
+                      {u.id !== 'admin_master' && (
+                        <>
+                          <button
+                            onClick={() => handleToggleDisableUser(u)}
+                            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[10px] font-semibold font-mono ${u.isDisabled ? 'border-[#22C55E]/30 bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#F59E0B]/30 bg-[#F59E0B]/10 text-[#F59E0B]'}`}
+                          >
+                            {u.isDisabled ? 'Enable' : 'Disable'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(u)}
+                            className="p-1 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 text-[#EF4444]"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

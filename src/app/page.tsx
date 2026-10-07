@@ -232,16 +232,16 @@ function DashboardContent() {
         </div>
 
         {/* Main Workspace Area */}
-        <main className="flex-1 mx-auto w-full max-w-[1920px] px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+        <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-4 sm:px-6 lg:px-8 space-y-6 pb-24 md:pb-6">
           {activeTab === 'portfolio' && <PortfolioTab />}
           {activeTab === 'calculator' && <CalculatorTab />}
           {activeTab === 'admin' && <AdminPanel />}
         </main>
 
         {/* Footer Bar */}
-        <footer className="border-t border-[#202A35] bg-[#0A0F15] py-4 text-xs text-[#596574]">
+        <footer className="border-t border-[#202A35] bg-[#0A0F15] py-4 text-xs text-[#596574] mb-14 md:mb-0">
           <div className="mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="tracking-wide">
+            <p className="tracking-wide text-center sm:text-left">
               StockPulse PRO &copy; 2026. Financial Command Center • AES-256 Encrypted Cloud DB.
             </p>
             <div className="flex items-center gap-2 text-[#8D99A8]">
@@ -250,6 +250,47 @@ function DashboardContent() {
             </div>
           </div>
         </footer>
+
+        {/* Fixed Mobile Bottom Navigation Bar (iOS & Android Smartphone Native Experience) */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0A0F15]/95 backdrop-blur-lg border-t border-[#202A35] px-4 py-2 flex items-center justify-around shadow-2xl">
+          <button
+            onClick={() => changeTab('portfolio')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+              activeTab === 'portfolio' ? 'text-[#38BDF8]' : 'text-[#8D99A8] hover:text-white'
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition ${activeTab === 'portfolio' ? 'bg-[#38BDF8]/15 border border-[#38BDF8]/30' : ''}`}>
+              <Briefcase className="h-5 w-5" />
+            </div>
+            <span>Portfolio</span>
+          </button>
+
+          <button
+            onClick={() => changeTab('calculator')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+              activeTab === 'calculator' ? 'text-[#22C55E]' : 'text-[#8D99A8] hover:text-white'
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition ${activeTab === 'calculator' ? 'bg-[#22C55E]/15 border border-[#22C55E]/30' : ''}`}>
+              <Calculator className="h-5 w-5" />
+            </div>
+            <span>Tax Engine</span>
+          </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => changeTab('admin')}
+              className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+                activeTab === 'admin' ? 'text-[#8B5CF6]' : 'text-[#8D99A8] hover:text-white'
+              }`}
+            >
+              <div className={`p-1.5 rounded-xl transition ${activeTab === 'admin' ? 'bg-[#8B5CF6]/15 border border-[#8B5CF6]/30' : ''}`}>
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <span>Admin</span>
+            </button>
+          )}
+        </nav>
       </div>
 
       {/* Auth Modal Overlay */}

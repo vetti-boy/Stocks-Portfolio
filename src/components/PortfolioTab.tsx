@@ -501,10 +501,11 @@ export const PortfolioTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Holdings Table */}
+      {/* Holdings Table & Mobile Cards */}
       <div className="glass-shell">
         <div className="glass-core overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop & Tablet Table View */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-300">
               <thead className="bg-[#05070d] text-[11px] uppercase tracking-wider text-slate-400 font-semibold border-b border-white/10">
                 <tr>
@@ -656,6 +657,91 @@ export const PortfolioTab: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card List View (< 640px screens) */}
+          <div className="block sm:hidden divide-y divide-white/5 font-sans">
+            {holdings.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                No holdings in portfolio. Click <strong className="text-white">Add Stock Purchase</strong> to record your first trade!
+              </div>
+            ) : (
+              holdings.map((holding) => {
+                const invested = holding.buyPrice * holding.quantity;
+                const currentVal = holding.currentPrice * holding.quantity;
+                const pnl = currentVal - invested;
+                const pnlPercent = invested > 0 ? (pnl / invested) * 100 : 0;
+                const isProfit = pnl >= 0;
+
+                return (
+                  <div key={holding.id} className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/20 font-bold text-indigo-400 text-xs font-mono">
+                          {holding.symbol.slice(0, 3)}
+                        </div>
+                        <div>
+                          <div className="font-bold text-white font-mono text-sm flex items-center gap-2">
+                            {holding.symbol}
+                            <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-slate-300 border border-white/10 font-sans">
+                              {holding.exchange}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 truncate max-w-[140px]">
+                            {holding.companyName}
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold font-mono ${isProfit ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
+                        {isProfit ? '+' : ''}{pnlPercent.toFixed(2)}%
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-[#05070d]/60 p-2.5 rounded-xl border border-white/5">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase">Qty & Buy Price</span>
+                        <span className="text-slate-200 font-semibold">{holding.quantity} @ ₹{holding.buyPrice.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block uppercase">Live Price</span>
+                        <span className="text-white font-bold">₹{holding.currentPrice.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase">Total Invested</span>
+                        <span className="text-slate-300">₹{invested.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block uppercase">Unrealized P&L</span>
+                        <span className={`font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isProfit ? '+' : '-'}₹{Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        onClick={() => handleOpenSellModal(holding)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition"
+                      >
+                        <IndianRupee className="h-3.5 w-3.5" /> Sell
+                      </button>
+                      <button
+                        onClick={() => handleOpenEditModal(holding)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-white/5 border border-white/10 hover:bg-white/10 transition"
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </button>
+                      <button
+                        onClick={() => deleteHolding(holding.id)}
+                        className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 
@@ -689,8 +775,8 @@ export const PortfolioTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Trade Ledger Table */}
-        <div className="overflow-x-auto">
+        {/* Trade Ledger Table (Desktop & Tablet) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-950/80 text-xs uppercase text-slate-400 font-semibold border-b border-white/10">
               <tr>
@@ -773,6 +859,58 @@ export const PortfolioTab: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Trade Ledger Mobile Cards (< 640px) */}
+        <div className="block sm:hidden divide-y divide-white/5 font-sans">
+          {tradeHistory.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              No recorded trades yet. Log a stock sale to track realized profits!
+            </div>
+          ) : (
+            tradeHistory.map((trade) => {
+              const isGain = (trade.realizedPnL || 0) >= 0;
+              return (
+                <div key={trade.id} className="p-3.5 space-y-2 font-mono text-xs">
+                  <div className="flex items-center justify-between font-sans">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white font-mono text-sm">{trade.symbol}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${trade.type === 'SELL' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-indigo-500/20 text-indigo-300'}`}>
+                        {trade.type}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400">{trade.date}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-[#05070d]/60 p-2 rounded-lg text-xs border border-white/5">
+                    <div>
+                      <span className="text-[9px] text-slate-400 block uppercase font-sans">Sell Qty & Price</span>
+                      <span className="text-slate-200">{trade.quantity} @ ₹{trade.price.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] text-slate-400 block uppercase font-sans">Total Value</span>
+                      <span className="text-white font-bold">₹{trade.totalValue.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-400 text-[10px] font-sans">Realized P&L:</span>
+                      <span className={`font-bold ${isGain ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {isGain ? '+' : '-'}₹{Math.abs(trade.realizedPnL || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => deleteTradeRecord(trade.id)}
+                      className="p-1 text-slate-400 hover:text-rose-400 transition"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
