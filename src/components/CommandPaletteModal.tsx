@@ -392,7 +392,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                 Close
               </span>
             </div>
-            <div className="text-[#38BDF8] font-bold font-mono">StockPulse PRO Command Engine</div>
+            <div className="text-[#38BDF8] font-bold font-mono">StockPulse Command Engine</div>
           </div>
         </div>
       </div>

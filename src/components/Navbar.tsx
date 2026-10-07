@@ -66,11 +66,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
               </div>
             </div>
             <div>
-              <h1 className="text-sm font-extrabold tracking-tight text-white flex items-center gap-2">
-                <span>STOCKPULSE</span>
-                <span className="rounded bg-[#38BDF8]/10 px-1.5 py-0.5 text-[9px] font-bold text-[#38BDF8] border border-[#38BDF8]/20 tracking-wider">
-                  PRO
-                </span>
+              <h1 className="text-sm font-extrabold tracking-tight text-white">
+                STOCKPULSE
               </h1>
               <div className="flex items-center gap-2 text-[10px] text-[#8D99A8]">
                 <span

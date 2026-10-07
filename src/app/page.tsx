@@ -94,33 +94,41 @@ function DashboardContent() {
           isSidebarCollapsed ? 'w-16' : 'w-64'
         }`}
       >
-        <div className="space-y-6 p-4">
+        <div className="space-y-6 p-3">
           {/* Brand Header */}
-          <div className="flex items-center justify-between">
-            {!isSidebarCollapsed && (
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center font-extrabold text-black text-xs shadow-md">
-                  SP
-                </div>
-                <div>
-                  <h1 className="text-sm font-extrabold tracking-tight text-white flex items-center gap-1.5">
-                    STOCKPULSE <span className="text-[10px] font-bold text-[#38BDF8] bg-[#38BDF8]/10 px-1.5 py-0.5 rounded border border-[#38BDF8]/20">PRO</span>
+          <div className="flex items-center justify-between min-h-[40px]">
+            {!isSidebarCollapsed ? (
+              <>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center font-extrabold text-black text-xs shadow-md shrink-0">
+                    SP
+                  </div>
+                  <h1 className="text-sm font-extrabold tracking-tight text-white">
+                    STOCKPULSE
                   </h1>
                 </div>
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="text-[#8D99A8] hover:text-white p-1.5 rounded-lg hover:bg-[#151D26] transition shrink-0"
+                  title="Collapse sidebar"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <div className="w-full flex flex-col items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center font-extrabold text-black text-xs shadow-md shrink-0">
+                  SP
+                </div>
+                <button
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  className="text-[#8D99A8] hover:text-white p-1 rounded-lg bg-[#111820] border border-[#202A35] hover:bg-[#151D26] transition shadow-sm mt-1"
+                  title="Expand sidebar"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5 rotate-180 text-[#38BDF8]" />
+                </button>
               </div>
             )}
-            {isSidebarCollapsed && (
-              <div className="mx-auto h-8 w-8 rounded-lg bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center font-extrabold text-black text-xs">
-                SP
-              </div>
-            )}
-            <button
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="text-[#8D99A8] hover:text-white p-1 rounded hover:bg-[#151D26] transition"
-              title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              <ChevronLeft className={`h-4 w-4 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} />
-            </button>
           </div>
 
           {/* Navigation Menu */}
@@ -131,10 +139,13 @@ function DashboardContent() {
                   FINANCIAL WORKSPACE
                 </div>
               )}
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <button
                   onClick={() => changeTab('portfolio')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                  title="Portfolio & Holdings"
+                  className={`w-full flex items-center ${
+                    isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+                  } rounded-xl text-xs font-semibold transition ${
                     activeTab === 'portfolio'
                       ? 'bg-[#111820] text-[#38BDF8] border border-[#38BDF8]/40 shadow-sm'
                       : 'text-[#8D99A8] hover:text-white hover:bg-[#151D26]'
@@ -146,7 +157,10 @@ function DashboardContent() {
 
                 <button
                   onClick={() => changeTab('calculator')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                  title="Tax P&L Engine"
+                  className={`w-full flex items-center ${
+                    isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+                  } rounded-xl text-xs font-semibold transition ${
                     activeTab === 'calculator'
                       ? 'bg-[#111820] text-[#38BDF8] border border-[#38BDF8]/40 shadow-sm'
                       : 'text-[#8D99A8] hover:text-white hover:bg-[#151D26]'
@@ -159,7 +173,10 @@ function DashboardContent() {
                 {isAdmin && (
                   <button
                     onClick={() => changeTab('admin')}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                    title="Enterprise Console"
+                    className={`w-full flex items-center ${
+                      isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+                    } rounded-xl text-xs font-semibold transition ${
                       activeTab === 'admin'
                         ? 'bg-[#111820] text-[#8B5CF6] border border-[#8B5CF6]/40 shadow-sm'
                         : 'text-[#8D99A8] hover:text-white hover:bg-[#151D26]'
@@ -238,7 +255,7 @@ function DashboardContent() {
         <footer className="border-t border-[#202A35] bg-[#0A0F15] py-4 text-xs text-[#596574] mb-14 md:mb-0">
           <div className="mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="tracking-wide text-center sm:text-left">
-              StockPulse PRO &copy; 2026. Financial Command Center • AES-256 Encrypted Cloud DB.
+              StockPulse &copy; 2026. Financial Command Center • AES-256 Encrypted Cloud DB.
             </p>
             <div className="flex items-center gap-2 text-[#8D99A8]">
               <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
