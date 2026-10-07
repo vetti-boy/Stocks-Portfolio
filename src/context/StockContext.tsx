@@ -185,6 +185,54 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isCloudDataLoadedRef = useRef(false);
 
+  // Helper to immediately persist data locally & to server database
+  const saveDataImmediately = async (
+    currentHoldings = holdings,
+    currentWatchlist = watchlist,
+    currentHistory = tradeHistory,
+    currentTax = taxSettings
+  ) => {
+    if (!user) return;
+
+    // 1. Instant Local Cache Save (synchronous)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          `stocks_user_data_${user.id}`,
+          JSON.stringify({
+            holdings: currentHoldings,
+            watchlist: currentWatchlist,
+            tradeHistory: currentHistory,
+            taxSettings: currentTax,
+          })
+        );
+      } catch {
+        // Ignored
+      }
+    }
+
+    // 2. Instant Server Database Save
+    try {
+      setSyncStatus('encrypting');
+      await fetch('/api/user/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          userEmail: user.email,
+          holdings: currentHoldings,
+          watchlist: currentWatchlist,
+          tradeHistory: currentHistory,
+          taxSettings: currentTax,
+        }),
+      });
+      setSyncStatus('synced');
+    } catch (err) {
+      console.warn('Server database save error:', err);
+      setSyncStatus('offline');
+    }
+  };
+
   // Load holdings from Local Session Cache & Server Database
   useEffect(() => {
     isCloudDataLoadedRef.current = false;
@@ -195,16 +243,17 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!user) return;
 
     // 1. Restore from Local Session Cache instantly so UI never displays empty state
+    let cachedData: any = null;
     if (typeof window !== 'undefined') {
       try {
         const localCacheKey = `stocks_user_data_${user.id}`;
         const cached = localStorage.getItem(localCacheKey);
         if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed.holdings)) setHoldings(parsed.holdings);
-          if (Array.isArray(parsed.watchlist)) setWatchlist(parsed.watchlist);
-          if (Array.isArray(parsed.tradeHistory)) setTradeHistory(parsed.tradeHistory);
-          if (parsed.taxSettings) setTaxSettings(parsed.taxSettings);
+          cachedData = JSON.parse(cached);
+          if (Array.isArray(cachedData.holdings)) setHoldings(cachedData.holdings);
+          if (Array.isArray(cachedData.watchlist)) setWatchlist(cachedData.watchlist);
+          if (Array.isArray(cachedData.tradeHistory)) setTradeHistory(cachedData.tradeHistory);
+          if (cachedData.taxSettings) setTaxSettings(cachedData.taxSettings);
         }
       } catch {
         // Ignored
@@ -218,9 +267,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const res = await fetch(`/api/user/data?userId=${user.id}`);
         const result = await res.json();
         if (result.success && result.data) {
-          if (Array.isArray(result.data.holdings)) setHoldings(result.data.holdings);
-          if (Array.isArray(result.data.watchlist)) setWatchlist(result.data.watchlist);
-          if (Array.isArray(result.data.tradeHistory)) setTradeHistory(result.data.tradeHistory);
+          const cloudHoldings = Array.isArray(result.data.holdings) ? result.data.holdings : [];
+          const cloudWatchlist = Array.isArray(result.data.watchlist) ? result.data.watchlist : [];
+          const cloudHistory = Array.isArray(result.data.tradeHistory) ? result.data.tradeHistory : [];
+
+          setHoldings(cloudHoldings);
+          setWatchlist(cloudWatchlist);
+          setTradeHistory(cloudHistory);
           if (result.data.taxSettings) setTaxSettings(result.data.taxSettings);
 
           // Update local session cache
@@ -231,11 +284,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               // Ignored
             }
           }
-        } else {
-          // Newly created user or no stored server data -> empty portfolio
-          setHoldings([]);
-          setWatchlist([]);
-          setTradeHistory([]);
+        } else if (cachedData && (cachedData.holdings?.length > 0 || cachedData.watchlist?.length > 0)) {
+          // If server returns no data but local storage has data, push local data to server
+          saveDataImmediately(
+            cachedData.holdings || [],
+            cachedData.watchlist || [],
+            cachedData.tradeHistory || [],
+            cachedData.taxSettings || taxSettings
+          );
         }
         setSyncStatus('synced');
       } catch (err) {
@@ -248,48 +304,6 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     fetchCloudData();
   }, [user]);
-
-  // Save to Server Database & Local Cache
-  useEffect(() => {
-    // STRICT CHECK: Guard against saving before initial server data loading finishes
-    if (!user || !isCloudDataLoadedRef.current) return;
-
-    // Save to local session cache immediately
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(
-          `stocks_user_data_${user.id}`,
-          JSON.stringify({ holdings, watchlist, tradeHistory, taxSettings })
-        );
-      } catch {
-        // Ignored
-      }
-    }
-
-    const saveToCloudDB = async () => {
-      setSyncStatus('encrypting');
-      try {
-        await fetch('/api/user/data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.id,
-            userEmail: user.email,
-            holdings,
-            watchlist,
-            tradeHistory,
-            taxSettings,
-          }),
-        });
-        setSyncStatus('synced');
-      } catch {
-        setSyncStatus('offline');
-      }
-    };
-
-    const timeout = setTimeout(saveToCloudDB, 1500);
-    return () => clearTimeout(timeout);
-  }, [holdings, watchlist, tradeHistory, taxSettings, user]);
 
   const toggleLiveTicker = () => setIsLiveTickerActive((prev) => !prev);
 
@@ -310,39 +324,51 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       dayChangePercent,
     };
 
-    setHoldings((prev) => [newHolding, ...prev]);
+    setHoldings((prev) => {
+      const nextHoldings = [newHolding, ...prev];
+      let nextWatchlist = watchlist;
+      if (!matched) {
+        const newItem: WatchlistItem = {
+          symbol: data.symbol.toUpperCase(),
+          companyName: data.companyName,
+          currentPrice: data.buyPrice,
+          previousClose: data.buyPrice,
+          dayChange: 0,
+          dayChangePercent: 0,
+          high52: +(data.buyPrice * 1.2).toFixed(2),
+          low52: +(data.buyPrice * 0.8).toFixed(2),
+          volume: '1.2L',
+          marketCap: '₹50,000Cr',
+          peRatio: 22.5,
+          category: data.category,
+          history: generateHistory(data.buyPrice),
+        };
+        nextWatchlist = [...watchlist, newItem];
+        setWatchlist(nextWatchlist);
+      }
+      saveDataImmediately(nextHoldings, nextWatchlist, tradeHistory, taxSettings);
+      return nextHoldings;
+    });
 
-    if (!matched) {
-      addToWatchlist({
-        symbol: data.symbol.toUpperCase(),
-        companyName: data.companyName,
-        currentPrice: data.buyPrice,
-        previousClose: data.buyPrice,
-        dayChange: 0,
-        dayChangePercent: 0,
-        high52: +(data.buyPrice * 1.2).toFixed(2),
-        low52: +(data.buyPrice * 0.8).toFixed(2),
-        volume: '1.2L',
-        marketCap: '₹50,000Cr',
-        peRatio: 22.5,
-        category: data.category,
-      });
-    }
-
-    // Trigger immediate live quote fetch to replace initial buyPrice with actual real market price
     setTimeout(() => {
       fetchLiveQuotesNow();
     }, 150);
   };
 
   const deleteHolding = (id: string) => {
-    setHoldings((prev) => prev.filter((h) => h.id !== id));
+    setHoldings((prev) => {
+      const next = prev.filter((h) => h.id !== id);
+      saveDataImmediately(next, watchlist, tradeHistory, taxSettings);
+      return next;
+    });
   };
 
   const updateHolding = (id: string, updated: Partial<StockHolding>) => {
-    setHoldings((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, ...updated } : h))
-    );
+    setHoldings((prev) => {
+      const next = prev.map((h) => (h.id === id ? { ...h, ...updated } : h));
+      saveDataImmediately(next, watchlist, tradeHistory, taxSettings);
+      return next;
+    });
   };
 
   const sellHolding = (id: string, sellPrice: number, sellQty: number, sellDate: string) => {
@@ -371,19 +397,27 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       exchange: targetHolding.exchange,
     };
 
-    setTradeHistory((prev) => [sellRecord, ...prev]);
+    const nextHistory = [sellRecord, ...tradeHistory];
+    setTradeHistory(nextHistory);
 
-    if (qtyToSell >= targetHolding.quantity) {
-      setHoldings((prev) => prev.filter((h) => h.id !== id));
-    } else {
-      setHoldings((prev) =>
-        prev.map((h) => (h.id === id ? { ...h, quantity: h.quantity - qtyToSell } : h))
-      );
-    }
+    setHoldings((prev) => {
+      let nextHoldings: StockHolding[];
+      if (qtyToSell >= targetHolding.quantity) {
+        nextHoldings = prev.filter((h) => h.id !== id);
+      } else {
+        nextHoldings = prev.map((h) => (h.id === id ? { ...h, quantity: h.quantity - qtyToSell } : h));
+      }
+      saveDataImmediately(nextHoldings, watchlist, nextHistory, taxSettings);
+      return nextHoldings;
+    });
   };
 
   const deleteTradeRecord = (id: string) => {
-    setTradeHistory((prev) => prev.filter((t) => t.id !== id));
+    setTradeHistory((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      saveDataImmediately(holdings, watchlist, next, taxSettings);
+      return next;
+    });
   };
 
   const addToWatchlist = (item: Omit<WatchlistItem, 'history'>) => {
@@ -392,15 +426,27 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ...item,
       history: generateHistory(item.currentPrice),
     };
-    setWatchlist((prev) => [...prev, newItem]);
+    setWatchlist((prev) => {
+      const next = [...prev, newItem];
+      saveDataImmediately(holdings, next, tradeHistory, taxSettings);
+      return next;
+    });
   };
 
   const removeFromWatchlist = (symbol: string) => {
-    setWatchlist((prev) => prev.filter((w) => w.symbol !== symbol));
+    setWatchlist((prev) => {
+      const next = prev.filter((w) => w.symbol !== symbol);
+      saveDataImmediately(holdings, next, tradeHistory, taxSettings);
+      return next;
+    });
   };
 
   const updateTaxSettings = (settings: Partial<TaxSettings>) => {
-    setTaxSettings((prev) => ({ ...prev, ...settings }));
+    setTaxSettings((prev) => {
+      const next = { ...prev, ...settings };
+      saveDataImmediately(holdings, watchlist, tradeHistory, next);
+      return next;
+    });
   };
 
   const resetToDemoData = () => {
@@ -408,6 +454,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setWatchlist([]);
     setTradeHistory([]);
     setTaxSettings(DEFAULT_TAX_SETTINGS);
+    saveDataImmediately([], [], [], DEFAULT_TAX_SETTINGS);
   };
 
   const exportPortfolioJSON = () => {

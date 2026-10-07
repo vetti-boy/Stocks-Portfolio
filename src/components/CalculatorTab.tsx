@@ -204,11 +204,6 @@ export const CalculatorTab: React.FC = () => {
           </p>
         </div>
 
-        {/* Live Status Badge */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#080B10] border border-[#38BDF8]/30 text-xs font-mono shrink-0">
-          <Sparkles className="h-4 w-4 text-[#38BDF8] animate-pulse" />
-          <span className="text-[#38BDF8] font-bold">Unified Bidirectional Flow</span>
-        </div>
       </div>
 
       {/* Calculation Data Preset Source Bar (Portfolio Stock vs Custom Trade) */}
