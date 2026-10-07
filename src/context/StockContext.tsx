@@ -25,6 +25,8 @@ interface StockContextType {
   importPortfolioJSON: (jsonString: string) => boolean;
   selectedStockSymbol: string;
   setSelectedStockSymbol: (symbol: string) => void;
+  selectedCalculatorHoldingId: string | null;
+  setSelectedCalculatorHoldingId: (id: string | null) => void;
   syncStatus: 'synced' | 'encrypting' | 'offline';
   fetchLiveQuotesNow: () => Promise<void>;
   isFetchingLiveQuotes: boolean;
@@ -79,6 +81,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [isLiveTickerActive, setIsLiveTickerActive] = useState<boolean>(true);
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<string>('');
+  const [selectedCalculatorHoldingId, setSelectedCalculatorHoldingId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'encrypting' | 'offline'>('synced');
   const [isFetchingLiveQuotes, setIsFetchingLiveQuotes] = useState<boolean>(false);
   const [marketStatus, setMarketStatus] = useState<MarketStatusInfo>(getIndianMarketStatus());
@@ -453,6 +456,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         importPortfolioJSON,
         selectedStockSymbol,
         setSelectedStockSymbol,
+        selectedCalculatorHoldingId,
+        setSelectedCalculatorHoldingId,
         syncStatus,
         fetchLiveQuotesNow,
         isFetchingLiveQuotes,

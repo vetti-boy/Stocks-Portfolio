@@ -246,7 +246,9 @@ function DashboardContent() {
 
         {/* Main Workspace Area */}
         <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-4 sm:px-6 lg:px-8 space-y-6 pb-24 md:pb-6">
-          {activeTab === 'portfolio' && <PortfolioTab />}
+          {activeTab === 'portfolio' && (
+            <PortfolioTab onOpenInCalculator={() => changeTab('calculator')} />
+          )}
           {activeTab === 'calculator' && <CalculatorTab />}
           {activeTab === 'admin' && <AdminPanel />}
         </main>

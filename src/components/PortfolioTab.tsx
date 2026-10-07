@@ -36,7 +36,11 @@ import {
 import { StockHolding, TradeRecord } from '@/types/stock';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 
-export const PortfolioTab: React.FC = () => {
+interface PortfolioTabProps {
+  onOpenInCalculator?: (holdingId: string) => void;
+}
+
+export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }) => {
   const {
     holdings,
     addHolding,
@@ -50,6 +54,7 @@ export const PortfolioTab: React.FC = () => {
     exportPortfolioJSON,
     importPortfolioJSON,
     fetchLiveQuotesNow,
+    setSelectedCalculatorHoldingId,
   } = useStock();
   const currSymbol = '₹';
 
@@ -779,6 +784,16 @@ export const PortfolioTab: React.FC = () => {
                         <td className="px-4 py-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
+                              onClick={() => {
+                                setSelectedCalculatorHoldingId(holding.id);
+                                if (onOpenInCalculator) onOpenInCalculator(holding.id);
+                              }}
+                              title="Open in Tax & Target Calculator"
+                              className="rounded-lg p-1.5 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors border border-cyan-500/30"
+                            >
+                              <Calculator className="h-4 w-4" />
+                            </button>
+                            <button
                               onClick={() => handleOpenSellModal(holding)}
                               title="Log Sell trade & realized profit"
                               className="rounded-lg p-1.5 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors border border-emerald-500/30"
@@ -880,14 +895,23 @@ export const PortfolioTab: React.FC = () => {
 
                     <div className="flex items-center justify-end gap-2 pt-1">
                       <button
+                        onClick={() => {
+                          setSelectedCalculatorHoldingId(holding.id);
+                          if (onOpenInCalculator) onOpenInCalculator(holding.id);
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition"
+                      >
+                        <Calculator className="h-3.5 w-3.5" /> Calc
+                      </button>
+                      <button
                         onClick={() => handleOpenSellModal(holding)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition"
                       >
                         <IndianRupee className="h-3.5 w-3.5" /> Sell
                       </button>
                       <button
                         onClick={() => handleOpenEditModal(holding)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-white/5 border border-white/10 hover:bg-white/10 transition"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-white/5 border border-white/10 hover:bg-white/10 transition"
                       >
                         <Pencil className="h-3.5 w-3.5" /> Edit
                       </button>

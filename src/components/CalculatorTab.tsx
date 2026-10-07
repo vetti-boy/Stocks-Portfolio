@@ -13,6 +13,8 @@ import {
   Zap,
   Building2,
   Sparkles,
+  Briefcase,
+  Pencil,
 } from 'lucide-react';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 
@@ -80,10 +82,30 @@ const CHARGE_DESCRIPTIONS = [
 ];
 
 export const CalculatorTab: React.FC = () => {
-  const { taxSettings, updateTaxSettings } = useStock();
+  const {
+    holdings,
+    taxSettings,
+    updateTaxSettings,
+    selectedCalculatorHoldingId,
+    setSelectedCalculatorHoldingId,
+  } = useStock();
 
   // Active input tracking: 'sellPrice' (editing Sell Price -> computes Net P&L) vs 'targetNetPnL' (editing Target Net P&L -> computes required Sell Price)
   const [activeInput, setActiveInput] = useState<'sellPrice' | 'targetNetPnL'>('sellPrice');
+
+  // Selected portfolio holding ID (if user picked a stock from portfolio)
+  const [selectedHoldingId, setSelectedHoldingId] = useState<string | null>(selectedCalculatorHoldingId);
+
+  // Sync selectedHoldingId with context when changed from outside (e.g. from PortfolioTab click)
+  useEffect(() => {
+    if (selectedCalculatorHoldingId) {
+      setSelectedHoldingId(selectedCalculatorHoldingId);
+    }
+  }, [selectedCalculatorHoldingId]);
+
+  const selectedHolding = useMemo(() => {
+    return holdings.find((h) => h.id === selectedHoldingId) || null;
+  }, [holdings, selectedHoldingId]);
 
   // Trade Type: 'DELIVERY' (Normal Cash Delivery) vs 'MTF' (Margin Trading Facility)
   const [tradeType, setTradeType] = useState<'DELIVERY' | 'MTF'>('DELIVERY');
@@ -98,6 +120,29 @@ export const CalculatorTab: React.FC = () => {
   // MTF Inputs
   const [ownQtyInput, setOwnQtyInput] = useState<string>('25');
   const [mtfDaysInput, setMtfDaysInput] = useState<string>('30');
+
+  // Populate fields automatically when a portfolio holding is selected!
+  useEffect(() => {
+    if (selectedHolding) {
+      setQuantity(selectedHolding.quantity.toString());
+      setBuyPrice(selectedHolding.buyPrice.toString());
+      setSellPriceInput(selectedHolding.currentPrice.toString());
+      setExchange(selectedHolding.exchange || 'NSE');
+      setTradeType(selectedHolding.isMTF ? 'MTF' : 'DELIVERY');
+      setOwnQtyInput((selectedHolding.ownQuantity ?? selectedHolding.quantity).toString());
+
+      const buyTime = selectedHolding.buyDate ? new Date(selectedHolding.buyDate).getTime() : Date.now();
+      const days = Math.max(0, Math.floor((Date.now() - buyTime) / (1000 * 60 * 60 * 24)));
+      setMtfDaysInput(days.toString());
+
+      updateTaxSettings({
+        brokerPreset: selectedHolding.broker || 'ZERODHA',
+        exchange: selectedHolding.exchange || 'NSE',
+      });
+
+      setActiveInput('sellPrice');
+    }
+  }, [selectedHoldingId]);
 
   useEffect(() => {
     if (taxSettings.exchange) {
@@ -154,7 +199,7 @@ export const CalculatorTab: React.FC = () => {
             <span>Zerodha & Groww Equity Delivery & MTF Calculator</span>
           </h2>
           <p className="text-xs text-[#8D99A8] mt-1">
-            Unified interactive calculator — type Sell Price or Net Profit to calculate all statutory fees, taxes, and contract note charges.
+            Unified interactive calculator — calculate for your actual portfolio stocks or custom manual trades.
           </p>
         </div>
 
@@ -163,6 +208,96 @@ export const CalculatorTab: React.FC = () => {
           <Sparkles className="h-4 w-4 text-[#38BDF8] animate-pulse" />
           <span className="text-[#38BDF8] font-bold">Unified Bidirectional Flow</span>
         </div>
+      </div>
+
+      {/* Calculation Data Preset Source Bar (Portfolio Stock vs Custom Trade) */}
+      <div className="bg-[#0D1218] rounded-xl p-5 border border-[#202A35] shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-[#38BDF8]" /> DATA PRESET & CALCULATION SOURCE
+            </h3>
+            <p className="text-xs text-[#8D99A8] mt-1">
+              Select a stock from your portfolio to inspect live holding taxes & profit targets, or choose Custom Manual Trade.
+            </p>
+          </div>
+
+          {/* Source Toggle Pills */}
+          <div className="flex items-center rounded-lg bg-[#080B10] border border-[#202A35] p-1 text-xs font-mono shrink-0">
+            <button
+              onClick={() => {
+                setSelectedHoldingId(null);
+                setSelectedCalculatorHoldingId(null);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md font-bold transition ${
+                !selectedHoldingId ? 'bg-[#38BDF8] text-black shadow' : 'text-[#8D99A8] hover:text-white'
+              }`}
+            >
+              <Pencil className="h-3.5 w-3.5" /> Custom Manual Trade
+            </button>
+            <button
+              onClick={() => {
+                if (holdings.length > 0 && !selectedHoldingId) {
+                  setSelectedHoldingId(holdings[0].id);
+                  setSelectedCalculatorHoldingId(holdings[0].id);
+                }
+              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md font-bold transition ${
+                selectedHoldingId ? 'bg-[#22C55E] text-black shadow' : 'text-[#8D99A8] hover:text-white'
+              }`}
+            >
+              <Briefcase className="h-3.5 w-3.5" /> Portfolio Stock ({holdings.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Stock Selector Dropdown */}
+        {selectedHoldingId ? (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-3 border-t border-[#202A35]">
+            <label className="text-xs font-semibold text-slate-300 font-mono shrink-0">
+              Active Holding:
+            </label>
+            <select
+              value={selectedHoldingId}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setSelectedHoldingId(newId);
+                setSelectedCalculatorHoldingId(newId);
+              }}
+              className="flex-1 bg-[#080B10] text-[#22C55E] border border-[#22C55E]/50 rounded-lg p-2.5 font-mono text-xs font-bold outline-none focus:border-[#22C55E] cursor-pointer"
+            >
+              {holdings.map((h) => (
+                <option key={h.id} value={h.id} className="bg-[#0D1218] text-white font-mono">
+                  {h.symbol} — {h.quantity} Qty @ ₹{h.buyPrice.toLocaleString('en-IN')} (Broker: {h.broker || 'ZERODHA'} • {h.exchange}{h.isMTF ? ' • MTF' : ''})
+                </option>
+              ))}
+            </select>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono px-2.5 py-1.5 rounded bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30 shrink-0">
+                ✓ Auto-Filled from Portfolio
+              </span>
+              <button
+                onClick={() => {
+                  setSelectedHoldingId(null);
+                  setSelectedCalculatorHoldingId(null);
+                }}
+                className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 transition shrink-0"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-[#8D99A8] pt-2 border-t border-[#202A35] flex items-center justify-between font-mono">
+            <span>Using Custom Manual Entry. Edit any field below to analyze custom buy/sell scenarios.</span>
+            {holdings.length > 0 && (
+              <span className="text-[#38BDF8] font-bold">
+                {holdings.length} holding{holdings.length > 1 ? 's' : ''} available in portfolio
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
