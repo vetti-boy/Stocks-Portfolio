@@ -29,6 +29,12 @@ export async function DELETE(req: Request) {
 
     await connectToDatabase();
 
+    // Block deleting any Admin account in MongoDB
+    const existingUser = await UserModel.findById(targetUserId);
+    if (existingUser && (existingUser.role === 'ADMIN' || existingUser.email === 'mailfortempusage@gmail.com')) {
+      return NextResponse.json({ error: 'Administrator accounts cannot be deleted.' }, { status: 400 });
+    }
+
     // 1. Delete user from MongoDB User collection & UserData collection
     try {
       await UserModel.findByIdAndDelete(targetUserId);

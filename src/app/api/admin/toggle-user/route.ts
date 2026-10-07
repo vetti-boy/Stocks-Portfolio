@@ -25,6 +25,12 @@ export async function POST(req: Request) {
 
     await connectToDatabase();
 
+    // Block disabling any Admin account in MongoDB
+    const existingUser = await UserModel.findById(targetUserId);
+    if (existingUser && (existingUser.role === 'ADMIN' || existingUser.email === 'mailfortempusage@gmail.com')) {
+      return NextResponse.json({ error: 'Administrator accounts cannot be disabled.' }, { status: 400 });
+    }
+
     // Try updating MongoDB User model
     try {
       const updatedUser = await UserModel.findByIdAndUpdate(

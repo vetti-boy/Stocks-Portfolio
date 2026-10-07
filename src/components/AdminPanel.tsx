@@ -509,7 +509,7 @@ export const AdminPanel: React.FC = () => {
                               <KeyRound className="h-3 w-3 text-[#8B5CF6]" /> Reset
                             </button>
 
-                            {u.id !== 'admin_master' && (
+                            {u.role !== 'ADMIN' && u.id !== 'admin_master' && u.email !== 'mailfortempusage@gmail.com' && (
                               <>
                                 <button
                                   onClick={() => handleToggleDisableUser(u)}
@@ -594,7 +594,7 @@ export const AdminPanel: React.FC = () => {
                       >
                         <KeyRound className="h-3 w-3" /> Reset
                       </button>
-                      {u.id !== 'admin_master' && (
+                      {u.role !== 'ADMIN' && u.id !== 'admin_master' && u.email !== 'mailfortempusage@gmail.com' && (
                         <>
                           <button
                             onClick={() => handleToggleDisableUser(u)}
