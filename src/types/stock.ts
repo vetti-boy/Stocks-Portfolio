@@ -71,6 +71,7 @@ export interface WatchlistItem {
 
 export interface TaxSettings {
   brokerPreset?: 'ZERODHA' | 'GROWW' | 'ANGELONE' | 'UPSTOX' | 'ICICIDIRECT' | 'CUSTOM';
+  exchange?: 'NSE' | 'BSE';
   holdingPeriodMonths: number;
   stcgRatePercent: number;
   ltcgRatePercent: number;
@@ -81,6 +82,8 @@ export interface TaxSettings {
   stampDutyPercent: number;
   sttPercent: number;
   gstPercent: number;
+  exchangeTxnRatePercent?: number;
+  sebiRatePercent?: number;
   flatDpCharges?: number;
 }
 
@@ -95,6 +98,9 @@ export interface CalculatorInput {
 
 export interface CalculationResult {
   totalInvestment: number;
+  buyTurnover: number;
+  sellTurnover: number;
+  turnover: number;
   grossSaleValue: number;
   grossProfit: number;
   isLongTerm: boolean;
@@ -104,10 +110,15 @@ export interface CalculationResult {
   sellBrokerage: number;
   totalBrokerage: number;
   stampDuty: number;
+  sttBuy: number;
+  sttSell: number;
   sttCharges: number;
+  exchangeTxnCharge: number;
+  sebiCharges: number;
   dpCharges: number;
   gstCharges: number;
   totalFees: number;
+  breakevenPoints: number;
   netPnL: number;
   netRoiPercent: number;
   requiredSellPricePerShare?: number;

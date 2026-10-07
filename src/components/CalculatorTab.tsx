@@ -6,124 +6,48 @@ import {
   Calculator,
   Target,
   IndianRupee,
+  Receipt,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  Zap,
 } from 'lucide-react';
-import { CalculationResult } from '@/types/stock';
+import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 
 export const CalculatorTab: React.FC = () => {
   const { taxSettings, updateTaxSettings } = useStock();
-  const currSymbol = '₹';
 
   // Calculator Mode: 'forward' (Known Sell Price -> Net P&L) or 'reverse' (Target Net P&L -> Required Sell Price)
   const [mode, setMode] = useState<'forward' | 'reverse'>('forward');
 
   // Input states in INR
   const [quantity, setQuantity] = useState<string>('100');
-  const [buyPrice, setBuyPrice] = useState<string>('2500.00');
-  const [sellPrice, setSellPrice] = useState<string>('3100.00');
-  const [targetNetPnL, setTargetNetPnL] = useState<string>('50000.00');
+  const [buyPrice, setBuyPrice] = useState<string>('100.00');
+  const [sellPrice, setSellPrice] = useState<string>('100.00');
+  const [targetNetPnL, setTargetNetPnL] = useState<string>('5000.00');
   const [holdingMonths, setHoldingMonths] = useState<string>('8');
+  const [exchange, setExchange] = useState<'NSE' | 'BSE'>(taxSettings.exchange || 'NSE');
 
-  // Perform Calculations
-  const result: CalculationResult = useMemo(() => {
+  // Perform Itemized Calculations using Statutory Brokerage Engine
+  const result = useMemo(() => {
     const qty = Math.max(0.0001, parseFloat(quantity) || 0);
     const buyP = Math.max(0, parseFloat(buyPrice) || 0);
     const sellP = Math.max(0, parseFloat(sellPrice) || 0);
     const targetPnL = parseFloat(targetNetPnL) || 0;
     const months = parseFloat(holdingMonths) || 0;
 
-    const isLongTerm = months > taxSettings.holdingPeriodMonths;
-    const taxRate = isLongTerm ? taxSettings.ltcgRatePercent : taxSettings.stcgRatePercent;
+    return calculateEquityDeliveryBrokerage({
+      quantity: qty,
+      buyPrice: buyP,
+      sellPrice: sellP,
+      targetNetPnL: targetPnL,
+      holdingMonths: months,
+      taxSettings: { ...taxSettings, exchange },
+      mode,
+    });
+  }, [mode, quantity, buyPrice, sellPrice, targetNetPnL, holdingMonths, taxSettings, exchange]);
 
-    const totalInvestment = qty * buyP;
-    const dpCharges = taxSettings.flatDpCharges !== undefined ? taxSettings.flatDpCharges : 15.93;
-
-    // Fees calculation (Zerodha / Indian Market Brokerage Rules)
-    const buyBrokerage =
-      taxSettings.flatBrokerageBuy + (totalInvestment * taxSettings.brokeragePercent) / 100;
-    const stampDuty = (totalInvestment * taxSettings.stampDutyPercent) / 100;
-
-    if (mode === 'forward') {
-      const grossSaleValue = qty * sellP;
-      const sellBrokerage =
-        taxSettings.flatBrokerageSell + (grossSaleValue * taxSettings.brokeragePercent) / 100;
-      const sttCharges = (grossSaleValue * taxSettings.sttPercent) / 100;
-      const gstCharges = ((buyBrokerage + sellBrokerage + dpCharges) * taxSettings.gstPercent) / 100;
-
-      const totalFees = buyBrokerage + sellBrokerage + dpCharges + stampDuty + sttCharges + gstCharges;
-      const grossProfit = grossSaleValue - totalInvestment - totalFees;
-
-      const taxAmount = grossProfit > 0 ? (grossProfit * taxRate) / 100 : 0;
-      const netPnL = grossProfit - taxAmount;
-      const netRoiPercent = totalInvestment > 0 ? (netPnL / totalInvestment) * 100 : 0;
-
-      return {
-        totalInvestment,
-        grossSaleValue,
-        grossProfit,
-        isLongTerm,
-        applicableTaxRate: taxRate,
-        taxAmount,
-        buyBrokerage,
-        sellBrokerage,
-        totalBrokerage: buyBrokerage + sellBrokerage,
-        stampDuty,
-        sttCharges,
-        dpCharges,
-        gstCharges,
-        totalFees,
-        netPnL,
-        netRoiPercent,
-      };
-    } else {
-      // REVERSE CALCULATOR MODE: Find required sell price per share in ₹
-      const targetGrossProfit =
-        targetPnL > 0 ? targetPnL / (1 - taxRate / 100) : targetPnL;
-
-      const gstMult = 1 + taxSettings.gstPercent / 100;
-      const totalBuySideCost = totalInvestment + buyBrokerage + stampDuty;
-      const sellFixedFees = (taxSettings.flatBrokerageSell + dpCharges) * gstMult;
-
-      const k =
-        (taxSettings.brokeragePercent * gstMult) / 100 + taxSettings.sttPercent / 100;
-
-      const requiredGrossSaleValue =
-        (totalBuySideCost + sellFixedFees + targetGrossProfit) / (1 - k);
-      const requiredSellPricePerShare = requiredGrossSaleValue / qty;
-
-      const sellBrokerage =
-        taxSettings.flatBrokerageSell +
-        (requiredGrossSaleValue * taxSettings.brokeragePercent) / 100;
-      const sttCharges = (requiredGrossSaleValue * taxSettings.sttPercent) / 100;
-      const gstCharges = ((buyBrokerage + sellBrokerage + dpCharges) * taxSettings.gstPercent) / 100;
-
-      const totalFees = buyBrokerage + sellBrokerage + dpCharges + stampDuty + sttCharges + gstCharges;
-      const grossProfit = requiredGrossSaleValue - totalInvestment - totalFees;
-      const taxAmount = grossProfit > 0 ? (grossProfit * taxRate) / 100 : 0;
-      const netPnL = grossProfit - taxAmount;
-      const netRoiPercent = totalInvestment > 0 ? (netPnL / totalInvestment) * 100 : 0;
-
-      return {
-        totalInvestment,
-        grossSaleValue: requiredGrossSaleValue,
-        grossProfit,
-        isLongTerm,
-        applicableTaxRate: taxRate,
-        taxAmount,
-        buyBrokerage,
-        sellBrokerage,
-        totalBrokerage: buyBrokerage + sellBrokerage,
-        stampDuty,
-        sttCharges,
-        dpCharges,
-        gstCharges,
-        totalFees,
-        netPnL,
-        netRoiPercent,
-        requiredSellPricePerShare,
-        requiredGrossSaleValue,
-      };
-    }
-  }, [mode, quantity, buyPrice, sellPrice, targetNetPnL, holdingMonths, taxSettings]);
+  const activeBroker = taxSettings.brokerPreset || 'ZERODHA';
 
   return (
     <div className="space-y-8">
@@ -132,10 +56,10 @@ export const CalculatorTab: React.FC = () => {
         <div>
           <h2 className="text-lg sm:text-xl font-extrabold text-[#F4F7FA] font-mono flex items-center gap-2.5">
             <Calculator className="h-5 w-5 text-[#38BDF8]" />
-            <span>Target Price & P&L Trading Calculator</span>
+            <span>Zerodha & Groww Equity Delivery Brokerage Calculator</span>
           </h2>
           <p className="text-xs text-[#8D99A8] mt-1">
-            Exact net profit calculation after STCG (20%), LTCG (12.5%), STT, GST & Stamp Duty under SEBI Indian tax rules.
+            Exact statutory charges breakdown (STT, Exchange Txn, SEBI, GST, Stamp Duty & DP charges) under Indian SEBI rules.
           </p>
         </div>
 
@@ -169,9 +93,38 @@ export const CalculatorTab: React.FC = () => {
         <div className="lg:col-span-7 space-y-6">
           {/* Trade Parameters Card */}
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-lg">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono border-b border-[#202A35] pb-3">
-              1. TRADE & INVESTMENT PARAMETERS (₹ INR)
-            </h3>
+            <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono">
+                1. TRADE & INVESTMENT PARAMETERS (₹ INR)
+              </h3>
+              {/* Exchange Selector Toggle (NSE vs BSE) */}
+              <div className="flex items-center bg-[#080B10] border border-[#202A35] rounded-lg p-0.5 text-xs font-mono">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExchange('NSE');
+                    updateTaxSettings({ exchange: 'NSE' });
+                  }}
+                  className={`px-3 py-1 rounded font-bold transition ${
+                    exchange === 'NSE' ? 'bg-[#38BDF8] text-black shadow' : 'text-[#8D99A8] hover:text-white'
+                  }`}
+                >
+                  NSE
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExchange('BSE');
+                    updateTaxSettings({ exchange: 'BSE' });
+                  }}
+                  className={`px-3 py-1 rounded font-bold transition ${
+                    exchange === 'BSE' ? 'bg-[#8B5CF6] text-white shadow' : 'text-[#8D99A8] hover:text-white'
+                  }`}
+                >
+                  BSE
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -257,7 +210,7 @@ export const CalculatorTab: React.FC = () => {
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B5CF6] flex items-center gap-2 font-mono">
                 <IndianRupee className="h-4 w-4 text-[#22C55E]" /> 2. BROKER TARIFF PRESETS
               </h3>
-              <span className="text-[10px] text-[#8D99A8] font-mono">SEBI Tariff Rules</span>
+              <span className="text-[10px] text-[#8D99A8] font-mono">SEBI Delivery Rules</span>
             </div>
 
             {/* Broker Buttons Grid */}
@@ -266,8 +219,8 @@ export const CalculatorTab: React.FC = () => {
                 {
                   id: 'ZERODHA',
                   name: 'Zerodha',
-                  subtitle: 'Kite Delivery',
-                  badge: 'DP: ₹15.93',
+                  subtitle: '₹0 Brokerage (Delivery)',
+                  badge: 'DP: ₹15.34',
                   apply: () =>
                     updateTaxSettings({
                       brokerPreset: 'ZERODHA',
@@ -277,14 +230,14 @@ export const CalculatorTab: React.FC = () => {
                       sttPercent: 0.1,
                       stampDutyPercent: 0.015,
                       gstPercent: 18,
-                      flatDpCharges: 15.93,
+                      flatDpCharges: 15.34,
                     }),
                 },
                 {
                   id: 'GROWW',
                   name: 'Groww',
-                  subtitle: 'Equity CNC',
-                  badge: 'DP: ₹23.60',
+                  subtitle: '₹20 or 0.05% Max Order',
+                  badge: 'DP: ₹15.93',
                   apply: () =>
                     updateTaxSettings({
                       brokerPreset: 'GROWW',
@@ -294,19 +247,19 @@ export const CalculatorTab: React.FC = () => {
                       sttPercent: 0.1,
                       stampDutyPercent: 0.015,
                       gstPercent: 18,
-                      flatDpCharges: 23.60,
+                      flatDpCharges: 15.93,
                     }),
                 },
                 {
                   id: 'ANGELONE',
                   name: 'Angel One',
-                  subtitle: 'Angel Speed',
+                  subtitle: '₹0 Brokerage (Delivery)',
                   badge: 'DP: ₹23.60',
                   apply: () =>
                     updateTaxSettings({
                       brokerPreset: 'ANGELONE',
-                      flatBrokerageBuy: 20,
-                      flatBrokerageSell: 20,
+                      flatBrokerageBuy: 0,
+                      flatBrokerageSell: 0,
                       brokeragePercent: 0,
                       sttPercent: 0.1,
                       stampDutyPercent: 0.015,
@@ -317,14 +270,14 @@ export const CalculatorTab: React.FC = () => {
                 {
                   id: 'UPSTOX',
                   name: 'Upstox',
-                  subtitle: 'Pro Delivery',
+                  subtitle: '₹20 or 0.05% Max Order',
                   badge: 'DP: ₹21.83',
                   apply: () =>
                     updateTaxSettings({
                       brokerPreset: 'UPSTOX',
                       flatBrokerageBuy: 20,
                       flatBrokerageSell: 20,
-                      brokeragePercent: 0.1,
+                      brokeragePercent: 0.05,
                       sttPercent: 0.1,
                       stampDutyPercent: 0.015,
                       gstPercent: 18,
@@ -334,7 +287,7 @@ export const CalculatorTab: React.FC = () => {
                 {
                   id: 'ICICIDIRECT',
                   name: 'ICICI Direct',
-                  subtitle: 'Direct Prime',
+                  subtitle: '0.55% Prime Delivery',
                   badge: 'DP: ₹29.50',
                   apply: () =>
                     updateTaxSettings({
@@ -351,7 +304,7 @@ export const CalculatorTab: React.FC = () => {
                 {
                   id: 'CUSTOM',
                   name: 'Custom Tariff',
-                  subtitle: 'Manual Entry',
+                  subtitle: 'Manual Rates',
                   badge: 'User Defined',
                   apply: () => updateTaxSettings({ brokerPreset: 'CUSTOM' }),
                 },
@@ -382,77 +335,12 @@ export const CalculatorTab: React.FC = () => {
                 );
               })}
             </div>
-
-            {/* Editable DP Charge & Brokerage Inputs */}
-            <div className="pt-3 border-t border-[#202A35] grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-[#8D99A8] mb-1 font-mono">
-                  DP Charge on Sell (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={taxSettings.flatDpCharges !== undefined ? taxSettings.flatDpCharges : 15.93}
-                  onChange={(e) =>
-                    updateTaxSettings({
-                      flatDpCharges: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full bg-[#080B10] text-[#38BDF8] font-bold border border-[#202A35] rounded-lg p-2.5 font-mono text-sm outline-none focus:border-[#38BDF8]"
-                />
-                <span className="text-[10px] text-[#596574] mt-1 block">
-                  Depository fee per stock on sell (Zerodha ₹15.93, Groww ₹23.60, Upstox ₹21.83, ICICI ₹29.50)
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#8D99A8] mb-1 font-mono">
-                  Flat Brokerage per Order (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={taxSettings.flatBrokerageSell || 0}
-                  onChange={(e) =>
-                    updateTaxSettings({
-                      flatBrokerageBuy: parseFloat(e.target.value) || 0,
-                      flatBrokerageSell: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  className="w-full bg-[#080B10] text-[#F4F7FA] border border-[#202A35] rounded-lg p-2.5 font-mono text-sm outline-none focus:border-[#38BDF8]"
-                />
-                <span className="text-[10px] text-[#596574] mt-1 block">
-                  Max flat charge per order (e.g. ₹0 Zerodha, ₹20 Groww/Angel One/Upstox)
-                </span>
-              </div>
-            </div>
-
-            {/* Tariff Summary Banner */}
-            <div className="rounded-xl bg-[#080B10] border border-[#202A35] p-4 text-xs space-y-1.5 text-[#8D99A8] font-mono">
-              <div className="flex items-center justify-between text-[#38BDF8] font-bold">
-                <span>Active Broker: {taxSettings.brokerPreset || 'ZERODHA'}</span>
-                <span>DP Charge on Sell: ₹{(taxSettings.flatDpCharges || 15.93).toFixed(2)}</span>
-              </div>
-              <p className="text-[11px] text-[#596574] font-sans">
-                {taxSettings.brokerPreset === 'GROWW'
-                  ? 'Groww: ₹20/order max brokerage + ₹23.60 DP charges on Sell + STT 0.1% + GST 18%.'
-                  : taxSettings.brokerPreset === 'ANGELONE'
-                  ? 'Angel One: ₹20/order brokerage + ₹23.60 DP charges on Sell + STT 0.1% + GST 18%.'
-                  : taxSettings.brokerPreset === 'UPSTOX'
-                  ? 'Upstox: ₹20/order max brokerage + ₹21.83 DP charges on Sell + STT 0.1% + GST 18%.'
-                  : taxSettings.brokerPreset === 'ICICIDIRECT'
-                  ? 'ICICI Direct: 0.55% brokerage + ₹29.50 DP charges on Sell + STT 0.1% + GST 18%.'
-                  : taxSettings.brokerPreset === 'CUSTOM'
-                  ? 'Custom: Manual DP charges & brokerage tariff configuration selected.'
-                  : 'Zerodha (Kite): ₹0 Brokerage on Equity Delivery + STT 0.1% + ₹15.93 DP charges on Sell.'}
-              </p>
-            </div>
           </div>
         </div>
 
         {/* Right Output Results Panel (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Main Hero Target Selling Price Result Card */}
+          {/* Target Selling Price Card in Reverse Mode */}
           {mode === 'reverse' && result.requiredSellPricePerShare && (
             <div className="bg-[#0D1218] rounded-xl p-6 border-2 border-[#22C55E] shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between text-[#22C55E] text-xs font-bold uppercase tracking-wider font-mono">
@@ -473,91 +361,96 @@ export const CalculatorTab: React.FC = () => {
             </div>
           )}
 
-          <div className="bg-[#0D1218] rounded-xl p-6 space-y-6 border border-[#202A35] shadow-lg">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#8D99A8] border-b border-[#202A35] pb-3 flex items-center justify-between font-mono">
-              <span>FINANCIAL BREAKDOWN</span>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                  result.isLongTerm
-                    ? 'bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30'
-                    : 'bg-[#F59E0B]/10 text-[#F59E0B] border border-[#F59E0B]/30'
-                }`}
-              >
-                {result.isLongTerm ? 'LTCG Tax Regime' : 'STCG Tax Regime'}
+          {/* CONTRACT NOTE ITEM-BY-ITEM STATUTORY CHARGES CARD (Matching Zerodha & Groww Screenshots) */}
+          <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#202A35] pb-3 font-mono">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-[#38BDF8]" />
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#F4F7FA]">
+                  Delivery Equity Contract Note
+                </h3>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/30">
+                {activeBroker} ({exchange})
               </span>
-            </h3>
+            </div>
 
-            {/* Metrics List */}
-            <div className="space-y-3.5 text-sm font-mono">
-              <div className="flex justify-between">
-                <span className="text-[#8D99A8]">Total Investment</span>
+            {/* Contract Note Details Table */}
+            <div className="space-y-2.5 text-xs font-mono">
+              {/* Turnover */}
+              <div className="flex justify-between py-1 border-b border-[#202A35]/60">
+                <span className="text-[#8D99A8]">Turnover (Buy + Sell)</span>
                 <span className="font-bold text-[#F4F7FA]">
-                  ₹{result.totalInvestment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{result.turnover.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-[#8D99A8]">Gross Sale Value</span>
+              {/* Brokerage Charges */}
+              <div className="flex justify-between py-1 border-b border-[#202A35]/60">
+                <span className="text-[#8D99A8]">{activeBroker === 'GROWW' ? 'Groww Charges (Brokerage)' : 'Brokerage Charges'}</span>
                 <span className="font-bold text-[#F4F7FA]">
-                  ₹{result.grossSaleValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{result.totalBrokerage.toFixed(2)}
                 </span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-[#8D99A8]">Gross Profit (Pre-tax)</span>
-                <span className="font-bold text-[#F4F7FA]">
-                  ₹{result.grossProfit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
+              {/* Statutory Taxes Subheader */}
+              <div className="text-[11px] font-bold text-[#38BDF8] pt-1 uppercase tracking-wider">
+                Statutory / Non-Brokerage Charges
               </div>
 
-              <div className="h-px bg-[#202A35] my-3" />
-
-              {/* Deductions Breakdown */}
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between text-[#8D99A8]">
-                  <span>Brokerage Charges</span>
-                  <span className="text-[#F4F7FA]">
-                    -₹{result.totalBrokerage.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#8D99A8]">
-                  <span>DP Charges (CDSL)</span>
-                  <span className="text-[#F4F7FA]">
-                    -₹{result.dpCharges.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#8D99A8]">
-                  <span>STT Duty ({taxSettings.sttPercent}%)</span>
-                  <span className="text-[#F4F7FA]">
-                    -₹{result.sttCharges.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#8D99A8]">
-                  <span>Stamp Duty ({taxSettings.stampDutyPercent}%)</span>
-                  <span className="text-[#F4F7FA]">
-                    -₹{result.stampDuty.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-[#8D99A8]">
-                  <span>GST ({taxSettings.gstPercent}%)</span>
-                  <span className="text-[#F4F7FA]">
-                    -₹{result.gstCharges.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="flex justify-between font-semibold text-[#EF4444] pt-1 border-t border-[#202A35] mt-1">
-                  <span>Income Tax ({result.applicableTaxRate}%)</span>
-                  <span>
-                    -₹{result.taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+              {/* STT */}
+              <div className="flex justify-between pl-2 text-[#8D99A8]">
+                <span>Securities Transaction Tax (STT Total)</span>
+                <span className="text-[#F4F7FA]">₹{result.sttCharges.toFixed(2)}</span>
               </div>
 
-              <div className="h-px bg-[#202A35] my-3" />
+              {/* Exchange Txn Charge */}
+              <div className="flex justify-between pl-2 text-[#8D99A8]">
+                <span>Exchange Txn Charge ({exchange})</span>
+                <span className="text-[#F4F7FA]">₹{result.exchangeTxnCharge.toFixed(2)}</span>
+              </div>
 
-              {/* Net Take-Home P&L */}
-              <div className="flex justify-between items-baseline pt-2">
-                <span className="text-sm font-bold text-[#F4F7FA]">Net Take-Home P&L</span>
+              {/* SEBI Charges */}
+              <div className="flex justify-between pl-2 text-[#8D99A8]">
+                <span>SEBI Turnover Charges</span>
+                <span className="text-[#F4F7FA]">₹{result.sebiCharges.toFixed(2)}</span>
+              </div>
+
+              {/* GST */}
+              <div className="flex justify-between pl-2 text-[#8D99A8]">
+                <span>GST (18%)</span>
+                <span className="text-[#F4F7FA]">₹{result.gstCharges.toFixed(2)}</span>
+              </div>
+
+              {/* Stamp Duty */}
+              <div className="flex justify-between pl-2 text-[#8D99A8]">
+                <span>Stamp Duty (Buy Side 0.015%)</span>
+                <span className="text-[#F4F7FA]">₹{result.stampDuty.toFixed(2)}</span>
+              </div>
+
+              {/* DP Charges */}
+              {result.dpCharges > 0 && (
+                <div className="flex justify-between pl-2 text-[#8D99A8]">
+                  <span>DP Charges (CDSL Sell Depository)</span>
+                  <span className="text-[#F4F7FA]">₹{result.dpCharges.toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* Total Tax & Charges Summary */}
+              <div className="flex justify-between py-2 border-t border-b border-[#202A35] font-bold text-sm text-[#F4F7FA]">
+                <span>Total Tax and Charges</span>
+                <span className="text-[#EF4444]">₹{result.totalFees.toFixed(2)}</span>
+              </div>
+
+              {/* Points to Breakeven */}
+              <div className="flex justify-between py-1 text-xs text-[#38BDF8] font-bold">
+                <span>Points to Breakeven</span>
+                <span>₹{result.breakevenPoints.toFixed(2)} / share</span>
+              </div>
+
+              {/* Net P&L */}
+              <div className="flex justify-between items-baseline pt-3">
+                <span className="text-sm font-bold text-[#F4F7FA]">Net P&L</span>
                 <span
                   className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
                     result.netPnL >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'
@@ -570,20 +463,6 @@ export const CalculatorTab: React.FC = () => {
                   })}
                 </span>
               </div>
-
-              <div className="flex justify-between items-center text-xs pt-1">
-                <span className="text-[#8D99A8]">Net ROI Yield</span>
-                <span
-                  className={`font-bold px-3 py-1 rounded text-xs ${
-                    result.netRoiPercent >= 0
-                      ? 'bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30'
-                      : 'bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/30'
-                  }`}
-                >
-                  {result.netRoiPercent >= 0 ? '+' : ''}
-                  {result.netRoiPercent.toFixed(2)}%
-                </span>
-              </div>
             </div>
           </div>
         </div>
@@ -591,4 +470,3 @@ export const CalculatorTab: React.FC = () => {
     </div>
   );
 };
-
