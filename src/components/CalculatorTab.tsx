@@ -7,17 +7,16 @@ import {
   Target,
   IndianRupee,
   Receipt,
-  CheckCircle2,
-  AlertCircle,
-  Building2,
-  Zap,
+  ArrowDownRight,
+  ArrowUpRight,
+  Scale,
 } from 'lucide-react';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 
 export const CalculatorTab: React.FC = () => {
   const { taxSettings, updateTaxSettings } = useStock();
 
-  // Calculator Mode: 'forward' (Known Sell Price -> Net P&L) or 'reverse' (Target Net P&L -> Required Sell Price)
+  // Mode: 'forward' (Known Sell Price -> Net P&L) or 'reverse' (Target Net P&L -> Required Sell Price)
   const [mode, setMode] = useState<'forward' | 'reverse'>('forward');
 
   // Input states in INR
@@ -28,7 +27,10 @@ export const CalculatorTab: React.FC = () => {
   const [holdingMonths, setHoldingMonths] = useState<string>('8');
   const [exchange, setExchange] = useState<'NSE' | 'BSE'>(taxSettings.exchange || 'NSE');
 
-  // Perform Itemized Calculations using Statutory Brokerage Engine
+  // Selected Broker: Only Zerodha or Groww
+  const activeBroker = (taxSettings.brokerPreset === 'GROWW' ? 'GROWW' : 'ZERODHA') as 'ZERODHA' | 'GROWW';
+
+  // Itemized Calculations
   const result = useMemo(() => {
     const qty = Math.max(0.0001, parseFloat(quantity) || 0);
     const buyP = Math.max(0, parseFloat(buyPrice) || 0);
@@ -42,12 +44,10 @@ export const CalculatorTab: React.FC = () => {
       sellPrice: sellP,
       targetNetPnL: targetPnL,
       holdingMonths: months,
-      taxSettings: { ...taxSettings, exchange },
+      taxSettings: { ...taxSettings, brokerPreset: activeBroker, exchange },
       mode,
     });
-  }, [mode, quantity, buyPrice, sellPrice, targetNetPnL, holdingMonths, taxSettings, exchange]);
-
-  const activeBroker = taxSettings.brokerPreset || 'ZERODHA';
+  }, [mode, quantity, buyPrice, sellPrice, targetNetPnL, holdingMonths, taxSettings, activeBroker, exchange]);
 
   return (
     <div className="space-y-8">
@@ -59,7 +59,7 @@ export const CalculatorTab: React.FC = () => {
             <span>Zerodha & Groww Equity Delivery Brokerage Calculator</span>
           </h2>
           <p className="text-xs text-[#8D99A8] mt-1">
-            Exact statutory charges breakdown (STT, Exchange Txn, SEBI, GST, Stamp Duty & DP charges) under Indian SEBI rules.
+            Itemized Buy & Sell side statutory charges (STT, Exchange Txn, SEBI, GST, Stamp Duty & DP charges) under Indian SEBI rules.
           </p>
         </div>
 
@@ -89,8 +89,8 @@ export const CalculatorTab: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Input Settings (7 Cols) */}
-        <div className="lg:col-span-7 space-y-6">
+        {/* Left Input Settings (6 Cols) */}
+        <div className="lg:col-span-6 space-y-6">
           {/* Trade Parameters Card */}
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-lg">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
@@ -204,142 +204,84 @@ export const CalculatorTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Broker Tariff Presets Setup */}
-          <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-lg">
+          {/* Broker Selector: ONLY Zerodha & Groww */}
+          <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#202A35] shadow-lg">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B5CF6] flex items-center gap-2 font-mono">
-                <IndianRupee className="h-4 w-4 text-[#22C55E]" /> 2. BROKER TARIFF PRESETS
+                <IndianRupee className="h-4 w-4 text-[#22C55E]" /> 2. SELECT BROKER PLATFORM
               </h3>
-              <span className="text-[10px] text-[#8D99A8] font-mono">SEBI Delivery Rules</span>
+              <span className="text-[10px] text-[#8D99A8] font-mono">SEBI Equity Delivery</span>
             </div>
 
-            {/* Broker Buttons Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {[
-                {
-                  id: 'ZERODHA',
-                  name: 'Zerodha',
-                  subtitle: '₹0 Brokerage (Delivery)',
-                  badge: 'DP: ₹15.34',
-                  apply: () =>
-                    updateTaxSettings({
-                      brokerPreset: 'ZERODHA',
-                      flatBrokerageBuy: 0,
-                      flatBrokerageSell: 0,
-                      brokeragePercent: 0,
-                      sttPercent: 0.1,
-                      stampDutyPercent: 0.015,
-                      gstPercent: 18,
-                      flatDpCharges: 15.34,
-                    }),
-                },
-                {
-                  id: 'GROWW',
-                  name: 'Groww',
-                  subtitle: '₹20 or 0.05% Max Order',
-                  badge: 'DP: ₹15.93',
-                  apply: () =>
-                    updateTaxSettings({
-                      brokerPreset: 'GROWW',
-                      flatBrokerageBuy: 20,
-                      flatBrokerageSell: 20,
-                      brokeragePercent: 0.05,
-                      sttPercent: 0.1,
-                      stampDutyPercent: 0.015,
-                      gstPercent: 18,
-                      flatDpCharges: 15.93,
-                    }),
-                },
-                {
-                  id: 'ANGELONE',
-                  name: 'Angel One',
-                  subtitle: '₹0 Brokerage (Delivery)',
-                  badge: 'DP: ₹23.60',
-                  apply: () =>
-                    updateTaxSettings({
-                      brokerPreset: 'ANGELONE',
-                      flatBrokerageBuy: 0,
-                      flatBrokerageSell: 0,
-                      brokeragePercent: 0,
-                      sttPercent: 0.1,
-                      stampDutyPercent: 0.015,
-                      gstPercent: 18,
-                      flatDpCharges: 23.60,
-                    }),
-                },
-                {
-                  id: 'UPSTOX',
-                  name: 'Upstox',
-                  subtitle: '₹20 or 0.05% Max Order',
-                  badge: 'DP: ₹21.83',
-                  apply: () =>
-                    updateTaxSettings({
-                      brokerPreset: 'UPSTOX',
-                      flatBrokerageBuy: 20,
-                      flatBrokerageSell: 20,
-                      brokeragePercent: 0.05,
-                      sttPercent: 0.1,
-                      stampDutyPercent: 0.015,
-                      gstPercent: 18,
-                      flatDpCharges: 21.83,
-                    }),
-                },
-                {
-                  id: 'ICICIDIRECT',
-                  name: 'ICICI Direct',
-                  subtitle: '0.55% Prime Delivery',
-                  badge: 'DP: ₹29.50',
-                  apply: () =>
-                    updateTaxSettings({
-                      brokerPreset: 'ICICIDIRECT',
-                      flatBrokerageBuy: 0,
-                      flatBrokerageSell: 0,
-                      brokeragePercent: 0.55,
-                      sttPercent: 0.1,
-                      stampDutyPercent: 0.015,
-                      gstPercent: 18,
-                      flatDpCharges: 29.50,
-                    }),
-                },
-                {
-                  id: 'CUSTOM',
-                  name: 'Custom Tariff',
-                  subtitle: 'Manual Rates',
-                  badge: 'User Defined',
-                  apply: () => updateTaxSettings({ brokerPreset: 'CUSTOM' }),
-                },
-              ].map((b) => {
-                const isActive = (taxSettings.brokerPreset || 'ZERODHA') === b.id;
-                return (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={b.apply}
-                    className={`p-3 rounded-xl border text-left transition flex flex-col justify-between active:scale-95 ${
-                      isActive
-                        ? 'bg-[#111820] border-[#38BDF8] shadow-md ring-1 ring-[#38BDF8]/40'
-                        : 'bg-[#080B10] border-[#202A35] hover:border-[#38BDF8]/40'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-[#F4F7FA] text-xs font-mono">{b.name}</span>
-                        {isActive && <span className="h-2 w-2 rounded-full bg-[#22C55E]" />}
-                      </div>
-                      <span className="text-[10px] text-[#8D99A8] block mt-0.5">{b.subtitle}</span>
-                    </div>
-                    <span className="mt-2 text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-[#080B10] text-[#38BDF8] border border-[#38BDF8]/30 inline-block w-fit">
-                      {b.badge}
-                    </span>
-                  </button>
-                );
-              })}
+            {/* Zerodha & Groww Selector Cards */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Zerodha */}
+              <button
+                type="button"
+                onClick={() =>
+                  updateTaxSettings({
+                    brokerPreset: 'ZERODHA',
+                    flatBrokerageBuy: 0,
+                    flatBrokerageSell: 0,
+                    brokeragePercent: 0,
+                    sttPercent: 0.1,
+                    stampDutyPercent: 0.015,
+                    gstPercent: 18,
+                    flatDpCharges: 15.34,
+                  })
+                }
+                className={`p-4 rounded-xl border text-left transition flex flex-col justify-between active:scale-95 ${
+                  activeBroker === 'ZERODHA'
+                    ? 'bg-[#111820] border-[#38BDF8] shadow-lg ring-2 ring-[#38BDF8]/40'
+                    : 'bg-[#080B10] border-[#202A35] hover:border-[#38BDF8]/40'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-[#F4F7FA] text-sm font-mono">Zerodha</span>
+                    {activeBroker === 'ZERODHA' && <span className="h-2.5 w-2.5 rounded-full bg-[#38BDF8]" />}
+                  </div>
+                  <span className="text-xs text-[#38BDF8] font-bold block mt-1">₹0 Brokerage (Delivery)</span>
+                  <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹15.34 on Sell</span>
+                </div>
+              </button>
+
+              {/* Groww */}
+              <button
+                type="button"
+                onClick={() =>
+                  updateTaxSettings({
+                    brokerPreset: 'GROWW',
+                    flatBrokerageBuy: 20,
+                    flatBrokerageSell: 20,
+                    brokeragePercent: 0.05,
+                    sttPercent: 0.1,
+                    stampDutyPercent: 0.015,
+                    gstPercent: 18,
+                    flatDpCharges: 15.93,
+                  })
+                }
+                className={`p-4 rounded-xl border text-left transition flex flex-col justify-between active:scale-95 ${
+                  activeBroker === 'GROWW'
+                    ? 'bg-[#111820] border-[#22C55E] shadow-lg ring-2 ring-[#22C55E]/40'
+                    : 'bg-[#080B10] border-[#202A35] hover:border-[#22C55E]/40'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-[#F4F7FA] text-sm font-mono">Groww</span>
+                    {activeBroker === 'GROWW' && <span className="h-2.5 w-2.5 rounded-full bg-[#22C55E]" />}
+                  </div>
+                  <span className="text-xs text-[#22C55E] font-bold block mt-1">₹20 or 0.05% Max Order</span>
+                  <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹15.93 on Sell</span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Right Output Results Panel (5 Cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        {/* Right Output Results Panel (6 Cols) */}
+        <div className="lg:col-span-6 space-y-6">
           {/* Target Selling Price Card in Reverse Mode */}
           {mode === 'reverse' && result.requiredSellPricePerShare && (
             <div className="bg-[#0D1218] rounded-xl p-6 border-2 border-[#22C55E] shadow-2xl relative overflow-hidden">
@@ -361,96 +303,120 @@ export const CalculatorTab: React.FC = () => {
             </div>
           )}
 
-          {/* CONTRACT NOTE ITEM-BY-ITEM STATUTORY CHARGES CARD (Matching Zerodha & Groww Screenshots) */}
+          {/* ITEM-BY-ITEM SEPARATE BUY & SELL CHARGES CONTRACT NOTE CARD */}
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-xl">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3 font-mono">
               <div className="flex items-center gap-2">
                 <Receipt className="h-4 w-4 text-[#38BDF8]" />
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#F4F7FA]">
-                  Delivery Equity Contract Note
+                  {activeBroker} Delivery Contract Note
                 </h3>
               </div>
               <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/30">
-                {activeBroker} ({exchange})
+                {exchange} Exchange
               </span>
             </div>
 
-            {/* Contract Note Details Table */}
-            <div className="space-y-2.5 text-xs font-mono">
-              {/* Turnover */}
-              <div className="flex justify-between py-1 border-b border-[#202A35]/60">
-                <span className="text-[#8D99A8]">Turnover (Buy + Sell)</span>
-                <span className="font-bold text-[#F4F7FA]">
-                  ₹{result.turnover.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {/* SEPARATE BUY SIDE vs SELL SIDE CHARGES TABLE */}
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="w-full text-xs font-mono text-left">
+                <thead>
+                  <tr className="border-b border-[#202A35] text-[#8D99A8] uppercase text-[10px]">
+                    <th className="py-2 pr-2">Charge Category</th>
+                    <th className="py-2 px-2 text-right text-[#38BDF8]">Buy Side (₹)</th>
+                    <th className="py-2 px-2 text-right text-[#22C55E]">Sell Side (₹)</th>
+                    <th className="py-2 pl-2 text-right text-white">Total (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#202A35]/60 text-[#F4F7FA]">
+                  {/* Turnover */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">Order Turnover</td>
+                    <td className="py-2 text-right">₹{result.buyTurnover.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{result.sellTurnover.toFixed(2)}</td>
+                    <td className="py-2 text-right font-bold">₹{result.turnover.toFixed(2)}</td>
+                  </tr>
+
+                  {/* Brokerage */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">Brokerage Charge</td>
+                    <td className="py-2 text-right">₹{result.buyBrokerage.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{result.sellBrokerage.toFixed(2)}</td>
+                    <td className="py-2 text-right font-bold">₹{result.totalBrokerage.toFixed(2)}</td>
+                  </tr>
+
+                  {/* STT */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">STT (0.1% Buy / 0.1% Sell)</td>
+                    <td className="py-2 text-right">₹{result.buyStt.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{result.sellStt.toFixed(2)}</td>
+                    <td className="py-2 text-right font-bold">₹{result.totalStt.toFixed(2)}</td>
+                  </tr>
+
+                  {/* Exchange Txn */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">Exchange Txn ({exchange})</td>
+                    <td className="py-2 text-right">₹{result.buyExchangeTxn.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{result.sellExchangeTxn.toFixed(2)}</td>
+                    <td className="py-2 text-right font-bold">₹{result.totalExchangeTxn.toFixed(2)}</td>
+                  </tr>
+
+                  {/* SEBI Charges */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">SEBI Turnover Fee</td>
+                    <td className="py-2 text-right">₹{result.buySebi.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{result.sellSebi.toFixed(2)}</td>
+                    <td className="py-2 text-right font-bold">₹{result.totalSebi.toFixed(2)}</td>
+                  </tr>
+
+                  {/* GST */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">GST (18%)</td>
+                    <td className="py-2 text-right">₹{result.buyGst.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{result.sellGst.toFixed(2)}</td>
+                    <td className="py-2 text-right font-bold">₹{result.totalGst.toFixed(2)}</td>
+                  </tr>
+
+                  {/* Stamp Duty (Buy Only) */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">Stamp Duty (0.015% Buy)</td>
+                    <td className="py-2 text-right">₹{result.buyStampDuty.toFixed(2)}</td>
+                    <td className="py-2 text-right text-[#596574]">-</td>
+                    <td className="py-2 text-right font-bold">₹{result.buyStampDuty.toFixed(2)}</td>
+                  </tr>
+
+                  {/* DP Charges (Sell Only) */}
+                  <tr>
+                    <td className="py-2 text-[#8D99A8]">DP Charge (CDSL Sell)</td>
+                    <td className="py-2 text-right text-[#596574]">-</td>
+                    <td className="py-2 text-right">₹{result.sellDpCharges.toFixed(2)}</td>
+                    <td className="py-2 text-right font-bold">₹{result.sellDpCharges.toFixed(2)}</td>
+                  </tr>
+
+                  {/* Subtotal Row */}
+                  <tr className="border-t-2 border-[#202A35] font-bold">
+                    <td className="py-2 text-[#F4F7FA]">Total Side Charges</td>
+                    <td className="py-2 text-right text-[#38BDF8]">₹{result.totalBuyCharges.toFixed(2)}</td>
+                    <td className="py-2 text-right text-[#22C55E]">₹{result.totalSellCharges.toFixed(2)}</td>
+                    <td className="py-2 text-right text-[#EF4444] text-sm">₹{result.totalFees.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Summary Highlights */}
+            <div className="pt-3 border-t border-[#202A35] space-y-3 font-mono">
+              <div className="flex justify-between items-center bg-[#080B10] p-3 rounded-lg border border-[#202A35]">
+                <span className="text-xs font-semibold text-[#38BDF8] flex items-center gap-1.5">
+                  <Scale className="h-4 w-4" /> Points to Breakeven
+                </span>
+                <span className="text-sm font-bold text-[#F4F7FA]">
+                  ₹{result.breakevenPoints.toFixed(2)} <span className="text-xs font-normal text-[#8D99A8]">/ share</span>
                 </span>
               </div>
 
-              {/* Brokerage Charges */}
-              <div className="flex justify-between py-1 border-b border-[#202A35]/60">
-                <span className="text-[#8D99A8]">{activeBroker === 'GROWW' ? 'Groww Charges (Brokerage)' : 'Brokerage Charges'}</span>
-                <span className="font-bold text-[#F4F7FA]">
-                  ₹{result.totalBrokerage.toFixed(2)}
-                </span>
-              </div>
-
-              {/* Statutory Taxes Subheader */}
-              <div className="text-[11px] font-bold text-[#38BDF8] pt-1 uppercase tracking-wider">
-                Statutory / Non-Brokerage Charges
-              </div>
-
-              {/* STT */}
-              <div className="flex justify-between pl-2 text-[#8D99A8]">
-                <span>Securities Transaction Tax (STT Total)</span>
-                <span className="text-[#F4F7FA]">₹{result.sttCharges.toFixed(2)}</span>
-              </div>
-
-              {/* Exchange Txn Charge */}
-              <div className="flex justify-between pl-2 text-[#8D99A8]">
-                <span>Exchange Txn Charge ({exchange})</span>
-                <span className="text-[#F4F7FA]">₹{result.exchangeTxnCharge.toFixed(2)}</span>
-              </div>
-
-              {/* SEBI Charges */}
-              <div className="flex justify-between pl-2 text-[#8D99A8]">
-                <span>SEBI Turnover Charges</span>
-                <span className="text-[#F4F7FA]">₹{result.sebiCharges.toFixed(2)}</span>
-              </div>
-
-              {/* GST */}
-              <div className="flex justify-between pl-2 text-[#8D99A8]">
-                <span>GST (18%)</span>
-                <span className="text-[#F4F7FA]">₹{result.gstCharges.toFixed(2)}</span>
-              </div>
-
-              {/* Stamp Duty */}
-              <div className="flex justify-between pl-2 text-[#8D99A8]">
-                <span>Stamp Duty (Buy Side 0.015%)</span>
-                <span className="text-[#F4F7FA]">₹{result.stampDuty.toFixed(2)}</span>
-              </div>
-
-              {/* DP Charges */}
-              {result.dpCharges > 0 && (
-                <div className="flex justify-between pl-2 text-[#8D99A8]">
-                  <span>DP Charges (CDSL Sell Depository)</span>
-                  <span className="text-[#F4F7FA]">₹{result.dpCharges.toFixed(2)}</span>
-                </div>
-              )}
-
-              {/* Total Tax & Charges Summary */}
-              <div className="flex justify-between py-2 border-t border-b border-[#202A35] font-bold text-sm text-[#F4F7FA]">
-                <span>Total Tax and Charges</span>
-                <span className="text-[#EF4444]">₹{result.totalFees.toFixed(2)}</span>
-              </div>
-
-              {/* Points to Breakeven */}
-              <div className="flex justify-between py-1 text-xs text-[#38BDF8] font-bold">
-                <span>Points to Breakeven</span>
-                <span>₹{result.breakevenPoints.toFixed(2)} / share</span>
-              </div>
-
-              {/* Net P&L */}
-              <div className="flex justify-between items-baseline pt-3">
-                <span className="text-sm font-bold text-[#F4F7FA]">Net P&L</span>
+              <div className="flex justify-between items-baseline pt-1">
+                <span className="text-sm font-bold text-[#F4F7FA]">Net Take-Home P&L</span>
                 <span
                   className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${
                     result.netPnL >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'

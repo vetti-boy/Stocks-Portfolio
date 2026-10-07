@@ -1,8 +1,8 @@
 import { TaxSettings, CalculationResult } from '@/types/stock';
 
 /**
- * Calculates itemized Indian Equity Delivery Brokerage, Taxes, & Statutory Charges
- * matching Zerodha & Groww contract notes with 100% mathematical precision.
+ * Itemized Indian Equity Delivery Brokerage & Statutory Tax Engine for Zerodha & Groww.
+ * Computes exact Buy Side vs Sell Side statutory charges separately.
  */
 export function calculateEquityDeliveryBrokerage(params: {
   quantity: number;
@@ -31,89 +31,72 @@ export function calculateEquityDeliveryBrokerage(params: {
   const taxRate = isLongTerm ? taxSettings.ltcgRatePercent : taxSettings.stcgRatePercent;
 
   const exchange = taxSettings.exchange || 'NSE';
-  // Exchange transaction charge: NSE 0.00297%, BSE 0.00375%
-  const exchangeTxnRate =
-    taxSettings.exchangeTxnRatePercent !== undefined
-      ? taxSettings.exchangeTxnRatePercent
-      : exchange === 'BSE'
-      ? 0.00375
-      : 0.00297;
-
+  // Exchange transaction charge rate: NSE 0.00297%, BSE 0.00375%
+  const exchangeTxnRate = exchange === 'BSE' ? 0.00375 : 0.00297;
   // SEBI Turnover Fee: 0.0001% (₹10 per crore)
-  const sebiRate =
-    taxSettings.sebiRatePercent !== undefined ? taxSettings.sebiRatePercent : 0.0001;
-
+  const sebiRate = 0.0001;
   // Stamp Duty (Buy side only for delivery): 0.015%
-  const stampDutyRate = taxSettings.stampDutyPercent !== undefined ? taxSettings.stampDutyPercent : 0.015;
-
+  const stampDutyRate = 0.015;
   // STT (Securities Transaction Tax for delivery): 0.1% buy + 0.1% sell
-  const sttRate = taxSettings.sttPercent !== undefined ? taxSettings.sttPercent : 0.1;
+  const sttRate = 0.1;
+  // GST Rate: 18%
+  const gstRate = 0.18;
 
-  // DP Charges (applied on sell transactions): Zerodha ₹15.34 (13+18% GST), Groww ₹15.93 (13.50+18% GST)
-  const dpCharges =
-    taxSettings.flatDpCharges !== undefined
-      ? taxSettings.flatDpCharges
-      : taxSettings.brokerPreset === 'GROWW'
-      ? 15.93
-      : 15.34;
+  // DP Charges (applied on sell transactions only): Zerodha ₹15.34 (13+18% GST), Groww ₹15.93 (13.50+18% GST)
+  const dpChargeRate =
+    taxSettings.brokerPreset === 'GROWW' ? 15.93 : 15.34;
 
   const buyTurnover = qty * buyP;
   const totalInvestment = buyTurnover;
 
-  // 1. Buy Brokerage
+  // 1. BUY SIDE CHARGES
   let buyBrokerage = 0;
-  if (taxSettings.brokerPreset === 'GROWW' || taxSettings.brokerPreset === 'UPSTOX') {
+  if (taxSettings.brokerPreset === 'GROWW') {
     buyBrokerage = Math.min(buyTurnover * 0.0005, 20);
-  } else if (taxSettings.brokerPreset === 'CUSTOM') {
-    buyBrokerage = taxSettings.flatBrokerageBuy + (buyTurnover * taxSettings.brokeragePercent) / 100;
   } else {
-    // Zerodha & Angel One delivery brokerage is ₹0
-    buyBrokerage = taxSettings.flatBrokerageBuy || 0;
+    // Zerodha Equity Delivery Buy Brokerage = ₹0
+    buyBrokerage = 0;
   }
 
-  // 2. Buy Stamp Duty (Buy side only)
-  const stampDuty = (buyTurnover * stampDutyRate) / 100;
-
-  // 3. Buy STT
-  const sttBuy = (buyTurnover * sttRate) / 100;
+  const buyStt = (buyTurnover * sttRate) / 100;
+  const buyExchangeTxn = (buyTurnover * exchangeTxnRate) / 100;
+  const buySebi = (buyTurnover * sebiRate) / 100;
+  const buyGst = (buyBrokerage + buyExchangeTxn + buySebi) * gstRate;
+  const buyStampDuty = (buyTurnover * stampDutyRate) / 100; // Stamp duty is BUY SIDE ONLY
+  const totalBuyCharges = buyBrokerage + buyStt + buyExchangeTxn + buySebi + buyGst + buyStampDuty;
 
   if (mode === 'forward') {
     const sellTurnover = qty * sellP;
     const grossSaleValue = sellTurnover;
     const turnover = buyTurnover + sellTurnover;
 
-    // Sell Brokerage
+    // 2. SELL SIDE CHARGES
     let sellBrokerage = 0;
-    if (taxSettings.brokerPreset === 'GROWW' || taxSettings.brokerPreset === 'UPSTOX') {
+    if (taxSettings.brokerPreset === 'GROWW') {
       sellBrokerage = Math.min(sellTurnover * 0.0005, 20);
-    } else if (taxSettings.brokerPreset === 'CUSTOM') {
-      sellBrokerage = taxSettings.flatBrokerageSell + (sellTurnover * taxSettings.brokeragePercent) / 100;
     } else {
-      sellBrokerage = taxSettings.flatBrokerageSell || 0;
+      // Zerodha Equity Delivery Sell Brokerage = ₹0
+      sellBrokerage = 0;
     }
 
+    const sellStt = (sellTurnover * sttRate) / 100;
+    const sellExchangeTxn = (sellTurnover * exchangeTxnRate) / 100;
+    const sellSebi = (sellTurnover * sebiRate) / 100;
+    const sellGst = (sellBrokerage + sellExchangeTxn + sellSebi) * gstRate;
+    const sellDpCharges = sellTurnover > 0 ? dpChargeRate : 0; // DP charge is SELL SIDE ONLY
+
+    const totalSellCharges = sellBrokerage + sellStt + sellExchangeTxn + sellSebi + sellGst + sellDpCharges;
+
+    // COMBINED TOTALS
     const totalBrokerage = buyBrokerage + sellBrokerage;
-
-    // Sell STT
-    const sttSell = (sellTurnover * sttRate) / 100;
-    const sttCharges = sttBuy + sttSell;
-
-    // Exchange Transaction Charges
-    const exchangeTxnCharge = (turnover * exchangeTxnRate) / 100;
-
-    // SEBI Turnover Fees
-    const sebiCharges = (turnover * sebiRate) / 100;
-
-    // GST (18% on Brokerage + Exchange Txn Charge + SEBI Fees)
-    const gstCharges = ((totalBrokerage + exchangeTxnCharge + sebiCharges) * (taxSettings.gstPercent || 18)) / 100;
-
-    // Total Statutory & Brokerage Fees
-    const totalFees =
-      totalBrokerage + sttCharges + exchangeTxnCharge + sebiCharges + stampDuty + gstCharges + (sellTurnover > 0 ? dpCharges : 0);
+    const totalStt = buyStt + sellStt;
+    const totalExchangeTxn = buyExchangeTxn + sellExchangeTxn;
+    const totalSebi = buySebi + sellSebi;
+    const totalGst = buyGst + sellGst;
+    const totalFees = totalBuyCharges + totalSellCharges;
 
     const breakevenPoints = qty > 0 ? totalFees / qty : 0;
     const grossProfit = sellTurnover - buyTurnover;
-
     const taxAmount = grossProfit > 0 ? (grossProfit * taxRate) / 100 : 0;
     const netPnL = grossProfit - totalFees;
     const netRoiPercent = totalInvestment > 0 ? (netPnL / totalInvestment) * 100 : 0;
@@ -128,17 +111,39 @@ export function calculateEquityDeliveryBrokerage(params: {
       isLongTerm,
       applicableTaxRate: taxRate,
       taxAmount,
+
+      // Buy Side Breakdown
       buyBrokerage,
+      buyStt,
+      buyExchangeTxn,
+      buySebi,
+      buyGst,
+      buyStampDuty,
+      totalBuyCharges,
+
+      // Sell Side Breakdown
       sellBrokerage,
+      sellStt,
+      sellExchangeTxn,
+      sellSebi,
+      sellGst,
+      sellDpCharges,
+      totalSellCharges,
+
+      // Combined Totals
       totalBrokerage,
-      stampDuty,
-      sttBuy,
-      sttSell,
-      sttCharges,
-      exchangeTxnCharge,
-      sebiCharges,
-      dpCharges: sellTurnover > 0 ? dpCharges : 0,
-      gstCharges,
+      totalStt,
+      totalExchangeTxn,
+      totalSebi,
+      totalGst,
+      stampDuty: buyStampDuty,
+      dpCharges: sellDpCharges,
+      sttBuy: buyStt,
+      sttSell: sellStt,
+      sttCharges: totalStt,
+      exchangeTxnCharge: totalExchangeTxn,
+      sebiCharges: totalSebi,
+      gstCharges: totalGst,
       totalFees,
       breakevenPoints,
       netPnL,
@@ -149,32 +154,21 @@ export function calculateEquityDeliveryBrokerage(params: {
     const targetPnL = targetNetPnL || 0;
     const targetGrossProfit = targetPnL > 0 ? targetPnL / (1 - taxRate / 100) : targetPnL;
 
-    const gstRate = (taxSettings.gstPercent || 18) / 100;
-    const gstMult = 1 + gstRate;
-
-    // Approximate sell side price per share iteratively for max accuracy with caps
     let reqSellP = buyP;
     for (let i = 0; i < 5; i++) {
       const estSellTurnover = qty * reqSellP;
-      const estTurnover = buyTurnover + estSellTurnover;
-
       let estSellBrokerage = 0;
-      if (taxSettings.brokerPreset === 'GROWW' || taxSettings.brokerPreset === 'UPSTOX') {
+      if (taxSettings.brokerPreset === 'GROWW') {
         estSellBrokerage = Math.min(estSellTurnover * 0.0005, 20);
-      } else if (taxSettings.brokerPreset === 'CUSTOM') {
-        estSellBrokerage = taxSettings.flatBrokerageSell + (estSellTurnover * taxSettings.brokeragePercent) / 100;
-      } else {
-        estSellBrokerage = taxSettings.flatBrokerageSell || 0;
       }
 
-      const estSttSell = (estSellTurnover * sttRate) / 100;
-      const estSttCharges = sttBuy + estSttSell;
-      const estExchTxn = (estTurnover * exchangeTxnRate) / 100;
-      const estSebi = (estTurnover * sebiRate) / 100;
-      const estGst = (buyBrokerage + estSellBrokerage + estExchTxn + estSebi) * gstRate;
+      const estSellStt = (estSellTurnover * sttRate) / 100;
+      const estSellExch = (estSellTurnover * exchangeTxnRate) / 100;
+      const estSellSebi = (estSellTurnover * sebiRate) / 100;
+      const estSellGst = (estSellBrokerage + estSellExch + estSellSebi) * gstRate;
+      const estTotalSellCharges = estSellBrokerage + estSellStt + estSellExch + estSellSebi + estSellGst + dpChargeRate;
 
-      const estTotalFees = buyBrokerage + estSellBrokerage + estSttCharges + estExchTxn + estSebi + stampDuty + estGst + dpCharges;
-
+      const estTotalFees = totalBuyCharges + estTotalSellCharges;
       const currentNet = estSellTurnover - buyTurnover - estTotalFees;
       const diff = targetGrossProfit - currentNet;
       reqSellP += diff / qty;
@@ -184,22 +178,24 @@ export function calculateEquityDeliveryBrokerage(params: {
     const turnover = buyTurnover + requiredGrossSaleValue;
 
     let sellBrokerage = 0;
-    if (taxSettings.brokerPreset === 'GROWW' || taxSettings.brokerPreset === 'UPSTOX') {
+    if (taxSettings.brokerPreset === 'GROWW') {
       sellBrokerage = Math.min(requiredGrossSaleValue * 0.0005, 20);
-    } else if (taxSettings.brokerPreset === 'CUSTOM') {
-      sellBrokerage = taxSettings.flatBrokerageSell + (requiredGrossSaleValue * taxSettings.brokeragePercent) / 100;
-    } else {
-      sellBrokerage = taxSettings.flatBrokerageSell || 0;
     }
 
-    const totalBrokerage = buyBrokerage + sellBrokerage;
-    const sttSell = (requiredGrossSaleValue * sttRate) / 100;
-    const sttCharges = sttBuy + sttSell;
-    const exchangeTxnCharge = (turnover * exchangeTxnRate) / 100;
-    const sebiCharges = (turnover * sebiRate) / 100;
-    const gstCharges = (totalBrokerage + exchangeTxnCharge + sebiCharges) * gstRate;
+    const sellStt = (requiredGrossSaleValue * sttRate) / 100;
+    const sellExchangeTxn = (requiredGrossSaleValue * exchangeTxnRate) / 100;
+    const sellSebi = (requiredGrossSaleValue * sebiRate) / 100;
+    const sellGst = (sellBrokerage + sellExchangeTxn + sellSebi) * gstRate;
+    const sellDpCharges = dpChargeRate;
+    const totalSellCharges = sellBrokerage + sellStt + sellExchangeTxn + sellSebi + sellGst + sellDpCharges;
 
-    const totalFees = totalBrokerage + sttCharges + exchangeTxnCharge + sebiCharges + stampDuty + gstCharges + dpCharges;
+    const totalBrokerage = buyBrokerage + sellBrokerage;
+    const totalStt = buyStt + sellStt;
+    const totalExchangeTxn = buyExchangeTxn + sellExchangeTxn;
+    const totalSebi = buySebi + sellSebi;
+    const totalGst = buyGst + sellGst;
+    const totalFees = totalBuyCharges + totalSellCharges;
+
     const grossProfit = requiredGrossSaleValue - buyTurnover;
     const taxAmount = grossProfit > 0 ? (grossProfit * taxRate) / 100 : 0;
     const netPnL = grossProfit - totalFees;
@@ -215,17 +211,39 @@ export function calculateEquityDeliveryBrokerage(params: {
       isLongTerm,
       applicableTaxRate: taxRate,
       taxAmount,
+
+      // Buy Side Breakdown
       buyBrokerage,
+      buyStt,
+      buyExchangeTxn,
+      buySebi,
+      buyGst,
+      buyStampDuty,
+      totalBuyCharges,
+
+      // Sell Side Breakdown
       sellBrokerage,
+      sellStt,
+      sellExchangeTxn,
+      sellSebi,
+      sellGst,
+      sellDpCharges,
+      totalSellCharges,
+
+      // Combined Totals
       totalBrokerage,
-      stampDuty,
-      sttBuy,
-      sttSell,
-      sttCharges,
-      exchangeTxnCharge,
-      sebiCharges,
-      dpCharges,
-      gstCharges,
+      totalStt,
+      totalExchangeTxn,
+      totalSebi,
+      totalGst,
+      stampDuty: buyStampDuty,
+      dpCharges: sellDpCharges,
+      sttBuy: buyStt,
+      sttSell: sellStt,
+      sttCharges: totalStt,
+      exchangeTxnCharge: totalExchangeTxn,
+      sebiCharges: totalSebi,
+      gstCharges: totalGst,
       totalFees,
       breakevenPoints: qty > 0 ? totalFees / qty : 0,
       netPnL,

@@ -70,7 +70,7 @@ export interface WatchlistItem {
 }
 
 export interface TaxSettings {
-  brokerPreset?: 'ZERODHA' | 'GROWW' | 'ANGELONE' | 'UPSTOX' | 'ICICIDIRECT' | 'CUSTOM';
+  brokerPreset?: 'ZERODHA' | 'GROWW';
   exchange?: 'NSE' | 'BSE';
   holdingPeriodMonths: number;
   stcgRatePercent: number;
@@ -106,16 +106,35 @@ export interface CalculationResult {
   isLongTerm: boolean;
   applicableTaxRate: number;
   taxAmount: number;
+  // Buy Side Charges
   buyBrokerage: number;
+  buyStt: number;
+  buyExchangeTxn: number;
+  buySebi: number;
+  buyGst: number;
+  buyStampDuty: number;
+  totalBuyCharges: number;
+  // Sell Side Charges
   sellBrokerage: number;
+  sellStt: number;
+  sellExchangeTxn: number;
+  sellSebi: number;
+  sellGst: number;
+  sellDpCharges: number;
+  totalSellCharges: number;
+  // Combined Totals
   totalBrokerage: number;
+  totalStt: number;
+  totalExchangeTxn: number;
+  totalSebi: number;
+  totalGst: number;
   stampDuty: number;
+  dpCharges: number;
   sttBuy: number;
   sttSell: number;
   sttCharges: number;
   exchangeTxnCharge: number;
   sebiCharges: number;
-  dpCharges: number;
   gstCharges: number;
   totalFees: number;
   breakevenPoints: number;
