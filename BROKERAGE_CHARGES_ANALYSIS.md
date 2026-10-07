@@ -7,13 +7,14 @@
 
 | Fee / Tax Category | Zerodha (Kite Delivery) | Groww (Equity Delivery) | Statutory Rule & Notes |
 | :--- | :--- | :--- | :--- |
-| **Brokerage Charge** | **Zero Brokerage (₹0.00)** | **₹20 or 0.05% per order** | Zerodha: ₹0 for Equity Delivery.<br/>Groww: $\min(0.05\% \times \text{Trade Value}, ₹20)$ per order. |
+| **Brokerage Charge** | **Zero Brokerage (₹0.00)** | **₹20 or 0.1% per order (min ₹5, max ₹20)** | Zerodha: ₹0 for Equity Delivery.<br/>Groww: $\min(₹20, \max(₹5, 0.1\% \times \text{Trade Value}))$ per order. |
 | **STT / CTT** | **0.1% on buy & sell** | **0.1% on buy & sell** | 0.1% of Buy Turnover + 0.1% of Sell Turnover for Equity Delivery. |
 | **Transaction Charges** | **NSE: 0.00307%**<br/>**BSE: 0.00375%** | **NSE: 0.00297%**<br/>**BSE: 0.00375%** | Applied to total turnover (Buy + Sell). |
-| **GST (18%)** | **18% on (Brokerage + SEBI + Transaction charges)** | **18% on (Brokerage + SEBI + Transaction charges)** | 18% GST on all exchange & broker fees. |
+| **IPFT Charges** | **NSE: Included** | **NSE: 0.0001% on buy & sell** | Investor Protection Fund Trust fee (₹10 / Crore on NSE). |
 | **SEBI Charges** | **₹10 / crore** ($0.0001\%$) | **₹10 / crore** ($0.0001\%$) | ₹10 per crore of Total Turnover. |
+| **GST (18%)** | **18% on (Brokerage + SEBI + Transaction charges)** | **18% on (Brokerage + SEBI + Transaction charges + IPFT + DP base)** | 18% GST on all exchange & broker fees. |
 | **Stamp Duty** | **0.015% or ₹1500 / crore on buy side** | **0.015% on buy side** | Applied **only on BUY order value**. |
-| **DP Charges (Sell)** | **₹15.34 per scrip**<br/>(₹3.5 CDSL + ₹9.5 Zerodha + ₹2.34 GST) | **₹21.54 per scrip**<br/>(₹18.25 base + ₹3.29 GST) | Charged on trading account ledger when stocks are sold, irrespective of quantity. |
+| **DP Charges (Sell)** | **₹15.34 per scrip**<br/>(₹3.5 CDSL + ₹9.5 Zerodha + ₹2.34 GST) | **₹23.60 per scrip**<br/>(₹3.5 CDSL + ₹16.5 Groww = ₹20 base + ₹3.60 GST).<br/>*₹0 if debit value < ₹100.* | Charged on trading account ledger when stocks are sold, irrespective of quantity. |
 
 ---
 
@@ -38,14 +39,15 @@
 
 | Charge Category | Buy Side (₹10,000) | Sell Side (₹10,000) | Combined Total (₹) | Official Formula / Rule |
 | :--- | :---: | :---: | :---: | :--- |
-| **Brokerage Charge** | ₹10.00 | ₹10.00 | **₹20.00** | ₹20 flat order charge per trade order. |
+| **Brokerage Charge** | ₹10.00 | ₹10.00 | **₹20.00** | $\min(₹20, \max(₹5, 0.1\% \times 10,000)) = ₹10.00$ per side. |
 | **STT (Securities Tax)** | ₹10.00 | ₹10.00 | **₹20.00** | 0.1% of Buy Turnover + 0.1% of Sell Turnover. |
 | **Exchange Txn (NSE)** | ₹0.30 | ₹0.29 | **₹0.59** | 0.00297% of Turnover ($20,000 \times 0.0000297$). |
+| **IPFT Charge (NSE)** | ₹0.01 | ₹0.01 | **₹0.02** | 0.0001% of Turnover ($20,000 \times 0.000001$). |
 | **SEBI Turnover Fee** | ₹0.01 | ₹0.01 | **₹0.02** | 0.0001% of Turnover (₹10 per Crore). |
-| **GST (18%)** | ₹1.85 | ₹1.86 | **₹3.71** | 18% of (Groww Brokerage ₹20.00 + Exch ₹0.59 + SEBI ₹0.02). |
+| **GST (18%)** | ₹1.86 | ₹1.86 | **₹3.72** | 18% of (Brokerage + Exch + IPFT + SEBI). |
 | **Stamp Duty** | ₹1.50 | - | **₹1.50** | 0.015% (₹1500 per Crore) on **BUY side only**. |
-| **DP Charges (CDSL)** | - | ₹21.54 | **₹21.54** | **₹18.25 base + ₹3.29 GST (18%)** on **SELL side**. |
-| **TOTAL CHARGES** | **₹23.66** | **₹43.70** | **₹67.36** *(₹45.82 pre-DP)* | Exact match with official Groww Calculator! |
+| **DP Charges (CDSL)** | - | ₹23.60 | **₹23.60** | **₹3.5 CDSL + ₹16.5 Groww = ₹20 base + ₹3.60 GST** on **SELL side**. |
+| **TOTAL CHARGES** | **₹23.68** | **₹45.77** | **₹69.45** *(₹45.85 pre-DP)* | Exact match with official Groww tariff structure! |
 
 ---
 

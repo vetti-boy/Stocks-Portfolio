@@ -23,7 +23,7 @@ const CHARGE_DESCRIPTIONS = [
     key: 'brokerage',
     label: 'Brokerage Charge',
     title: 'Brokerage Fee',
-    desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 flat or 0.05% max per order.',
+    desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 or 0.1% per order, whichever is lower (min ₹5, max ₹20).',
   },
   {
     key: 'stt',
@@ -41,13 +41,13 @@ const CHARGE_DESCRIPTIONS = [
     key: 'sebi',
     label: 'SEBI Turnover Fee',
     title: 'SEBI Regulatory Fee',
-    desc: 'Regulator charge collected by SEBI to regulate stock markets at ₹10 per crore (0.0001%) of turnover.',
+    desc: 'Regulator charge collected by SEBI to regulate stock markets at ₹10 per crore (0.0001%) of turnover + IPFT.',
   },
   {
     key: 'gst',
     label: 'GST (18%)',
     title: 'Goods & Services Tax (GST)',
-    desc: '18% Govt tax levied on (Brokerage + Exchange Transaction Charges + SEBI Fees).',
+    desc: '18% Govt tax levied on (Brokerage + Exchange Transaction Charges + SEBI Fees + IPFT + DP Base).',
   },
   {
     key: 'stamp',
@@ -59,7 +59,7 @@ const CHARGE_DESCRIPTIONS = [
     key: 'dp',
     label: 'DP Charge (CDSL Sell)',
     title: 'Depository Participant (DP) Charge',
-    desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹21.54 (18.25+18% GST).',
+    desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹23.60 (₹3.5 CDSL + ₹16.5 Groww = ₹20 base + ₹3.60 GST). ₹0 if sell value < ₹100.',
   },
 ];
 
@@ -279,11 +279,11 @@ export const CalculatorTab: React.FC = () => {
                     brokerPreset: 'GROWW',
                     flatBrokerageBuy: 20,
                     flatBrokerageSell: 20,
-                    brokeragePercent: 0.05,
+                    brokeragePercent: 0.1,
                     sttPercent: 0.1,
                     stampDutyPercent: 0.015,
                     gstPercent: 18,
-                    flatDpCharges: 21.54,
+                    flatDpCharges: 23.60,
                   })
                 }
                 className={`p-4 rounded-xl border text-left transition flex flex-col justify-between active:scale-95 ${
@@ -297,8 +297,8 @@ export const CalculatorTab: React.FC = () => {
                     <span className="font-extrabold text-[#F4F7FA] text-sm font-mono">Groww</span>
                     {activeBroker === 'GROWW' && <span className="h-2.5 w-2.5 rounded-full bg-[#22C55E]" />}
                   </div>
-                  <span className="text-xs text-[#22C55E] font-bold block mt-1">₹20 or 0.05% Max Order</span>
-                  <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹21.54 on Sell</span>
+                  <span className="text-xs text-[#22C55E] font-bold block mt-1">₹20 or 0.1% Lower (Min ₹5)</span>
+                  <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹23.60 on Sell</span>
                 </div>
               </button>
             </div>

@@ -1512,13 +1512,13 @@ export const PortfolioTab: React.FC = () => {
                     Statutory Duties & Broker Charges
                   </div>
                   {[
-                    { label: `Brokerage (${activeHoldingBroker})`, val: calcRes.totalBrokerage, title: 'Brokerage Fee', desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 flat or 0.05% max per order.' },
+                    { label: `Brokerage (${activeHoldingBroker})`, val: calcRes.totalBrokerage, title: 'Brokerage Fee', desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 or 0.1% per order, whichever is lower (min ₹5, max ₹20).' },
                     { label: 'STT (0.1% Buy / 0.1% Sell)', val: calcRes.sttCharges, title: 'Securities Transaction Tax (STT)', desc: 'Statutory tax levied by Central Govt under SEBI rules at 0.1% on Buy and 0.1% on Sell value for Equity Delivery.' },
                     { label: 'Exchange Txn Charge', val: calcRes.exchangeTxnCharge, title: 'Exchange Transaction Charge', desc: 'Infrastructure fee charged by stock exchanges (NSE: 0.00307% for Zerodha / 0.00297% for Groww, BSE: 0.00375%).' },
-                    { label: 'SEBI Turnover Charges', val: calcRes.sebiCharges, title: 'SEBI Regulatory Fee', desc: 'Regulator charge collected by SEBI to regulate stock markets at ₹10 per crore (0.0001%) of turnover.' },
+                    { label: 'SEBI Turnover Charges', val: calcRes.sebiCharges, title: 'SEBI Regulatory Fee', desc: 'Regulator charge collected by SEBI to regulate stock markets at ₹10 per crore (0.0001%) of turnover + IPFT.' },
                     { label: 'Stamp Duty (0.015% Buy)', val: calcRes.stampDuty, title: 'State Stamp Duty', desc: 'State Govt stamp tax levied at 0.015% (₹1,500/Cr) on BUY side order value only.' },
-                    { label: 'GST (18%)', val: calcRes.gstCharges, title: 'Goods & Services Tax (GST)', desc: '18% Govt tax levied on (Brokerage + Exchange Transaction Charges + SEBI Fees).' },
-                    ...(calcRes.dpCharges > 0 ? [{ label: 'CDSL DP Charge (Sell)', val: calcRes.dpCharges, title: 'Depository Participant (DP) Charge', desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹21.54 (18.25+18% GST).' }] : []),
+                    { label: 'GST (18%)', val: calcRes.gstCharges, title: 'Goods & Services Tax (GST)', desc: '18% Govt tax levied on (Brokerage + Exchange Transaction Charges + SEBI Fees + IPFT + DP Base).' },
+                    ...(calcRes.dpCharges > 0 ? [{ label: 'CDSL DP Charge (Sell)', val: calcRes.dpCharges, title: 'Depository Participant (DP) Charge', desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹23.60 (₹3.5 CDSL + ₹16.5 Groww = ₹20 base + ₹3.60 GST). ₹0 if sell value < ₹100.' }] : []),
                   ].map((item, idx) => (
                     <div key={idx} className="group relative flex justify-between cursor-help hover:text-white transition">
                       <span className="text-slate-400 group-hover:text-cyan-400 flex items-center gap-1 transition">
