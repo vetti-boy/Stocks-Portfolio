@@ -266,11 +266,54 @@ export const PortfolioTab: React.FC = () => {
     }, 1200);
   };
 
-  // Calculated Portfolio Totals
-  const totalInvested = holdings.reduce((sum, h) => sum + h.buyPrice * h.quantity, 0);
-  const currentVal = holdings.reduce((sum, h) => sum + h.currentPrice * h.quantity, 0);
-  const totalPnL = currentVal - totalInvested;
-  const totalPnLPercent = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
+  // Calculated Portfolio Totals & Itemized Brokerage Deductions
+  const holdingsWithCalculations = holdings.map((h) => {
+    const buyTime = h.buyDate ? new Date(h.buyDate).getTime() : Date.now();
+    const daysHeld = Math.max(0, Math.floor((Date.now() - buyTime) / (1000 * 60 * 60 * 24)));
+
+    const hTaxSettings = {
+      ...taxSettings,
+      brokerPreset: (h.broker || 'ZERODHA') as 'ZERODHA' | 'GROWW',
+      exchange: (h.exchange || 'NSE') as 'NSE' | 'BSE',
+    };
+
+    const calc = calculateEquityDeliveryBrokerage({
+      quantity: h.quantity,
+      buyPrice: h.buyPrice,
+      sellPrice: h.currentPrice,
+      taxSettings: hTaxSettings,
+      isMTF: h.isMTF,
+      ownQuantity: h.ownQuantity,
+      mtfQuantity: h.mtfQuantity,
+      mtfDays: daysHeld,
+    });
+
+    const grossInvested = h.buyPrice * h.quantity;
+    const currentMarketValue = h.currentPrice * h.quantity;
+    const grossPnL = currentMarketValue - grossInvested;
+    const netPnL = calc.netPnL;
+    const totalDeductions = calc.totalFees;
+    const netRoiPercent = calc.netRoiPercent;
+
+    return {
+      ...h,
+      daysHeld,
+      calc,
+      grossInvested,
+      currentMarketValue,
+      grossPnL,
+      netPnL,
+      totalDeductions,
+      netRoiPercent,
+    };
+  });
+
+  const totalInvested = holdingsWithCalculations.reduce((sum, item) => sum + item.grossInvested, 0);
+  const currentVal = holdingsWithCalculations.reduce((sum, item) => sum + item.currentMarketValue, 0);
+  const totalNetPnL = holdingsWithCalculations.reduce((sum, item) => sum + item.netPnL, 0);
+  const totalGrossPnL = holdingsWithCalculations.reduce((sum, item) => sum + item.grossPnL, 0);
+  const totalDeductions = holdingsWithCalculations.reduce((sum, item) => sum + item.totalDeductions, 0);
+  const totalPnLPercent = totalInvested > 0 ? (totalNetPnL / totalInvested) * 100 : 0;
 
   // Broker Allocation Breakdown
   const zerodhaVal = holdings
@@ -283,16 +326,8 @@ export const PortfolioTab: React.FC = () => {
   const growwPct = currentVal > 0 ? (growwVal / currentVal) * 100 : 0;
 
   // Best & Worst Performers
-  const holdingsWithReturn = holdings.map((h) => {
-    const val = h.currentPrice * h.quantity;
-    const cost = h.buyPrice * h.quantity;
-    const gain = val - cost;
-    const gainPct = cost > 0 ? (gain / cost) * 100 : 0;
-    return { ...h, gain, gainPct };
-  });
-
-  const bestPerformer = holdingsWithReturn.length
-    ? [...holdingsWithReturn].sort((a, b) => b.gainPct - a.gainPct)[0]
+  const bestPerformer = holdingsWithCalculations.length
+    ? [...holdingsWithCalculations].sort((a, b) => b.netRoiPercent - a.netRoiPercent)[0]
     : null;
 
   const handleAddSubmit = (e: React.FormEvent) => {
@@ -398,14 +433,14 @@ export const PortfolioTab: React.FC = () => {
         </div>
 
         {/* Card 3: Unrealized Net P&L */}
-        <div className={`glass-shell ${totalPnL >= 0 ? 'glass-shell-profit' : 'glass-shell-loss'}`}>
+        <div className={`glass-shell ${totalNetPnL >= 0 ? 'glass-shell-profit' : 'glass-shell-loss'}`}>
           <div className="glass-core p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
                 Unrealized Net P&L
               </span>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${totalPnL >= 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-rose-500/10 border border-rose-500/20'}`}>
-                {totalPnL >= 0 ? (
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${totalNetPnL >= 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-rose-500/10 border border-rose-500/20'}`}>
+                {totalNetPnL >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-emerald-400" />
                 ) : (
                   <TrendingDown className="h-4 w-4 text-rose-400" />
@@ -414,22 +449,27 @@ export const PortfolioTab: React.FC = () => {
             </div>
             <div
               className={`mt-4 text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${
-                totalPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                totalNetPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
-              {totalPnL >= 0 ? '+' : '-'}₹
-              {Math.abs(totalPnL).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {totalNetPnL >= 0 ? '+' : '-'}₹
+              {Math.abs(totalNetPnL).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div className="mt-2 flex items-center gap-2 font-mono">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                  totalPnL >= 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                }`}
-              >
-                {totalPnLPercent >= 0 ? '+' : ''}
-                {totalPnLPercent.toFixed(2)}%
+            <div className="mt-2 flex items-center justify-between font-mono">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                    totalNetPnL >= 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                  }`}
+                >
+                  {totalPnLPercent >= 0 ? '+' : ''}
+                  {totalPnLPercent.toFixed(2)}%
+                </span>
+                <span className="text-xs text-slate-400">net yield</span>
+              </div>
+              <span className="text-[10px] text-slate-400">
+                After ₹{totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} charges
               </span>
-              <span className="text-xs text-slate-400">overall yield</span>
             </div>
           </div>
         </div>
@@ -451,18 +491,18 @@ export const PortfolioTab: React.FC = () => {
                   <span className="text-xl sm:text-2xl font-bold text-white font-mono">{bestPerformer.symbol}</span>
                   <span
                     className={`text-xs font-bold font-mono rounded-full px-2 py-0.5 border ${
-                      bestPerformer.gain >= 0
+                      bestPerformer.netPnL >= 0
                         ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                         : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
                     }`}
                   >
-                    {bestPerformer.gain >= 0 ? '+' : ''}
-                    {bestPerformer.gainPct.toFixed(2)}%
+                    {bestPerformer.netPnL >= 0 ? '+' : ''}
+                    {bestPerformer.netRoiPercent.toFixed(2)}%
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-slate-400 font-mono">
-                  {bestPerformer.gain >= 0 ? 'Gain: +' : 'Loss: -'}₹
-                  {Math.abs(bestPerformer.gain).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {bestPerformer.netPnL >= 0 ? 'Net Profit: +' : 'Net Loss: -'}₹
+                  {Math.abs(bestPerformer.netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             ) : (
@@ -563,19 +603,22 @@ export const PortfolioTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-sans">
-                {holdings.length === 0 ? (
+                {holdingsWithCalculations.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-16 text-center text-slate-400">
                       No holdings in portfolio. Click <strong className="text-white">Add Stock Purchase</strong> to record your first trade!
                     </td>
                   </tr>
                 ) : (
-                  holdings.map((holding) => {
-                    const invested = holding.buyPrice * holding.quantity;
-                    const currentVal = holding.currentPrice * holding.quantity;
-                    const pnl = currentVal - invested;
-                    const pnlPercent = invested > 0 ? (pnl / invested) * 100 : 0;
-                    const isProfit = pnl >= 0;
+                  holdingsWithCalculations.map((holding) => {
+                    const invested = holding.grossInvested;
+                    const currentVal = holding.currentMarketValue;
+                    const netPnL = holding.netPnL;
+                    const grossPnL = holding.grossPnL;
+                    const totalDeductions = holding.totalDeductions;
+                    const netRoiPercent = holding.netRoiPercent;
+                    const isProfit = netPnL >= 0;
+                    const calc = holding.calc;
 
                     return (
                       <tr
@@ -603,14 +646,9 @@ export const PortfolioTab: React.FC = () => {
                               {holding.isMTF && (() => {
                                 const ownQ = holding.ownQuantity ?? holding.quantity;
                                 const mtfQ = holding.mtfQuantity ?? 0;
-                                const mtfBorrowed = holding.mtfBorrowedAmount ?? (mtfQ * holding.buyPrice);
-                                const buyTime = holding.buyDate ? new Date(holding.buyDate).getTime() : Date.now();
-                                const days = Math.max(0, Math.floor((Date.now() - buyTime) / (1000 * 60 * 60 * 24)));
-                                const dailyRate = holding.broker === 'GROWW' ? 0.041 : 0.04;
-                                const interestAccrued = mtfBorrowed * (dailyRate / 100) * days;
                                 return (
                                   <div className="text-[10px] font-mono text-amber-300/90 mt-0.5">
-                                    Own: {ownQ} • MTF: {mtfQ} • Int: ₹{interestAccrued.toFixed(2)} ({days}d)
+                                    Own: {ownQ} • MTF: {mtfQ} • Int: ₹{(calc.mtfInterestCost || 0).toFixed(2)} ({holding.daysHeld}d)
                                   </div>
                                 );
                               })()}
@@ -661,17 +699,17 @@ export const PortfolioTab: React.FC = () => {
                           ₹{currentVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
 
-                        {/* Unrealized P&L */}
-                        <td className="px-4 py-4 text-right font-mono">
+                        {/* Unrealized Net P&L */}
+                        <td className="px-4 py-4 text-right font-mono group relative">
                           <div
                             className={`font-bold flex items-center justify-end gap-1 text-sm ${
                               isProfit ? 'text-emerald-400' : 'text-rose-400'
                             }`}
                           >
                             {isProfit ? '+' : '-'}₹
-                            {Math.abs(pnl).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            {Math.abs(netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
-                          <div className="mt-0.5">
+                          <div className="mt-0.5 flex items-center justify-end gap-1.5">
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                 isProfit
@@ -680,8 +718,60 @@ export const PortfolioTab: React.FC = () => {
                               }`}
                             >
                               {isProfit ? '+' : ''}
-                              {pnlPercent.toFixed(2)}%
+                              {netRoiPercent.toFixed(2)}%
                             </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-end gap-1 font-sans">
+                            <span>Deductions: ₹{totalDeductions.toFixed(2)}</span>
+                            <div className="relative inline-block group/tooltip">
+                              <HelpCircle className="h-3 w-3 text-slate-400 hover:text-slate-200 cursor-help" />
+                              <div className="pointer-events-none absolute right-0 bottom-full mb-2 hidden group-hover/tooltip:block w-60 p-3 bg-[#080c14] border border-slate-700/80 rounded-xl shadow-2xl z-50 text-[11px] text-slate-200 font-sans text-left">
+                                <div className="font-bold text-white mb-2 pb-1.5 border-b border-slate-800 flex justify-between items-center">
+                                  <span>Estimated Deductions</span>
+                                  <span className="text-amber-400 font-mono">₹{totalDeductions.toFixed(2)}</span>
+                                </div>
+                                <div className="space-y-1 font-mono text-[10px]">
+                                  <div className="flex justify-between py-0.5 border-b border-white/5">
+                                    <span className="text-slate-400 font-sans">Gross P&L:</span>
+                                    <span className={grossPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                      {grossPnL >= 0 ? '+' : '-'}₹{Math.abs(grossPnL).toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 font-sans">Brokerage:</span>
+                                    <span>₹{calc.totalBrokerage.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 font-sans">STT (0.1% Buy+Sell):</span>
+                                    <span>₹{calc.totalStt.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 font-sans">Exch + SEBI + GST:</span>
+                                    <span>₹{(calc.totalExchangeTxn + calc.totalSebi + calc.totalGst).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 font-sans">Stamp Duty (Buy):</span>
+                                    <span>₹{calc.stampDuty.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400 font-sans">DP Charges (Sell):</span>
+                                    <span>₹{calc.dpCharges.toFixed(2)}</span>
+                                  </div>
+                                  {holding.isMTF && (
+                                    <>
+                                      <div className="flex justify-between text-amber-300 pt-1 border-t border-amber-500/20">
+                                        <span className="font-sans">MTF Interest ({holding.daysHeld}d):</span>
+                                        <span>₹{(calc.mtfInterestCost || 0).toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between text-amber-300">
+                                        <span className="font-sans">Pledge/Unpledge Fee:</span>
+                                        <span>₹{(calc.mtfPledgeUnpledgeFee || 0).toFixed(2)}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </td>
 
@@ -721,17 +811,19 @@ export const PortfolioTab: React.FC = () => {
 
           {/* Mobile Card List View (< 640px screens) */}
           <div className="block sm:hidden divide-y divide-white/5 font-sans">
-            {holdings.length === 0 ? (
+            {holdingsWithCalculations.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs">
                 No holdings in portfolio. Click <strong className="text-white">Add Stock Purchase</strong> to record your first trade!
               </div>
             ) : (
-              holdings.map((holding) => {
-                const invested = holding.buyPrice * holding.quantity;
-                const currentVal = holding.currentPrice * holding.quantity;
-                const pnl = currentVal - invested;
-                const pnlPercent = invested > 0 ? (pnl / invested) * 100 : 0;
-                const isProfit = pnl >= 0;
+              holdingsWithCalculations.map((holding) => {
+                const invested = holding.grossInvested;
+                const currentVal = holding.currentMarketValue;
+                const netPnL = holding.netPnL;
+                const grossPnL = holding.grossPnL;
+                const totalDeductions = holding.totalDeductions;
+                const netRoiPercent = holding.netRoiPercent;
+                const isProfit = netPnL >= 0;
 
                 return (
                   <div key={holding.id} className="p-4 space-y-3">
@@ -746,6 +838,11 @@ export const PortfolioTab: React.FC = () => {
                             <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-slate-300 border border-white/10 font-sans">
                               {holding.exchange}
                             </span>
+                            {holding.isMTF && (
+                              <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-400 border border-amber-500/40 tracking-wider font-mono">
+                                MTF
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-400 truncate max-w-[140px]">
                             {holding.companyName}
@@ -753,7 +850,7 @@ export const PortfolioTab: React.FC = () => {
                         </div>
                       </div>
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold font-mono ${isProfit ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
-                        {isProfit ? '+' : ''}{pnlPercent.toFixed(2)}%
+                        {isProfit ? '+' : ''}{netRoiPercent.toFixed(2)}%
                       </span>
                     </div>
 
@@ -771,9 +868,12 @@ export const PortfolioTab: React.FC = () => {
                         <span className="text-slate-300">₹{invested.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] text-slate-400 block uppercase">Unrealized P&L</span>
+                        <span className="text-[10px] text-slate-400 block uppercase">Unrealized Net P&L</span>
                         <span className={`font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isProfit ? '+' : '-'}₹{Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          {isProfit ? '+' : '-'}₹{Math.abs(netPnL).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5 font-sans">
+                          (Deductions: ₹{totalDeductions.toFixed(0)})
                         </span>
                       </div>
                     </div>
