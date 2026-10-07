@@ -236,6 +236,39 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  // Change User Role (ADMIN <-> USER)
+  const handleChangeUserRole = async (targetUser: any, newRole: 'ADMIN' | 'USER') => {
+    if (targetUser.id === 'admin_master' || targetUser.email === 'mailfortempusage@gmail.com') {
+      alert('System Administrator role cannot be changed.');
+      return;
+    }
+
+    const confirmMsg = `Change role of "${targetUser.name}" (${targetUser.email}) to ${newRole}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch('/api/admin/change-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: targetUser.id,
+          newRole,
+          adminRole: user?.role || 'ADMIN',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        alert(data.error || 'Failed to change user role.');
+      } else {
+        fetchUsers();
+      }
+    } catch {
+      alert('Network error changing user role.');
+    }
+  };
+
+
   // Permanently Delete User Account
   const handleDeleteUser = async (targetUser: any) => {
     if (targetUser.id === 'admin_master') {
@@ -466,15 +499,25 @@ export const AdminPanel: React.FC = () => {
                           <div className="text-[11px] text-[#8D99A8] font-mono">{u.email}</div>
                         </td>
                         <td className="px-3 py-3">
-                          <span
-                            className={`rounded px-2 py-0.5 text-[10px] font-bold font-mono ${
-                              u.role === 'ADMIN'
-                                ? 'bg-[#8B5CF6]/20 text-[#8B5CF6] border border-[#8B5CF6]/30'
-                                : 'bg-[#111820] text-[#8D99A8] border border-[#202A35]'
-                            }`}
-                          >
-                            {u.role}
-                          </span>
+                          {u.id === 'admin_master' || u.email === 'mailfortempusage@gmail.com' ? (
+                            <span className="rounded bg-[#8B5CF6]/20 text-[#8B5CF6] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#8B5CF6]/30">
+                              ADMIN
+                            </span>
+                          ) : (
+                            <select
+                              value={u.role || 'USER'}
+                              onChange={(e) => handleChangeUserRole(u, e.target.value as 'ADMIN' | 'USER')}
+                              title="Click to switch user role between USER and ADMIN"
+                              className={`rounded px-2 py-1 text-[10px] font-bold font-mono outline-none border cursor-pointer transition ${
+                                u.role === 'ADMIN'
+                                  ? 'bg-[#8B5CF6]/20 text-[#8B5CF6] border-[#8B5CF6]/40 hover:bg-[#8B5CF6]/30'
+                                  : 'bg-[#111820] text-[#38BDF8] border-[#202A35] hover:border-[#38BDF8]/40'
+                              }`}
+                            >
+                              <option value="USER" className="bg-[#0D1218] text-white">USER</option>
+                              <option value="ADMIN" className="bg-[#0D1218] text-[#8B5CF6]">ADMIN</option>
+                            </select>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center font-mono">
                           {u.isDisabled ? (
@@ -561,10 +604,23 @@ export const AdminPanel: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="font-bold text-[#F4F7FA] text-xs flex items-center gap-1.5">
-                          {u.name}
-                          <span className={`rounded px-1.5 py-0.2 text-[9px] font-bold font-mono ${u.role === 'ADMIN' ? 'bg-[#8B5CF6]/20 text-[#8B5CF6]' : 'bg-[#111820] text-[#8D99A8]'}`}>
-                            {u.role}
-                          </span>
+                          <span>{u.name}</span>
+                          {u.id === 'admin_master' || u.email === 'mailfortempusage@gmail.com' ? (
+                            <span className="rounded px-1.5 py-0.2 text-[9px] font-bold font-mono bg-[#8B5CF6]/20 text-[#8B5CF6] border border-[#8B5CF6]/30">
+                              ADMIN
+                            </span>
+                          ) : (
+                            <select
+                              value={u.role || 'USER'}
+                              onChange={(e) => handleChangeUserRole(u, e.target.value as 'ADMIN' | 'USER')}
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold font-mono outline-none border cursor-pointer ${
+                                u.role === 'ADMIN' ? 'bg-[#8B5CF6]/20 text-[#8B5CF6] border-[#8B5CF6]/30' : 'bg-[#111820] text-[#38BDF8] border-[#202A35]'
+                              }`}
+                            >
+                              <option value="USER" className="bg-[#0D1218] text-white">USER</option>
+                              <option value="ADMIN" className="bg-[#0D1218] text-[#8B5CF6]">ADMIN</option>
+                            </select>
+                          )}
                         </div>
                         <div className="text-[11px] text-[#8D99A8] font-mono">{u.email}</div>
                       </div>
