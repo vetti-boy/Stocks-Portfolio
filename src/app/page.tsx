@@ -191,17 +191,7 @@ function DashboardContent() {
           </nav>
         </div>
 
-        {/* Sidebar Footer Security Status */}
-        {!isSidebarCollapsed && (
-          <div className="p-4 border-t border-[#202A35] space-y-2 text-[11px] text-[#8D99A8]">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-white font-mono">
-                <span className="h-2 w-2 rounded-full bg-[#22C55E]" /> AES-256
-              </span>
-              <span className="text-[10px] text-[#38BDF8] font-mono uppercase">{syncStatus}</span>
-            </div>
-          </div>
-        )}
+
       </aside>
 
       {/* Right Core Container */}

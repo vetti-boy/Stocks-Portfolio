@@ -338,13 +338,6 @@ export const AdminPanel: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-[#080B10] border border-[#202A35] px-3 py-1.5 text-xs font-mono">
-            <Database className="h-4 w-4 text-[#22C55E]" />
-            <span className="text-[#8D99A8]">Cloud DB:</span>
-            <span className="rounded bg-[#22C55E]/10 text-[#22C55E] px-2 py-0.5 text-[10px] font-bold border border-[#22C55E]/20">
-              AES-256-GCM
-            </span>
-          </div>
         </div>
       </div>
 
