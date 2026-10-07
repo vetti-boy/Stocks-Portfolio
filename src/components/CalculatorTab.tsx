@@ -9,6 +9,10 @@ import {
   Receipt,
   HelpCircle,
   Scale,
+  ArrowLeftRight,
+  Zap,
+  Building2,
+  Sparkles,
 } from 'lucide-react';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 
@@ -78,8 +82,8 @@ const CHARGE_DESCRIPTIONS = [
 export const CalculatorTab: React.FC = () => {
   const { taxSettings, updateTaxSettings } = useStock();
 
-  // Mode: 'forward' (Known Sell Price -> Net P&L) or 'reverse' (Target Net P&L -> Required Sell Price)
-  const [mode, setMode] = useState<'forward' | 'reverse'>('forward');
+  // Active input tracking: 'sellPrice' (editing Sell Price -> computes Net P&L) vs 'targetNetPnL' (editing Target Net P&L -> computes required Sell Price)
+  const [activeInput, setActiveInput] = useState<'sellPrice' | 'targetNetPnL'>('sellPrice');
 
   // Trade Type: 'DELIVERY' (Normal Cash Delivery) vs 'MTF' (Margin Trading Facility)
   const [tradeType, setTradeType] = useState<'DELIVERY' | 'MTF'>('DELIVERY');
@@ -87,8 +91,8 @@ export const CalculatorTab: React.FC = () => {
   // Input states in INR
   const [quantity, setQuantity] = useState<string>('100');
   const [buyPrice, setBuyPrice] = useState<string>('100.00');
-  const [sellPrice, setSellPrice] = useState<string>('100.00');
-  const [targetNetPnL, setTargetNetPnL] = useState<string>('5000.00');
+  const [sellPriceInput, setSellPriceInput] = useState<string>('110.00');
+  const [targetNetPnLInput, setTargetNetPnLInput] = useState<string>('950.00');
   const [exchange, setExchange] = useState<'NSE' | 'BSE'>('NSE');
 
   // MTF Inputs
@@ -104,12 +108,12 @@ export const CalculatorTab: React.FC = () => {
   // Selected Broker: Only Zerodha or Groww
   const activeBroker = (taxSettings.brokerPreset === 'GROWW' ? 'GROWW' : 'ZERODHA') as 'ZERODHA' | 'GROWW';
 
-  // Itemized Calculations
+  // Itemized Calculations (Forward or Reverse mode depending on activeInput)
   const result = useMemo(() => {
     const qty = Math.max(0.0001, parseFloat(quantity) || 0);
     const buyP = Math.max(0, parseFloat(buyPrice) || 0);
-    const sellP = Math.max(0, parseFloat(sellPrice) || 0);
-    const targetPnL = parseFloat(targetNetPnL) || 0;
+    const sellP = Math.max(0, parseFloat(sellPriceInput) || 0);
+    const targetPnL = parseFloat(targetNetPnLInput) || 0;
     const ownQ = Math.max(0, parseFloat(ownQtyInput) || 0);
     const days = Math.max(0, parseFloat(mtfDaysInput) || 0);
 
@@ -119,50 +123,45 @@ export const CalculatorTab: React.FC = () => {
       sellPrice: sellP,
       targetNetPnL: targetPnL,
       taxSettings: { ...taxSettings, brokerPreset: activeBroker, exchange },
-      mode,
+      mode: activeInput === 'targetNetPnL' ? 'reverse' : 'forward',
       isMTF: tradeType === 'MTF',
       ownQuantity: ownQ,
       mtfQuantity: Math.max(0, qty - ownQ),
       mtfDays: days,
     });
-  }, [mode, tradeType, quantity, buyPrice, sellPrice, targetNetPnL, ownQtyInput, mtfDaysInput, taxSettings, activeBroker, exchange]);
+  }, [activeInput, tradeType, quantity, buyPrice, sellPriceInput, targetNetPnLInput, ownQtyInput, mtfDaysInput, taxSettings, activeBroker, exchange]);
+
+  // Automatic Bidirectional Sync of the inactive input field
+  useEffect(() => {
+    if (activeInput === 'sellPrice') {
+      if (typeof result.netPnL === 'number' && !isNaN(result.netPnL)) {
+        setTargetNetPnLInput(result.netPnL.toFixed(2));
+      }
+    } else if (activeInput === 'targetNetPnL') {
+      if (typeof result.requiredSellPricePerShare === 'number' && !isNaN(result.requiredSellPricePerShare)) {
+        setSellPriceInput(result.requiredSellPricePerShare.toFixed(2));
+      }
+    }
+  }, [activeInput, result.netPnL, result.requiredSellPricePerShare]);
 
   return (
     <div className="space-y-8">
-      {/* Mode Switcher Banner */}
+      {/* Top Title Banner */}
       <div className="bg-[#0D1218] rounded-xl p-6 border border-[#202A35] shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg sm:text-xl font-extrabold text-[#F4F7FA] font-mono flex items-center gap-2.5">
             <Calculator className="h-5 w-5 text-[#38BDF8]" />
-            <span>Zerodha & Groww Equity Delivery Brokerage Calculator</span>
+            <span>Zerodha & Groww Equity Delivery & MTF Calculator</span>
           </h2>
           <p className="text-xs text-[#8D99A8] mt-1">
-            Hover over any charge category below to inspect full statutory rules & tax definitions.
+            Unified interactive calculator — type Sell Price or Net Profit to calculate all statutory fees, taxes, and contract note charges.
           </p>
         </div>
 
-        {/* Mode Toggle Pills */}
-        <div className="flex items-center rounded-lg bg-[#080B10] border border-[#202A35] p-1 text-xs font-semibold shrink-0">
-          <button
-            onClick={() => setMode('forward')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-mono transition ${
-              mode === 'forward'
-                ? 'bg-[#38BDF8] text-[#080B10] font-bold shadow'
-                : 'text-[#8D99A8] hover:text-[#F4F7FA]'
-            }`}
-          >
-            <Calculator className="h-3.5 w-3.5" /> Forward Net P&L
-          </button>
-          <button
-            onClick={() => setMode('reverse')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-mono transition ${
-              mode === 'reverse'
-                ? 'bg-[#22C55E] text-[#080B10] font-bold shadow'
-                : 'text-[#8D99A8] hover:text-[#F4F7FA]'
-            }`}
-          >
-            <Target className="h-3.5 w-3.5" /> Target Sell Price
-          </button>
+        {/* Live Status Badge */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#080B10] border border-[#38BDF8]/30 text-xs font-mono shrink-0">
+          <Sparkles className="h-4 w-4 text-[#38BDF8] animate-pulse" />
+          <span className="text-[#38BDF8] font-bold">Unified Bidirectional Flow</span>
         </div>
       </div>
 
@@ -175,7 +174,7 @@ export const CalculatorTab: React.FC = () => {
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono">
                 1. TRADE PARAMETERS & MTF SPLIT
               </h3>
-              
+
               <div className="flex items-center gap-2">
                 {/* Trade Type Selector Toggle (Delivery vs MTF) */}
                 <div className="flex items-center bg-[#080B10] border border-[#202A35] rounded-lg p-0.5 text-xs font-mono">
@@ -305,42 +304,99 @@ export const CalculatorTab: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
 
-            {mode === 'forward' ? (
-              <div>
-                <label className="block text-xs font-semibold text-[#8D99A8] mb-1.5">
-                  Expected Sell Price per Share (₹)
+          {/* Unified Bidirectional Pricing & Net Profit Inputs Card */}
+          <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#38BDF8]/40 shadow-xl">
+            <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono flex items-center gap-2">
+                <ArrowLeftRight className="h-4 w-4 text-[#38BDF8] animate-pulse" />
+                <span>2. UNIFIED SELL PRICE & PROFIT TARGET</span>
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/30">
+                {activeInput === 'sellPrice' ? 'Mode: Sell Price → Net P&L' : 'Mode: Target Profit → Required Price'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+              {/* Field A: Expected Sell Price */}
+              <div
+                className={`p-3.5 rounded-xl border transition-all ${
+                  activeInput === 'sellPrice'
+                    ? 'bg-[#111820] border-[#38BDF8] ring-1 ring-[#38BDF8]/50 shadow-md'
+                    : 'bg-[#080B10] border-[#202A35]'
+                }`}
+              >
+                <label className="block text-[11px] font-bold text-slate-300 mb-1.5 font-mono flex items-center justify-between">
+                  <span>Sell Price per Share (₹)</span>
+                  {activeInput === 'sellPrice' && (
+                    <span className="text-[#38BDF8] text-[10px] font-semibold flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#38BDF8] animate-ping" /> Active
+                    </span>
+                  )}
                 </label>
                 <input
                   type="number"
-                  value={sellPrice}
-                  onChange={(e) => setSellPrice(e.target.value)}
-                  className="w-full bg-[#080B10] text-[#22C55E] border border-[#202A35] rounded-lg p-2.5 font-mono text-sm font-bold focus:border-[#22C55E] outline-none"
+                  value={sellPriceInput}
+                  onFocus={() => setActiveInput('sellPrice')}
+                  onChange={(e) => {
+                    setActiveInput('sellPrice');
+                    setSellPriceInput(e.target.value);
+                  }}
+                  placeholder="e.g. 683.70"
+                  className="w-full bg-[#080B10] text-[#38BDF8] border border-[#202A35] rounded-lg p-2.5 font-mono text-base font-bold focus:border-[#38BDF8] outline-none"
                 />
-              </div>
-            ) : (
-              <div className="rounded-xl bg-[#22C55E]/10 border border-[#22C55E]/30 p-4 space-y-2">
-                <label className="block text-xs font-bold text-[#22C55E] font-mono">
-                  Target Desired Net Profit (₹)
-                </label>
-                <input
-                  type="number"
-                  value={targetNetPnL}
-                  onChange={(e) => setTargetNetPnL(e.target.value)}
-                  className="w-full bg-[#080B10] border border-[#22C55E]/50 rounded-lg p-2.5 font-mono text-[#22C55E] text-lg font-bold focus:border-[#22C55E] outline-none"
-                />
-                <span className="text-[11px] text-[#8D99A8] block">
-                  Enter exact take-home net profit after all taxes & SEBI charges.
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  Selling price per share
                 </span>
               </div>
-            )}
+
+              {/* Field B: Target Net Take-Home P&L */}
+              <div
+                className={`p-3.5 rounded-xl border transition-all ${
+                  activeInput === 'targetNetPnL'
+                    ? 'bg-[#111820] border-[#22C55E] ring-1 ring-[#22C55E]/50 shadow-md'
+                    : 'bg-[#080B10] border-[#202A35]'
+                }`}
+              >
+                <label className="block text-[11px] font-bold text-slate-300 mb-1.5 font-mono flex items-center justify-between">
+                  <span>Net Take-Home Profit (₹)</span>
+                  {activeInput === 'targetNetPnL' && (
+                    <span className="text-[#22C55E] text-[10px] font-semibold flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E] animate-ping" /> Active
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="number"
+                  value={targetNetPnLInput}
+                  onFocus={() => setActiveInput('targetNetPnL')}
+                  onChange={(e) => {
+                    setActiveInput('targetNetPnL');
+                    setTargetNetPnLInput(e.target.value);
+                  }}
+                  placeholder="e.g. 5000"
+                  className="w-full bg-[#080B10] text-[#22C55E] border border-[#202A35] rounded-lg p-2.5 font-mono text-base font-bold focus:border-[#22C55E] outline-none"
+                />
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  Net profit after all taxes & DP
+                </span>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-[#8D99A8] font-sans flex items-center gap-1.5 pt-1">
+              <HelpCircle className="h-3.5 w-3.5 text-[#38BDF8] shrink-0" />
+              <span>
+                <strong>Single Flow:</strong> Type in either box — editing Sell Price updates Net Profit, and editing Net Profit updates required Sell Price automatically!
+              </span>
+            </div>
           </div>
 
           {/* Broker Selector: ONLY Zerodha & Groww */}
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#202A35] shadow-lg">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B5CF6] flex items-center gap-2 font-mono">
-                <IndianRupee className="h-4 w-4 text-[#22C55E]" /> 2. SELECT BROKER PLATFORM
+                <IndianRupee className="h-4 w-4 text-[#22C55E]" /> 3. SELECT BROKER PLATFORM
               </h3>
               <span className="text-[10px] text-[#8D99A8] font-mono">SEBI Equity Delivery</span>
             </div>
@@ -414,8 +470,8 @@ export const CalculatorTab: React.FC = () => {
 
         {/* Right Output Results Panel (6 Cols) */}
         <div className="lg:col-span-6 space-y-6">
-          {/* Target Selling Price Card in Reverse Mode */}
-          {mode === 'reverse' && result.requiredSellPricePerShare && (
+          {/* Active Highlight Banner */}
+          {activeInput === 'targetNetPnL' && result.requiredSellPricePerShare ? (
             <div className="bg-[#0D1218] rounded-xl p-6 border-2 border-[#22C55E] shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between text-[#22C55E] text-xs font-bold uppercase tracking-wider font-mono">
                 <span>TARGET SELLING PRICE REQUIRED</span>
@@ -430,7 +486,29 @@ export const CalculatorTab: React.FC = () => {
               </div>
               <p className="mt-2 text-xs text-[#22C55E] font-semibold tracking-wide">
                 Sell at or above this price to take home net profit of ₹
-                {parseFloat(targetNetPnL).toLocaleString('en-IN')} after all taxes & charges!
+                {(parseFloat(targetNetPnLInput) || 0).toLocaleString('en-IN')} after all taxes & charges!
+              </p>
+            </div>
+          ) : (
+            <div className="bg-[#0D1218] rounded-xl p-6 border-2 border-[#38BDF8] shadow-2xl relative overflow-hidden">
+              <div className="flex items-center justify-between text-[#38BDF8] text-xs font-bold uppercase tracking-wider font-mono">
+                <span>PROJECTED NET TAKE-HOME P&L</span>
+                <Calculator className="h-5 w-5 text-[#38BDF8]" />
+              </div>
+              <div className="mt-3 text-3xl sm:text-4xl font-extrabold font-mono tracking-tight flex items-baseline gap-2">
+                <span className={result.netPnL >= 0 ? 'text-[#22C55E]' : 'text-[#EF4444]'}>
+                  {result.netPnL >= 0 ? '+' : ''}₹
+                  {result.netPnL.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${result.netPnL >= 0 ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/30' : 'bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/30'}`}>
+                  {result.netRoiPercent >= 0 ? '+' : ''}{result.netRoiPercent.toFixed(2)}% ROI
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-[#8D99A8] tracking-wide">
+                Net profit when selling at ₹{(parseFloat(sellPriceInput) || 0).toLocaleString('en-IN')} / share after deducting ₹{result.totalFees.toFixed(2)} total side charges.
               </p>
             </div>
           )}
