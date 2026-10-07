@@ -141,7 +141,7 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
               {isChangingPinMode
                 ? newPinStep === 'old'
                   ? 'Enter current 4-digit PIN (Default: 1234)'
-                  : 'Update your screen lock passcode'
+                  : 'Update your screen lock PIN'
                 : 'Enter 4-digit security PIN to unlock (Default: 1234)'}
             </p>
           </div>
@@ -192,7 +192,7 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
           {pinChangeSuccess && (
             <div className="flex items-center justify-center gap-1.5 text-xs text-[#22C55E] font-semibold">
               <CheckCircle2 className="h-4 w-4" />
-              <span>Passcode updated & unlocked!</span>
+              <span>PIN updated & unlocked!</span>
             </div>
           )}
 
@@ -245,7 +245,7 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
               className="text-[#38BDF8] hover:underline flex items-center gap-1.5 font-medium transition"
             >
               <KeyRound className="h-3.5 w-3.5" />
-              <span>{isChangingPinMode ? 'Cancel Change' : 'Change Passcode'}</span>
+              <span>{isChangingPinMode ? 'Cancel Change' : 'Change Security PIN'}</span>
             </button>
 
             <span className="text-[10px] text-[#596574]">AES-256-GCM</span>

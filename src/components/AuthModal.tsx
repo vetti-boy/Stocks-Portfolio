@@ -71,7 +71,7 @@ export const AuthModal: React.FC = () => {
       } else if (res.mustChangePassword) {
         // First time login -> Require password update
         setIsMustChangePasswordMode(true);
-        setSuccessMsg('First-time login detected. You must update your passcode to proceed.');
+        setSuccessMsg('First-time login detected. You must update your password to proceed.');
       }
     } else {
       if (!name) {
@@ -93,7 +93,7 @@ export const AuthModal: React.FC = () => {
   const handleFirstTimePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || newPassword.length < 4) {
-      setErrorMsg('New passcode must be at least 4 characters long');
+      setErrorMsg('New password must be at least 4 characters long');
       return;
     }
 
@@ -114,9 +114,9 @@ export const AuthModal: React.FC = () => {
       setIsSubmitting(false);
 
       if (!res.ok || data.error) {
-        setErrorMsg(data.error || 'Failed to update passcode');
+        setErrorMsg(data.error || 'Failed to update password');
       } else {
-        setSuccessMsg('Passcode updated successfully! Your account is now fully active.');
+        setSuccessMsg('Password updated successfully! Your account is now fully active.');
         setIsMustChangePasswordMode(false);
         setNewPassword('');
         updateUser({ mustChangePassword: false });
@@ -124,7 +124,7 @@ export const AuthModal: React.FC = () => {
       }
     } catch {
       setIsSubmitting(false);
-      setErrorMsg('Failed to update passcode due to network error');
+      setErrorMsg('Failed to update password due to network error');
     }
   };
 
@@ -171,7 +171,7 @@ export const AuthModal: React.FC = () => {
       return;
     }
     if (!newPassword || newPassword.length < 4) {
-      setErrorMsg('New passcode must be at least 4 characters long');
+      setErrorMsg('New password must be at least 4 characters long');
       return;
     }
 
@@ -195,7 +195,7 @@ export const AuthModal: React.FC = () => {
       if (!res.ok || data.error) {
         setErrorMsg(data.error || 'OTP verification failed');
       } else {
-        setSuccessMsg('Passcode verified & updated successfully via OTP!');
+        setSuccessMsg('Password verified & updated successfully via OTP!');
         setIsOtpMode(false);
         setOtpSent(false);
         setOtpCode('');
@@ -227,9 +227,9 @@ export const AuthModal: React.FC = () => {
           </div>
           <h2 className="text-xl font-extrabold text-[#F4F7FA] tracking-tight font-mono">
             {isMustChangePasswordMode
-              ? 'First-Time Login: Set New Passcode'
+              ? 'First-Time Login: Set New Password'
               : isOtpMode
-              ? 'Change Passcode (Email OTP)'
+              ? 'Change Password (Email OTP)'
               : user
               ? 'Account Session & Security'
               : authMode === 'login'
@@ -238,9 +238,9 @@ export const AuthModal: React.FC = () => {
           </h2>
           <p className="text-xs text-[#8D99A8]">
             {isMustChangePasswordMode
-              ? 'You are logging in with a default passcode. Update it now to activate your account.'
+              ? 'You are logging in with a default password. Update it now to activate your account.'
               : isOtpMode
-              ? 'Enter the 6-digit OTP code sent to your email to update your passcode.'
+              ? 'Enter the 6-digit OTP code sent to your email to update your password.'
               : user
               ? `Logged in as ${user.name} (${user.role})`
               : 'Access your encrypted portfolio & live watchlist synced to MongoDB Atlas Cloud.'}
@@ -266,7 +266,7 @@ export const AuthModal: React.FC = () => {
           <form onSubmit={handleFirstTimePasswordChange} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Enter Your New Personal Passcode *
+                Enter Your New Personal Password *
               </label>
               <div className="relative flex items-center">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400 z-10 pointer-events-none" />
@@ -274,7 +274,7 @@ export const AuthModal: React.FC = () => {
                   type={showNewPassword ? 'text' : 'password'}
                   required
                   minLength={4}
-                  placeholder="Enter new strong passcode"
+                  placeholder="Enter new strong password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full glass-input !pl-10 !pr-10 text-xs font-mono text-emerald-300 font-bold"
@@ -345,7 +345,7 @@ export const AuthModal: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    New Passcode *
+                    New Password *
                   </label>
                   <div className="relative flex items-center">
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400 z-10 pointer-events-none" />
@@ -383,7 +383,7 @@ export const AuthModal: React.FC = () => {
                     className="w-2/3 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-lg hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
                   >
                     {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <span>Verify OTP & Change Passcode</span>
+                    <span>Verify OTP & Change Password</span>
                   </button>
                 </div>
               </div>
@@ -422,7 +422,7 @@ export const AuthModal: React.FC = () => {
                 }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 py-2 text-xs font-semibold text-cyan-300 transition"
               >
-                <KeyRound className="h-3.5 w-3.5" /> Change Passcode (Email OTP Verification)
+                <KeyRound className="h-3.5 w-3.5" /> Change Password (Email OTP Verification)
               </button>
 
               <button
@@ -556,7 +556,7 @@ export const AuthModal: React.FC = () => {
                   setEmail('mailfortempusage@gmail.com');
                   setPassword('');
                   setErrorMsg('');
-                  setSuccessMsg('Enter admin passcode to log in as Administrator.');
+                  setSuccessMsg('Enter admin password to log in as Administrator.');
                 }}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 border border-white/10 hover:bg-slate-800 py-2.5 text-xs font-semibold text-slate-200 transition"
               >

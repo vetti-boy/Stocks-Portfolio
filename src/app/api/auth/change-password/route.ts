@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
     if (!newPassword || newPassword.length < 4) {
       return NextResponse.json(
-        { error: 'New passcode must be at least 4 characters long' },
+        { error: 'New password must be at least 4 characters long' },
         { status: 400 }
       );
     }
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
           await user.save();
 
           return NextResponse.json({
-            message: 'Passcode updated successfully',
+            message: 'Password updated successfully',
             user: {
               id: user._id.toString(),
               name: user.name,
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
 
         const fbUser = global.fallbackUsersStore[fbUserIndex];
         return NextResponse.json({
-          message: 'Passcode updated successfully',
+          message: 'Password updated successfully',
           user: {
             id: fbUser.id,
             name: fbUser.name,
@@ -81,9 +81,9 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ message: 'Passcode updated successfully' });
+    return NextResponse.json({ message: 'Password updated successfully' });
   } catch (err: any) {
     console.error('Password change error:', err);
-    return NextResponse.json({ error: err?.message || 'Failed to update passcode' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Failed to update password' }, { status: 500 });
   }
 }

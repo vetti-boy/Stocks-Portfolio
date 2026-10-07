@@ -64,7 +64,7 @@ export async function sendNewUserWelcomeEmail(toEmail: string, userName: string,
       
       <div style="background-color: #0d111d; border: 1px solid rgba(56,189,248,0.3); padding: 15px 20px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 5px 0;"><strong>Login Email:</strong> <span style="color: #38bdf8;">${toEmail}</span></p>
-        <p style="margin: 5px 0;"><strong>Default Passcode:</strong> <span style="color: #10b981; font-family: monospace; font-size: 16px;">${defaultPassword}</span></p>
+        <p style="margin: 5px 0;"><strong>Default Password:</strong> <span style="color: #10b981; font-family: monospace; font-size: 16px;">${defaultPassword}</span></p>
       </div>
 
       <div style="text-align: center; margin: 25px 0;">
@@ -133,7 +133,7 @@ export async function sendAdminResetPasswordNotification(toEmail: string, userNa
       
       <div style="background-color: #0d111d; border: 1px solid rgba(168,85,247,0.4); padding: 15px 20px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 5px 0;"><strong>Account Email:</strong> <span style="color: #38bdf8;">${toEmail}</span></p>
-        <p style="margin: 5px 0;"><strong>New Passcode:</strong> <span style="color: #10b981; font-family: monospace; font-size: 16px;">${newPassword}</span></p>
+        <p style="margin: 5px 0;"><strong>New Password:</strong> <span style="color: #10b981; font-family: monospace; font-size: 16px;">${newPassword}</span></p>
       </div>
 
       <div style="text-align: center; margin: 25px 0;">
@@ -142,7 +142,7 @@ export async function sendAdminResetPasswordNotification(toEmail: string, userNa
         </a>
       </div>
 
-      <p style="font-size: 13px; color: #94a3b8;">You can now log in using this passcode.</p>
+      <p style="font-size: 13px; color: #94a3b8;">You can now log in using this password.</p>
     </div>
   `;
 

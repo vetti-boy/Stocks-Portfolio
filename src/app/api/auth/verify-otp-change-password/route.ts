@@ -45,7 +45,7 @@ export async function POST(req: Request) {
           if (user.otpCode === cleanOtp) {
             const isExpired = user.otpExpiresAt && new Date(user.otpExpiresAt).getTime() < Date.now();
             if (isExpired) {
-              return NextResponse.json({ error: 'OTP passcode has expired. Please request a new OTP.' }, { status: 400 });
+              return NextResponse.json({ error: 'OTP code has expired. Please request a new OTP.' }, { status: 400 });
             }
 
             user.passwordHash = passwordHash;
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Password successfully updated! You can now log in with your new passcode.',
+      message: 'Password successfully updated! You can now log in with your new password.',
       user: updatedUser,
     });
   } catch (err: any) {

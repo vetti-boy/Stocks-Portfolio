@@ -164,7 +164,7 @@ export const AdminPanel: React.FC = () => {
       } else {
         setResetStatusMsg({
           type: 'success',
-          text: `Passcode updated and credentials emailed to ${resetTargetUser.email}!`,
+          text: `Password updated and credentials emailed to ${resetTargetUser.email}!`,
         });
         setTimeout(() => {
           setResetTargetUser(null);
@@ -404,7 +404,7 @@ export const AdminPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-[#8D99A8] mb-1">
-                  Initial Passcode (Emailed to User) *
+                  Initial Password (Emailed to User) *
                 </label>
                 <div className="relative flex items-center">
                   <input
@@ -424,7 +424,7 @@ export const AdminPanel: React.FC = () => {
                   </button>
                 </div>
                 <span className="text-[10px] text-[#596574] mt-1 block">
-                  User will receive this initial passcode via email.
+                  User will receive this initial password via email.
                 </span>
               </div>
 
@@ -717,20 +717,20 @@ export const AdminPanel: React.FC = () => {
                   <Mail className="h-4 w-4 text-[#38BDF8]" /> Server Mail Dispatch
                 </div>
                 <p className="text-[11px] text-[#8D99A8]">
-                  Set new passcode directly without current password verification. Updated passcode will be emailed to user.
+                  Set new password directly without current password verification. Updated password will be emailed to user.
                 </p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-[#8D99A8] mb-1">
-                  Set New Passcode for User *
+                  Set New Password for User *
                 </label>
                 <div className="relative flex items-center">
                   <input
                     type={showResetPassword ? 'text' : 'password'}
                     required
                     minLength={4}
-                    placeholder="Enter new passcode for user"
+                    placeholder="Enter new password for user"
                     value={resetPasswordValue}
                     onChange={(e) => setResetPasswordValue(e.target.value)}
                     className="w-full bg-[#080B10] text-[#F4F7FA] border border-[#202A35] rounded-lg p-2.5 font-mono text-xs pr-10 outline-none focus:border-[#38BDF8]"

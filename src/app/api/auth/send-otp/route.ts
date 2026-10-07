@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `A 6-digit OTP passcode has been sent to ${userEmail}. It will expire in 10 minutes.`,
+      message: `A 6-digit OTP code has been sent to ${userEmail}. It will expire in 10 minutes.`,
       email: userEmail,
     });
   } catch (err: any) {

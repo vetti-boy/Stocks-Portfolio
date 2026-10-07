@@ -51,13 +51,14 @@ export async function POST(req: Request) {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+    const cleanPassword = String(password).trim();
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    const passwordHash = await bcrypt.hash(cleanPassword, salt);
 
     const db = await connectToDatabase();
 
     // Send Welcome Email with credentials to the user's email
-    await sendNewUserWelcomeEmail(cleanEmail, name, password);
+    await sendNewUserWelcomeEmail(cleanEmail, name, cleanPassword);
 
     if (db && db.connection.readyState === 1) {
       try {

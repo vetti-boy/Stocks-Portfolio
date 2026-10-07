@@ -48,71 +48,11 @@ const generateHistory = (basePrice: number): PricePoint[] => {
   return points;
 };
 
-const INITIAL_HOLDINGS: StockHolding[] = [
-  {
-    id: 'hold_hero_1001',
-    symbol: 'HEROMOTORS.NS',
-    companyName: 'Hero Motors Limited',
-    buyPrice: 172.00,
-    currentPrice: 167.52,
-    previousClose: 172.00,
-    quantity: 28,
-    exchange: 'NSE',
-    category: 'Automotive',
-    broker: 'ZERODHA',
-    buyDate: '2026-10-01',
-    dayChangePercent: -2.68,
-  },
-  {
-    id: 'hold_solara_1002',
-    symbol: 'SOLARA.NS',
-    companyName: 'Solara Active Pharma Sciences',
-    buyPrice: 725.86,
-    currentPrice: 682.65,
-    previousClose: 725.86,
-    quantity: 45,
-    exchange: 'NSE',
-    category: 'Tech',
-    broker: 'ZERODHA',
-    buyDate: '2026-10-01',
-    dayChangePercent: -5.95,
-  },
-];
+const INITIAL_HOLDINGS: StockHolding[] = [];
 
-const DEMO_HOLDINGS: StockHolding[] = INITIAL_HOLDINGS;
+const DEMO_HOLDINGS: StockHolding[] = [];
 
-const INITIAL_WATCHLIST: WatchlistItem[] = [
-  {
-    symbol: 'HEROMOTORS.NS',
-    companyName: 'Hero Motors Limited',
-    currentPrice: 167.52,
-    previousClose: 172.00,
-    dayChange: -4.48,
-    dayChangePercent: -2.68,
-    high52: 210.00,
-    low52: 140.00,
-    volume: '5.2L',
-    marketCap: '₹4,800Cr',
-    peRatio: 18.5,
-    category: 'Automotive',
-    history: [],
-  },
-  {
-    symbol: 'SOLARA.NS',
-    companyName: 'Solara Active Pharma Sciences',
-    currentPrice: 682.65,
-    previousClose: 725.86,
-    dayChange: -43.21,
-    dayChangePercent: -5.95,
-    high52: 850.00,
-    low52: 550.00,
-    volume: '8.4L',
-    marketCap: '₹12,400Cr',
-    peRatio: 24.2,
-    category: 'Tech',
-    history: [],
-  },
-];
+const INITIAL_WATCHLIST: WatchlistItem[] = [];
 
 const DEFAULT_TAX_SETTINGS: TaxSettings = {
   holdingPeriodMonths: 12,
@@ -244,8 +184,12 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Load holdings from Local Session Cache & AES-256-GCM Encrypted MongoDB Cloud DB
   useEffect(() => {
-    if (!user) return;
     isCloudDataLoadedRef.current = false;
+    setHoldings([]);
+    setWatchlist([]);
+    setTradeHistory([]);
+
+    if (!user) return;
 
     // 1. Restore from Local Session Cache instantly so UI never displays empty state
     if (typeof window !== 'undefined') {
@@ -284,6 +228,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               // Ignored
             }
           }
+        } else {
+          // Newly created user or no stored cloud data -> empty portfolio
+          setHoldings([]);
+          setWatchlist([]);
+          setTradeHistory([]);
         }
         setSyncStatus('synced');
       } catch (err) {

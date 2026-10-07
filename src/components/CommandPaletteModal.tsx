@@ -157,7 +157,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     },
     {
       id: 'action-lock',
-      title: 'Lock Screen (4-Digit Passcode)',
+      title: 'Lock Screen (4-Digit PIN)',
       category: 'Security',
       icon: Lock,
       action: () => {
