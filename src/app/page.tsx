@@ -16,19 +16,25 @@ function DashboardContent() {
   const { user } = useAuth();
   const { syncStatus } = useStock();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'calculator' | 'admin'>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedTab = localStorage.getItem('stocks_active_tab') as 'portfolio' | 'calculator' | 'admin';
-        if (savedTab && ['portfolio', 'calculator', 'admin'].includes(savedTab)) {
-          return savedTab;
-        }
-      } catch {
-        // Ignored
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'calculator' | 'admin'>('portfolio');
+  const [storedPin, setStoredPin] = useState('1234');
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    try {
+      const savedTab = localStorage.getItem('stocks_active_tab') as 'portfolio' | 'calculator' | 'admin';
+      if (savedTab && ['portfolio', 'calculator', 'admin'].includes(savedTab)) {
+        setActiveTab(savedTab);
       }
+      const pin = localStorage.getItem('app_screen_lock_pin');
+      if (pin) {
+        setStoredPin(pin);
+      }
+    } catch {
+      // Ignored
     }
-    return 'portfolio';
-  });
+  }, []);
 
   const changeTab = (tab: 'portfolio' | 'calculator' | 'admin') => {
     setActiveTab(tab);
@@ -42,16 +48,6 @@ function DashboardContent() {
   };
 
   const [isLocked, setIsLocked] = useState(false);
-  const [storedPin, setStoredPin] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        return localStorage.getItem('app_screen_lock_pin') || '1234';
-      } catch {
-        return '1234';
-      }
-    }
-    return '1234';
-  });
 
   const handleUpdateStoredPin = (newPin: string) => {
     setStoredPin(newPin);

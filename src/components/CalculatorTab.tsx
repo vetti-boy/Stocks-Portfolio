@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStock } from '@/context/StockContext';
 import {
   Calculator,
@@ -74,7 +74,13 @@ export const CalculatorTab: React.FC = () => {
   const [buyPrice, setBuyPrice] = useState<string>('100.00');
   const [sellPrice, setSellPrice] = useState<string>('100.00');
   const [targetNetPnL, setTargetNetPnL] = useState<string>('5000.00');
-  const [exchange, setExchange] = useState<'NSE' | 'BSE'>(taxSettings.exchange || 'NSE');
+  const [exchange, setExchange] = useState<'NSE' | 'BSE'>('NSE');
+
+  useEffect(() => {
+    if (taxSettings.exchange) {
+      setExchange(taxSettings.exchange);
+    }
+  }, [taxSettings.exchange]);
 
   // Selected Broker: Only Zerodha or Groww
   const activeBroker = (taxSettings.brokerPreset === 'GROWW' ? 'GROWW' : 'ZERODHA') as 'ZERODHA' | 'GROWW';
