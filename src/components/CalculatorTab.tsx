@@ -23,7 +23,7 @@ const CHARGE_DESCRIPTIONS = [
     key: 'brokerage',
     label: 'Brokerage Charge',
     title: 'Brokerage Fee',
-    desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 or 0.1% per order, whichever is lower (min ₹5, max ₹20).',
+    desc: 'Broker execution fee. Normal Delivery: Zerodha = ₹0, Groww = ₹20 or 0.1% (min ₹5). MTF Trade: Zerodha = 0.3% max ₹20, Groww = 0.1% max ₹20.',
   },
   {
     key: 'stt',
@@ -61,6 +61,18 @@ const CHARGE_DESCRIPTIONS = [
     title: 'Depository Participant (DP) Charge',
     desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹23.60 (₹3.5 CDSL + ₹16.5 Groww = ₹20 base + ₹3.60 GST). ₹0 if sell value < ₹100.',
   },
+  {
+    key: 'mtfInterest',
+    label: 'MTF Daily Interest',
+    title: 'MTF Margin Funded Interest',
+    desc: 'Daily interest charged on broker funded amount. Zerodha = 0.04% / day (₹40/lakh/day = 14.6% p.a.), Groww = 0.041% / day (14.95% p.a.). Charged for all days including weekends & holidays.',
+  },
+  {
+    key: 'mtfPledge',
+    label: 'MTF Pledge / Unpledge',
+    title: 'MTF Pledge & Unpledge Fee',
+    desc: 'Statutory depository fee for pledging MTF stocks on buy and unpledging on sell. Zerodha = ₹35.40 (17.70 + 17.70), Groww = ₹47.20 (23.60 + 23.60).',
+  },
 ];
 
 export const CalculatorTab: React.FC = () => {
@@ -69,12 +81,19 @@ export const CalculatorTab: React.FC = () => {
   // Mode: 'forward' (Known Sell Price -> Net P&L) or 'reverse' (Target Net P&L -> Required Sell Price)
   const [mode, setMode] = useState<'forward' | 'reverse'>('forward');
 
+  // Trade Type: 'DELIVERY' (Normal Cash Delivery) vs 'MTF' (Margin Trading Facility)
+  const [tradeType, setTradeType] = useState<'DELIVERY' | 'MTF'>('DELIVERY');
+
   // Input states in INR
   const [quantity, setQuantity] = useState<string>('100');
   const [buyPrice, setBuyPrice] = useState<string>('100.00');
   const [sellPrice, setSellPrice] = useState<string>('100.00');
   const [targetNetPnL, setTargetNetPnL] = useState<string>('5000.00');
   const [exchange, setExchange] = useState<'NSE' | 'BSE'>('NSE');
+
+  // MTF Inputs
+  const [ownQtyInput, setOwnQtyInput] = useState<string>('25');
+  const [mtfDaysInput, setMtfDaysInput] = useState<string>('30');
 
   useEffect(() => {
     if (taxSettings.exchange) {
@@ -91,6 +110,8 @@ export const CalculatorTab: React.FC = () => {
     const buyP = Math.max(0, parseFloat(buyPrice) || 0);
     const sellP = Math.max(0, parseFloat(sellPrice) || 0);
     const targetPnL = parseFloat(targetNetPnL) || 0;
+    const ownQ = Math.max(0, parseFloat(ownQtyInput) || 0);
+    const days = Math.max(0, parseFloat(mtfDaysInput) || 0);
 
     return calculateEquityDeliveryBrokerage({
       quantity: qty,
@@ -99,8 +120,12 @@ export const CalculatorTab: React.FC = () => {
       targetNetPnL: targetPnL,
       taxSettings: { ...taxSettings, brokerPreset: activeBroker, exchange },
       mode,
+      isMTF: tradeType === 'MTF',
+      ownQuantity: ownQ,
+      mtfQuantity: Math.max(0, qty - ownQ),
+      mtfDays: days,
     });
-  }, [mode, quantity, buyPrice, sellPrice, targetNetPnL, taxSettings, activeBroker, exchange]);
+  }, [mode, tradeType, quantity, buyPrice, sellPrice, targetNetPnL, ownQtyInput, mtfDaysInput, taxSettings, activeBroker, exchange]);
 
   return (
     <div className="space-y-8">
@@ -146,43 +171,68 @@ export const CalculatorTab: React.FC = () => {
         <div className="lg:col-span-6 space-y-6">
           {/* Trade Parameters Card */}
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-lg">
-            <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#202A35] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono">
-                1. TRADE & INVESTMENT PARAMETERS (₹ INR)
+                1. TRADE PARAMETERS & MTF SPLIT
               </h3>
-              {/* Exchange Selector Toggle (NSE vs BSE) */}
-              <div className="flex items-center bg-[#080B10] border border-[#202A35] rounded-lg p-0.5 text-xs font-mono">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setExchange('NSE');
-                    updateTaxSettings({ exchange: 'NSE' });
-                  }}
-                  className={`px-3 py-1 rounded font-bold transition ${
-                    exchange === 'NSE' ? 'bg-[#38BDF8] text-black shadow' : 'text-[#8D99A8] hover:text-white'
-                  }`}
-                >
-                  NSE
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setExchange('BSE');
-                    updateTaxSettings({ exchange: 'BSE' });
-                  }}
-                  className={`px-3 py-1 rounded font-bold transition ${
-                    exchange === 'BSE' ? 'bg-[#8B5CF6] text-white shadow' : 'text-[#8D99A8] hover:text-white'
-                  }`}
-                >
-                  BSE
-                </button>
+              
+              <div className="flex items-center gap-2">
+                {/* Trade Type Selector Toggle (Delivery vs MTF) */}
+                <div className="flex items-center bg-[#080B10] border border-[#202A35] rounded-lg p-0.5 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setTradeType('DELIVERY')}
+                    className={`px-3 py-1 rounded font-bold transition ${
+                      tradeType === 'DELIVERY' ? 'bg-[#38BDF8] text-black shadow' : 'text-[#8D99A8] hover:text-white'
+                    }`}
+                  >
+                    Normal Delivery
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTradeType('MTF')}
+                    className={`px-3 py-1 rounded font-bold transition ${
+                      tradeType === 'MTF' ? 'bg-[#F59E0B] text-black shadow' : 'text-[#8D99A8] hover:text-white'
+                    }`}
+                  >
+                    MTF Margin Trade
+                  </button>
+                </div>
+
+                {/* Exchange Selector Toggle (NSE vs BSE) */}
+                <div className="flex items-center bg-[#080B10] border border-[#202A35] rounded-lg p-0.5 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExchange('NSE');
+                      updateTaxSettings({ exchange: 'NSE' });
+                    }}
+                    className={`px-2.5 py-1 rounded font-bold transition ${
+                      exchange === 'NSE' ? 'bg-[#38BDF8] text-black shadow' : 'text-[#8D99A8] hover:text-white'
+                    }`}
+                  >
+                    NSE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExchange('BSE');
+                      updateTaxSettings({ exchange: 'BSE' });
+                    }}
+                    className={`px-2.5 py-1 rounded font-bold transition ${
+                      exchange === 'BSE' ? 'bg-[#8B5CF6] text-white shadow' : 'text-[#8D99A8] hover:text-white'
+                    }`}
+                  >
+                    BSE
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-[#8D99A8] mb-1.5">
-                  Quantity (Shares)
+                  Total Order Quantity (Shares)
                 </label>
                 <input
                   type="number"
@@ -204,6 +254,57 @@ export const CalculatorTab: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* MTF Own Capital vs Borrowed Split Inputs */}
+            {tradeType === 'MTF' && (
+              <div className="rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 p-4 space-y-4">
+                <div className="flex items-center justify-between text-xs font-bold text-[#F59E0B] font-mono">
+                  <span>MARGIN TRADING FACILITY (MTF) CAPITAL SPLIT</span>
+                  <span>{activeBroker} Rate: {result.mtfDailyInterestRatePercent}% / day</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      Own Shares (Your Money)
+                    </label>
+                    <input
+                      type="number"
+                      value={ownQtyInput}
+                      onChange={(e) => setOwnQtyInput(e.target.value)}
+                      className="w-full bg-[#080B10] border border-[#F59E0B]/40 rounded-lg p-2 text-xs font-mono text-[#F59E0B] font-bold outline-none focus:border-[#F59E0B]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      MTF Holding Days (Days Held)
+                    </label>
+                    <input
+                      type="number"
+                      value={mtfDaysInput}
+                      onChange={(e) => setMtfDaysInput(e.target.value)}
+                      className="w-full bg-[#080B10] border border-[#F59E0B]/40 rounded-lg p-2 text-xs font-mono text-white outline-none focus:border-[#F59E0B]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[11px] font-mono bg-[#080B10] p-2.5 rounded-lg border border-[#F59E0B]/20">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Your Own Cash:</span>
+                    <span className="font-bold text-[#22C55E]">₹{result.ownInvestment?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Broker Funded:</span>
+                    <span className="font-bold text-[#F59E0B]">₹{result.mtfBorrowedAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Interest per Day:</span>
+                    <span className="font-bold text-amber-400">₹{((result.mtfBorrowedAmount || 0) * (result.mtfDailyInterestRatePercent || 0.04) / 100).toFixed(2)}/day</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {mode === 'forward' ? (
               <div>
@@ -417,6 +518,24 @@ export const CalculatorTab: React.FC = () => {
                       total: result.sellDpCharges,
                       info: CHARGE_DESCRIPTIONS[7],
                     },
+                    ...(result.isMTF
+                      ? [
+                          {
+                            label: `MTF Daily Interest (${result.mtfHoldingDays}d @ ${result.mtfDailyInterestRatePercent}%/day)`,
+                            buy: null,
+                            sell: null,
+                            total: result.mtfInterestCost || 0,
+                            info: CHARGE_DESCRIPTIONS[8],
+                          },
+                          {
+                            label: 'MTF Pledge & Unpledge Fee',
+                            buy: (activeBroker === 'GROWW' ? 23.60 : 17.70),
+                            sell: (activeBroker === 'GROWW' ? 23.60 : 17.70),
+                            total: result.mtfPledgeUnpledgeFee || 0,
+                            info: CHARGE_DESCRIPTIONS[9],
+                          },
+                        ]
+                      : []),
                   ].map((row, idx) => (
                     <tr key={idx} className="group hover:bg-[#111820]/80 transition">
                       <td className="py-2.5 pr-2 text-[#8D99A8] group-hover:text-white relative cursor-help">
@@ -447,7 +566,7 @@ export const CalculatorTab: React.FC = () => {
 
                   {/* Subtotal Row */}
                   <tr className="border-t-2 border-[#202A35] font-bold">
-                    <td className="py-3 text-[#F4F7FA]">Total Side Charges</td>
+                    <td className="py-3 text-[#F4F7FA]">Total Side & MTF Charges</td>
                     <td className="py-3 text-right text-[#38BDF8]">₹{result.totalBuyCharges.toFixed(2)}</td>
                     <td className="py-3 text-right text-[#22C55E]">₹{result.totalSellCharges.toFixed(2)}</td>
                     <td className="py-3 text-right text-[#EF4444] text-sm">₹{result.totalFees.toFixed(2)}</td>
@@ -466,6 +585,18 @@ export const CalculatorTab: React.FC = () => {
                   ₹{result.breakevenPoints.toFixed(2)} <span className="text-xs font-normal text-[#8D99A8]">/ share</span>
                 </span>
               </div>
+
+              {result.isMTF && (
+                <div className="flex justify-between items-center bg-[#F59E0B]/10 p-3 rounded-lg border border-[#F59E0B]/30">
+                  <span className="text-xs font-bold text-[#F59E0B] flex items-center gap-1.5">
+                    Return on Own Capital (Leveraged)
+                  </span>
+                  <span className="text-sm font-extrabold text-[#F59E0B]">
+                    {(result.mtfNetReturnOnOwnCapitalPercent || 0) >= 0 ? '+' : ''}
+                    {(result.mtfNetReturnOnOwnCapitalPercent || 0).toFixed(2)}%
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between items-baseline pt-1">
                 <span className="text-sm font-bold text-[#F4F7FA]">Net Take-Home P&L</span>

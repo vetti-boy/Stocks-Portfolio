@@ -27,6 +27,14 @@ export interface StockHolding {
   currentPrice: number;
   previousClose: number;
   dayChangePercent: number;
+  // MTF (Margin Trading Facility) Properties
+  isMTF?: boolean;
+  ownQuantity?: number;
+  mtfQuantity?: number;
+  ownAmount?: number;
+  mtfBorrowedAmount?: number;
+  mtfInterestAccrued?: number;
+  mtfDaysHeld?: number;
 }
 
 export interface TradeRecord {
@@ -43,6 +51,14 @@ export interface TradeRecord {
   realizedPnL?: number;
   realizedPnLPercent?: number;
   exchange: string;
+  // MTF Realized Trade Details
+  isMTF?: boolean;
+  ownQuantity?: number;
+  mtfQuantity?: number;
+  mtfBorrowedAmount?: number;
+  mtfInterestDeducted?: number;
+  mtfPledgeCharges?: number;
+  mtfDaysHeld?: number;
 }
 
 export interface PricePoint {
@@ -94,6 +110,10 @@ export interface CalculatorInput {
   targetNetPnL: number;
   holdingPeriodMonths: number;
   mode: 'forward' | 'reverse';
+  isMTF?: boolean;
+  ownQuantity?: number;
+  mtfQuantity?: number;
+  mtfDays?: number;
 }
 
 export interface CalculationResult {
@@ -142,4 +162,15 @@ export interface CalculationResult {
   netRoiPercent: number;
   requiredSellPricePerShare?: number;
   requiredGrossSaleValue?: number;
+  // MTF Breakdown Details
+  isMTF?: boolean;
+  ownQuantity?: number;
+  mtfQuantity?: number;
+  ownInvestment?: number;
+  mtfBorrowedAmount?: number;
+  mtfDailyInterestRatePercent?: number;
+  mtfHoldingDays?: number;
+  mtfInterestCost?: number;
+  mtfPledgeUnpledgeFee?: number;
+  mtfNetReturnOnOwnCapitalPercent?: number;
 }

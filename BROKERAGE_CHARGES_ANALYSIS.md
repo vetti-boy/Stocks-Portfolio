@@ -1,9 +1,9 @@
-# Official Zerodha & Groww Equity Delivery Brokerage Analysis
-> Calibrated reference of statutory fees, brokerage charges, GST, DP charges, and contract note calculations based on official tariff schedules from **Zerodha (Kite)** and **Groww (Nextbillion Technology)**.
+# Official Zerodha & Groww Equity Delivery & MTF Brokerage Analysis
+> Calibrated reference of statutory fees, brokerage charges, GST, DP charges, and Margin Trading Facility (MTF) calculations based on official tariff schedules from **Zerodha (Kite)** and **Groww (Nextbillion Technology)**.
 
 ---
 
-## 1. Official Tariff Schedule Comparison
+## 1. Official Tariff Schedule Comparison (Normal Equity Delivery)
 
 | Fee / Tax Category | Zerodha (Kite Delivery) | Groww (Equity Delivery) | Statutory Rule & Notes |
 | :--- | :--- | :--- | :--- |
@@ -18,9 +18,21 @@
 
 ---
 
-## 2. Test Order Execution (100 Qty @ ₹100 Buy / ₹100 Sell)
+## 2. Margin Trading Facility (MTF) Tariff Schedule
 
-### 2.1. Zerodha (Kite Delivery) - Itemized Contract Note
+| MTF Parameter | Zerodha MTF Tariff | Groww MTF Tariff | Calculation Rule |
+| :--- | :--- | :--- | :--- |
+| **Daily Interest Rate** | **0.04% per day** (14.6% p.a.)<br/>*(₹40 per lakh / day)* | **0.041% per day** (14.95% p.a.) | $\text{Interest} = \text{Funded Amount} \times \text{Daily Rate} \times \text{Days Held}$.<br/>Applied on funded amount from T+1 till sell date (including weekends & holidays). |
+| **MTF Brokerage** | **₹20 or 0.3% per order** (whichever is lower) | **0.1% per order** (min ₹5, max ₹20) | Applied per executed MTF order (Buy & Sell). |
+| **Pledge Fee (Buy)** | **₹15 + 18% GST = ₹17.70** per ISIN | **₹20 + 18% GST = ₹23.60** per order | Charged per pledge request on buy side. |
+| **Unpledge Fee (Sell)** | **₹15 + 18% GST = ₹17.70** per ISIN | **₹20 + 18% GST = ₹23.60** per order | Charged per unpledge request on sell side. |
+| **Total Pledge/Unpledge** | **₹35.40** per trade cycle | **₹47.20** per trade cycle | Combined pledge (buy) + unpledge (sell) cost. |
+
+---
+
+## 3. Test Order Execution (100 Qty @ ₹100 Buy / ₹100 Sell)
+
+### 3.1. Zerodha (Kite Delivery) - Itemized Contract Note
 
 | Charge Category | Buy Side (₹10,000) | Sell Side (₹10,000) | Combined Total (₹) | Official Formula / Rule |
 | :--- | :---: | :---: | :---: | :--- |
@@ -35,7 +47,7 @@
 
 ---
 
-### 2.2. Groww (Nextbillion) - Itemized Contract Note
+### 3.2. Groww (Nextbillion) - Itemized Contract Note
 
 | Charge Category | Buy Side (₹10,000) | Sell Side (₹10,000) | Combined Total (₹) | Official Formula / Rule |
 | :--- | :---: | :---: | :---: | :--- |

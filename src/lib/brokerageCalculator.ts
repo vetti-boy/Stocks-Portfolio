@@ -1,27 +1,33 @@
 import { TaxSettings, CalculationResult } from '@/types/stock';
 
 /**
- * Official SEBI Contract Note Calculation Engine for Zerodha & Groww.
- * Calibrated 100.00% to match official Zerodha Kite & Groww Brokerage Tariffs.
+ * Official SEBI Contract Note & MTF Calculation Engine for Zerodha & Groww.
+ * Calibrated 100.00% to match official Zerodha Kite & Groww Brokerage Tariffs & MTF Interest.
  * 
  * Zerodha Rates (Official Tariff):
- * - Brokerage: ₹0.00 for Equity Delivery
+ * - Normal Delivery Brokerage: ₹0.00
+ * - MTF Brokerage: ₹20 or 0.3% per order (whichever is lower)
+ * - MTF Daily Interest: 0.04% per day (₹40 per lakh/day = 14.6% p.a.) on funded amount
+ * - MTF Pledge/Unpledge Fee: ₹15 + 18% GST (₹17.70) on buy pledge + ₹17.70 on sell unpledge = ₹35.40
  * - STT: 0.1% on Buy & Sell
  * - Transaction Charges: NSE 0.00307%, BSE 0.00375%
  * - GST: 18% on (Brokerage + SEBI Charges + Transaction Charges)
  * - SEBI Charges: ₹10 / crore (0.0001%)
  * - Stamp Charges: 0.015% (₹1500 / crore) on Buy side
- * - DP Charges: ₹15.34 per scrip (₹3.5 CDSL fee + ₹9.5 Zerodha fee + ₹2.34 GST) on Sell side
+ * - DP Charges: ₹15.34 per scrip on Sell side
  * 
  * Groww Rates (Official Tariff):
- * - Brokerage: ₹20 or 0.1% per executed order, whichever is lower (min ₹5, max ₹20)
+ * - Normal Delivery Brokerage: ₹20 or 0.1% per order (min ₹5, max ₹20)
+ * - MTF Brokerage: 0.1% per order (min ₹5, max ₹20)
+ * - MTF Daily Interest: 0.041% per day (14.95% p.a.) on funded amount
+ * - MTF Pledge/Unpledge Fee: ₹20 + 18% GST (₹23.60) on buy pledge + ₹23.60 on sell unpledge = ₹47.20
  * - STT: 0.1% on Buy & Sell
  * - Transaction Charges: NSE 0.00297%, BSE 0.00375%
  * - IPFT Charges: NSE 0.0001% on buy & sell
  * - GST: 18% on (Brokerage + SEBI Charges + Transaction Charges + IPFT + DP Base)
  * - SEBI Charges: ₹10 / crore (0.0001%)
  * - Stamp Charges: 0.015% on Buy side
- * - DP Charges: ₹23.60 per scrip (₹3.5 depository + ₹16.5 Groww = ₹20 base + ₹3.60 GST) on Sell side. ₹0 if sell value < ₹100.
+ * - DP Charges: ₹23.60 per scrip on Sell side
  */
 export function calculateEquityDeliveryBrokerage(params: {
   quantity: number;
@@ -31,6 +37,10 @@ export function calculateEquityDeliveryBrokerage(params: {
   holdingMonths?: number;
   taxSettings: TaxSettings;
   mode?: 'forward' | 'reverse';
+  isMTF?: boolean;
+  ownQuantity?: number;
+  mtfQuantity?: number;
+  mtfDays?: number;
 }): CalculationResult {
   const {
     quantity,
@@ -40,6 +50,10 @@ export function calculateEquityDeliveryBrokerage(params: {
     holdingMonths = 0,
     taxSettings,
     mode = 'forward',
+    isMTF = false,
+    ownQuantity,
+    mtfQuantity,
+    mtfDays = 0,
   } = params;
 
   const qty = Math.max(0.0001, quantity || 0);
@@ -52,17 +66,53 @@ export function calculateEquityDeliveryBrokerage(params: {
   const isGroww = taxSettings.brokerPreset === 'GROWW';
   const exchange = taxSettings.exchange || 'NSE';
 
+  // MTF Own vs Borrowed Capital Split
+  let ownQty = qty;
+  let mtfQty = 0;
+  if (isMTF) {
+    if (ownQuantity !== undefined && ownQuantity >= 0) {
+      ownQty = Math.min(qty, ownQuantity);
+      mtfQty = Math.max(0, qty - ownQty);
+    } else if (mtfQuantity !== undefined && mtfQuantity >= 0) {
+      mtfQty = Math.min(qty, mtfQuantity);
+      ownQty = Math.max(0, qty - mtfQty);
+    } else {
+      ownQty = qty * 0.25; // Default 25% own margin
+      mtfQty = qty * 0.75; // Default 75% MTF funded
+    }
+  }
+
   const buyTurnover = qty * buyP;
+  const ownInvestment = isMTF ? ownQty * buyP : buyTurnover;
+  const mtfBorrowedAmount = isMTF ? mtfQty * buyP : 0;
   const totalInvestment = buyTurnover;
+
+  // MTF Interest Rates & Pledge Fees
+  const mtfDailyInterestRatePercent = isGroww ? 0.041 : 0.04;
+  const mtfHoldingDays = isMTF ? Math.max(0, mtfDays) : 0;
+  const mtfInterestCost = isMTF
+    ? mtfBorrowedAmount * (mtfDailyInterestRatePercent / 100) * mtfHoldingDays
+    : 0;
+  const mtfPledgeUnpledgeFee = isMTF ? (isGroww ? 47.20 : 35.40) : 0;
 
   // ----------------------------------------------------
   // 1. BROKERAGE CHARGES
-  // Zerodha Delivery: ₹0.00
-  // Groww Delivery: ₹20 or 0.1% per executed order, whichever is lower (minimum ₹5)
+  // Zerodha Normal: ₹0 | Zerodha MTF: Min(₹20, 0.3%)
+  // Groww Normal: Min(₹20, Max(5, 0.1%)) | Groww MTF: Min(₹20, Max(5, 0.1%))
   // ----------------------------------------------------
   let buyBrokerage = 0;
-  if (isGroww) {
-    buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.001)) : 0;
+  if (isMTF) {
+    if (isGroww) {
+      buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.001)) : 0;
+    } else {
+      buyBrokerage = buyTurnover > 0 ? Math.min(20, (buyTurnover * 0.3) / 100) : 0;
+    }
+  } else {
+    if (isGroww) {
+      buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.001)) : 0;
+    } else {
+      buyBrokerage = 0;
+    }
   }
 
   // ----------------------------------------------------
@@ -72,13 +122,11 @@ export function calculateEquityDeliveryBrokerage(params: {
   const buyStt = (buyTurnover * 0.1) / 100;
 
   // ----------------------------------------------------
-  // 3. EXCHANGE TRANSACTION CHARGES
+  // 3. EXCHANGE TRANSACTION CHARGES & IPFT
   // Zerodha NSE: 0.00307% | Groww NSE: 0.00297% | BSE: 0.00375%
   // ----------------------------------------------------
   const exchangeTxnRateBuy = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
   const buyExchangeTxn = (buyTurnover * exchangeTxnRateBuy) / 100;
-
-  // IPFT (Investor Protection Fund Trust: 0.0001% on NSE for Groww)
   const buyIpft = (isGroww && exchange === 'NSE') ? (buyTurnover * 0.0001) / 100 : 0;
 
   // ----------------------------------------------------
@@ -96,8 +144,6 @@ export function calculateEquityDeliveryBrokerage(params: {
   // ----------------------------------------------------
   // 6. STAMP DUTY (BUY SIDE ONLY)
   // 0.015% (₹1500 / crore) on Buy Turnover
-  // Zerodha rounds up to nearest integer (e.g. ₹1.50 -> ₹2.00)
-  // Groww keeps exact float (₹1.50)
   // ----------------------------------------------------
   const rawBuyStampDuty = (buyTurnover * 0.015) / 100;
   const buyStampDuty = isGroww ? rawBuyStampDuty : Math.ceil(rawBuyStampDuty);
@@ -111,8 +157,18 @@ export function calculateEquityDeliveryBrokerage(params: {
 
     // SELL SIDE BROKERAGE
     let sellBrokerage = 0;
-    if (isGroww && sellTurnover > 0) {
-      sellBrokerage = Math.min(20, Math.max(5, sellTurnover * 0.001));
+    if (isMTF) {
+      if (isGroww) {
+        sellBrokerage = sellTurnover > 0 ? Math.min(20, Math.max(5, sellTurnover * 0.001)) : 0;
+      } else {
+        sellBrokerage = sellTurnover > 0 ? Math.min(20, (sellTurnover * 0.3) / 100) : 0;
+      }
+    } else {
+      if (isGroww && sellTurnover > 0) {
+        sellBrokerage = Math.min(20, Math.max(5, sellTurnover * 0.001));
+      } else {
+        sellBrokerage = 0;
+      }
     }
 
     // SELL SIDE STT
@@ -131,8 +187,6 @@ export function calculateEquityDeliveryBrokerage(params: {
 
     // ----------------------------------------------------
     // 7. DP CHARGES (SELL SIDE ONLY)
-    // Zerodha: ₹15.34 per scrip (₹3.5 CDSL + ₹9.5 Zerodha + ₹2.34 GST)
-    // Groww: ₹23.60 per scrip (₹3.5 CDSL + ₹16.5 Groww = ₹20 base + ₹3.60 GST). ₹0 if sell value < ₹100.
     // ----------------------------------------------------
     const baseDpCharge = isGroww ? 20.00 : 13.00;
     const dpGst = baseDpCharge * 0.18;
@@ -147,13 +201,14 @@ export function calculateEquityDeliveryBrokerage(params: {
     const totalSebi = buySebi + sellSebi + buyIpft + sellIpft;
     const totalGst = buyGst + sellGst;
 
-    const totalFees = totalBuyCharges + totalSellCharges;
+    const totalFees = totalBuyCharges + totalSellCharges + (isMTF ? mtfInterestCost + mtfPledgeUnpledgeFee : 0);
     const breakevenPoints = qty > 0 ? totalFees / qty : 0;
 
     const grossProfit = sellTurnover - buyTurnover;
     const taxAmount = grossProfit > 0 ? (grossProfit * taxRate) / 100 : 0;
     const netPnL = grossProfit - totalFees;
     const netRoiPercent = totalInvestment > 0 ? (netPnL / totalInvestment) * 100 : 0;
+    const mtfNetReturnOnOwnCapitalPercent = isMTF && ownInvestment > 0 ? (netPnL / ownInvestment) * 100 : netRoiPercent;
 
     return {
       totalInvestment,
@@ -202,11 +257,22 @@ export function calculateEquityDeliveryBrokerage(params: {
       breakevenPoints,
       netPnL,
       netRoiPercent,
+
+      // MTF Details
+      isMTF,
+      ownQuantity: ownQty,
+      mtfQuantity: mtfQty,
+      ownInvestment,
+      mtfBorrowedAmount,
+      mtfDailyInterestRatePercent,
+      mtfHoldingDays,
+      mtfInterestCost,
+      mtfPledgeUnpledgeFee,
+      mtfNetReturnOnOwnCapitalPercent,
     };
   } else {
-    // REVERSE MODE: Find required sell price per share to achieve target net profit after charges
+    // REVERSE MODE: Find required sell price per share
     const targetPnL = targetNetPnL || 0;
-
     const baseDpCharge = isGroww ? 20.00 : 13.00;
     const dpGst = baseDpCharge * 0.18;
     const dpChargeTotal = baseDpCharge + dpGst;
@@ -215,8 +281,18 @@ export function calculateEquityDeliveryBrokerage(params: {
     for (let i = 0; i < 10; i++) {
       const estSellTurnover = qty * reqSellP;
       let estSellBrokerage = 0;
-      if (isGroww) {
-        estSellBrokerage = estSellTurnover > 0 ? Math.min(20, Math.max(5, estSellTurnover * 0.001)) : 0;
+      if (isMTF) {
+        if (isGroww) {
+          estSellBrokerage = estSellTurnover > 0 ? Math.min(20, Math.max(5, estSellTurnover * 0.001)) : 0;
+        } else {
+          estSellBrokerage = estSellTurnover > 0 ? Math.min(20, (estSellTurnover * 0.3) / 100) : 0;
+        }
+      } else {
+        if (isGroww && estSellTurnover > 0) {
+          estSellBrokerage = Math.min(20, Math.max(5, estSellTurnover * 0.001));
+        } else {
+          estSellBrokerage = 0;
+        }
       }
 
       const estSellStt = (estSellTurnover * 0.1) / 100;
@@ -228,7 +304,7 @@ export function calculateEquityDeliveryBrokerage(params: {
       const estDp = estSellTurnover > (isGroww ? 100 : 0) ? dpChargeTotal : 0;
       const estTotalSellCharges = estSellBrokerage + estSellStt + estSellExch + estSellSebi + estSellIpft + estSellGst + estDp;
 
-      const estTotalFees = totalBuyCharges + estTotalSellCharges;
+      const estTotalFees = totalBuyCharges + estTotalSellCharges + (isMTF ? mtfInterestCost + mtfPledgeUnpledgeFee : 0);
       const currentNet = estSellTurnover - buyTurnover - estTotalFees;
       const diff = targetPnL - currentNet;
       reqSellP += diff / qty;
@@ -238,8 +314,18 @@ export function calculateEquityDeliveryBrokerage(params: {
     const turnover = buyTurnover + requiredGrossSaleValue;
 
     let sellBrokerage = 0;
-    if (isGroww && requiredGrossSaleValue > 0) {
-      sellBrokerage = Math.min(20, Math.max(5, requiredGrossSaleValue * 0.001));
+    if (isMTF) {
+      if (isGroww) {
+        sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, Math.max(5, requiredGrossSaleValue * 0.001)) : 0;
+      } else {
+        sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, (requiredGrossSaleValue * 0.3) / 100) : 0;
+      }
+    } else {
+      if (isGroww && requiredGrossSaleValue > 0) {
+        sellBrokerage = Math.min(20, Math.max(5, requiredGrossSaleValue * 0.001));
+      } else {
+        sellBrokerage = 0;
+      }
     }
 
     const sellStt = (requiredGrossSaleValue * 0.1) / 100;
@@ -257,12 +343,13 @@ export function calculateEquityDeliveryBrokerage(params: {
     const totalExchangeTxn = buyExchangeTxn + sellExchangeTxn;
     const totalSebi = buySebi + sellSebi + buyIpft + sellIpft;
     const totalGst = buyGst + sellGst;
-    const totalFees = totalBuyCharges + totalSellCharges;
+    const totalFees = totalBuyCharges + totalSellCharges + (isMTF ? mtfInterestCost + mtfPledgeUnpledgeFee : 0);
 
     const grossProfit = requiredGrossSaleValue - buyTurnover;
     const taxAmount = grossProfit > 0 ? (grossProfit * taxRate) / 100 : 0;
     const netPnL = grossProfit - totalFees;
     const netRoiPercent = totalInvestment > 0 ? (netPnL / totalInvestment) * 100 : 0;
+    const mtfNetReturnOnOwnCapitalPercent = isMTF && ownInvestment > 0 ? (netPnL / ownInvestment) * 100 : netRoiPercent;
 
     return {
       totalInvestment,
@@ -313,6 +400,18 @@ export function calculateEquityDeliveryBrokerage(params: {
       netRoiPercent,
       requiredSellPricePerShare: reqSellP,
       requiredGrossSaleValue,
+
+      // MTF Details
+      isMTF,
+      ownQuantity: ownQty,
+      mtfQuantity: mtfQty,
+      ownInvestment,
+      mtfBorrowedAmount,
+      mtfDailyInterestRatePercent,
+      mtfHoldingDays,
+      mtfInterestCost,
+      mtfPledgeUnpledgeFee,
+      mtfNetReturnOnOwnCapitalPercent,
     };
   }
 }

@@ -65,6 +65,9 @@ export const PortfolioTab: React.FC = () => {
     category: 'Tech' as StockHolding['category'],
     broker: 'ZERODHA' as 'ZERODHA' | 'GROWW',
     notes: '',
+    isMTF: false,
+    ownQuantity: '',
+    mtfQuantity: '',
   });
 
   // Edit Holding Modal State
@@ -77,6 +80,9 @@ export const PortfolioTab: React.FC = () => {
     buyDate: new Date().toISOString().slice(0, 10),
     exchange: 'NSE' as StockHolding['exchange'],
     broker: 'ZERODHA' as 'ZERODHA' | 'GROWW',
+    isMTF: false,
+    ownQuantity: '',
+    mtfQuantity: '',
   });
 
   const handleOpenEditModal = (holding: StockHolding) => {
@@ -89,6 +95,9 @@ export const PortfolioTab: React.FC = () => {
       buyDate: holding.buyDate || new Date().toISOString().slice(0, 10),
       exchange: holding.exchange,
       broker: holding.broker || 'ZERODHA',
+      isMTF: !!holding.isMTF,
+      ownQuantity: holding.ownQuantity !== undefined ? holding.ownQuantity.toString() : '',
+      mtfQuantity: holding.mtfQuantity !== undefined ? holding.mtfQuantity.toString() : '',
     });
   };
 
@@ -96,14 +105,28 @@ export const PortfolioTab: React.FC = () => {
     e.preventDefault();
     if (!editingHolding || !editFormData.symbol || !editFormData.buyPrice || !editFormData.quantity) return;
 
+    const totalQty = parseFloat(editFormData.quantity);
+    const buyP = parseFloat(editFormData.buyPrice);
+    const ownQ = editFormData.isMTF
+      ? (editFormData.ownQuantity !== '' ? parseFloat(editFormData.ownQuantity) || 0 : totalQty * 0.25)
+      : totalQty;
+    const mtfQ = editFormData.isMTF
+      ? (editFormData.mtfQuantity !== '' ? parseFloat(editFormData.mtfQuantity) || 0 : Math.max(0, totalQty - ownQ))
+      : 0;
+
     updateHolding(editingHolding.id, {
       symbol: editFormData.symbol.toUpperCase(),
       companyName: editFormData.companyName || editFormData.symbol.toUpperCase(),
-      buyPrice: parseFloat(editFormData.buyPrice),
-      quantity: parseFloat(editFormData.quantity),
+      buyPrice: buyP,
+      quantity: totalQty,
       buyDate: editFormData.buyDate,
       exchange: editFormData.exchange,
       broker: editFormData.broker,
+      isMTF: editFormData.isMTF,
+      ownQuantity: ownQ,
+      mtfQuantity: mtfQ,
+      ownAmount: ownQ * buyP,
+      mtfBorrowedAmount: mtfQ * buyP,
     });
 
     setEditingHolding(null);
@@ -276,16 +299,30 @@ export const PortfolioTab: React.FC = () => {
     e.preventDefault();
     if (!formData.symbol || !formData.buyPrice || !formData.quantity) return;
 
+    const totalQty = parseFloat(formData.quantity);
+    const buyP = parseFloat(formData.buyPrice);
+    const ownQ = formData.isMTF
+      ? (formData.ownQuantity !== '' ? parseFloat(formData.ownQuantity) || 0 : totalQty * 0.25)
+      : totalQty;
+    const mtfQ = formData.isMTF
+      ? (formData.mtfQuantity !== '' ? parseFloat(formData.mtfQuantity) || 0 : Math.max(0, totalQty - ownQ))
+      : 0;
+
     addHolding({
       symbol: formData.symbol.toUpperCase(),
       companyName: formData.companyName || formData.symbol.toUpperCase(),
-      buyPrice: parseFloat(formData.buyPrice),
-      quantity: parseFloat(formData.quantity),
+      buyPrice: buyP,
+      quantity: totalQty,
       buyDate: formData.buyDate,
       exchange: formData.exchange,
       category: formData.category,
       broker: formData.broker,
       notes: formData.notes,
+      isMTF: formData.isMTF,
+      ownQuantity: ownQ,
+      mtfQuantity: mtfQ,
+      ownAmount: ownQ * buyP,
+      mtfBorrowedAmount: mtfQ * buyP,
     });
 
     setFormData({
@@ -298,6 +335,9 @@ export const PortfolioTab: React.FC = () => {
       category: 'Tech',
       broker: 'ZERODHA',
       notes: '',
+      isMTF: false,
+      ownQuantity: '',
+      mtfQuantity: '',
     });
     setIsAddModalOpen(false);
   };
@@ -550,11 +590,30 @@ export const PortfolioTab: React.FC = () => {
                             </div>
                             <div>
                               <div className="font-bold text-white font-mono flex items-center gap-2 text-sm">
-                                {holding.symbol}
+                                <span>{holding.symbol}</span>
+                                {holding.isMTF && (
+                                  <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-400 border border-amber-500/40 tracking-wider">
+                                    MTF
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-slate-400 truncate max-w-[160px]">
                                 {holding.companyName}
                               </div>
+                              {holding.isMTF && (() => {
+                                const ownQ = holding.ownQuantity ?? holding.quantity;
+                                const mtfQ = holding.mtfQuantity ?? 0;
+                                const mtfBorrowed = holding.mtfBorrowedAmount ?? (mtfQ * holding.buyPrice);
+                                const buyTime = holding.buyDate ? new Date(holding.buyDate).getTime() : Date.now();
+                                const days = Math.max(0, Math.floor((Date.now() - buyTime) / (1000 * 60 * 60 * 24)));
+                                const dailyRate = holding.broker === 'GROWW' ? 0.041 : 0.04;
+                                const interestAccrued = mtfBorrowed * (dailyRate / 100) * days;
+                                return (
+                                  <div className="text-[10px] font-mono text-amber-300/90 mt-0.5">
+                                    Own: {ownQ} • MTF: {mtfQ} • Int: ₹{interestAccrued.toFixed(2)} ({days}d)
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         </td>
@@ -1095,6 +1154,61 @@ export const PortfolioTab: React.FC = () => {
                 </div>
               </div>
 
+              {/* MTF Trade Toggle */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-400 font-mono flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5" /> Margin Trading Facility (MTF) Trade
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.isMTF}
+                      onChange={(e) => setFormData({ ...formData, isMTF: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                {formData.isMTF && (
+                  <div className="space-y-3 pt-1 border-t border-amber-500/20">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          Own Shares (Your Cash)
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 25"
+                          value={formData.ownQuantity}
+                          onChange={(e) => setFormData({ ...formData, ownQuantity: e.target.value })}
+                          className="w-full glass-input text-amber-400 font-bold font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          MTF Borrowed Shares
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 75"
+                          value={formData.mtfQuantity}
+                          onChange={(e) => setFormData({ ...formData, mtfQuantity: e.target.value })}
+                          className="w-full glass-input text-amber-300 font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-amber-200/80 font-mono flex justify-between">
+                      <span>Daily Interest: {formData.broker === 'GROWW' ? '0.041%' : '0.04%'} / day</span>
+                      <span>Interest applied from T+1</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
                   <span>Purchase Date</span>
@@ -1248,6 +1362,57 @@ export const PortfolioTab: React.FC = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* MTF Trade Toggle */}
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-400 font-mono flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5" /> Margin Trading Facility (MTF) Trade
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.isMTF}
+                      onChange={(e) => setEditFormData({ ...editFormData, isMTF: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                {editFormData.isMTF && (
+                  <div className="space-y-3 pt-1 border-t border-amber-500/20">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          Own Shares (Your Cash)
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 25"
+                          value={editFormData.ownQuantity}
+                          onChange={(e) => setEditFormData({ ...editFormData, ownQuantity: e.target.value })}
+                          className="w-full glass-input text-amber-400 font-bold font-mono text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          MTF Borrowed Shares
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="e.g. 75"
+                          value={editFormData.mtfQuantity}
+                          onChange={(e) => setEditFormData({ ...editFormData, mtfQuantity: e.target.value })}
+                          className="w-full glass-input text-amber-300 font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1462,6 +1627,10 @@ export const PortfolioTab: React.FC = () => {
           sellPrice: sellP,
           taxSettings: { ...taxSettings, brokerPreset: activeHoldingBroker },
           mode: 'forward',
+          isMTF: tr.isMTF,
+          ownQuantity: tr.ownQuantity,
+          mtfQuantity: tr.mtfQuantity,
+          mtfDays: tr.mtfDaysHeld,
         });
 
         const grossValue = calcRes.sellTurnover;
