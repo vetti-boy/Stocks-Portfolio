@@ -420,7 +420,11 @@ export const CalculatorTab: React.FC = () => {
                         </span>
 
                         {/* INTERACTIVE HOVER TOOLTIP POPUP */}
-                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:flex flex-col z-30 w-64 p-3 rounded-xl bg-[#0A0F15] border border-[#38BDF8]/40 shadow-2xl text-[11px] text-[#F4F7FA] font-sans leading-relaxed pointer-events-none animate-fadeIn">
+                        <div
+                          className={`absolute left-0 ${
+                            idx < 3 ? 'top-full mt-2' : 'bottom-full mb-2'
+                          } hidden group-hover:flex flex-col z-50 w-64 p-3 rounded-xl bg-[#0A0F15] border border-[#38BDF8]/60 shadow-2xl text-[11px] text-[#F4F7FA] font-sans leading-relaxed pointer-events-none animate-fadeIn`}
+                        >
                           <span className="font-bold text-[#38BDF8] font-mono mb-1">{row.info.title}</span>
                           <span className="text-slate-300">{row.info.desc}</span>
                         </div>

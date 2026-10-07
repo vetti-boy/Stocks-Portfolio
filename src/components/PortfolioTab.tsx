@@ -1526,7 +1526,11 @@ export const PortfolioTab: React.FC = () => {
                         <HelpCircle className="h-3 w-3 text-slate-500 group-hover:text-cyan-400 shrink-0" />
                       </span>
                       <span>₹{item.val.toFixed(2)}</span>
-                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover:flex flex-col z-50 w-64 p-3 rounded-xl bg-slate-900 border border-cyan-500/40 shadow-2xl text-[11px] text-slate-200 font-sans leading-relaxed pointer-events-none">
+                      <div
+                        className={`absolute left-0 ${
+                          idx < 3 ? 'top-full mt-2' : 'bottom-full mb-2'
+                        } hidden group-hover:flex flex-col z-50 w-64 p-3 rounded-xl bg-slate-900 border border-cyan-500/60 shadow-2xl text-[11px] text-slate-200 font-sans leading-relaxed pointer-events-none`}
+                      >
                         <span className="font-bold text-cyan-400 font-mono mb-1">{item.title}</span>
                         <span>{item.desc}</span>
                       </div>
