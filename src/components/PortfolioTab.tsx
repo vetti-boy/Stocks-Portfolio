@@ -1460,7 +1460,6 @@ export const PortfolioTab: React.FC = () => {
           quantity: tr.quantity,
           buyPrice: buyP,
           sellPrice: sellP,
-          holdingMonths: 6,
           taxSettings: { ...taxSettings, brokerPreset: activeHoldingBroker },
           mode: 'forward',
         });

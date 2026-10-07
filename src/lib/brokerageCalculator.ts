@@ -27,7 +27,7 @@ export function calculateEquityDeliveryBrokerage(params: {
   buyPrice: number;
   sellPrice: number;
   targetNetPnL?: number;
-  holdingMonths: number;
+  holdingMonths?: number;
   taxSettings: TaxSettings;
   mode?: 'forward' | 'reverse';
 }): CalculationResult {
@@ -36,7 +36,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     buyPrice,
     sellPrice,
     targetNetPnL = 0,
-    holdingMonths,
+    holdingMonths = 0,
     taxSettings,
     mode = 'forward',
   } = params;

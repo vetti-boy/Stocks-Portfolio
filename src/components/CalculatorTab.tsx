@@ -74,7 +74,6 @@ export const CalculatorTab: React.FC = () => {
   const [buyPrice, setBuyPrice] = useState<string>('100.00');
   const [sellPrice, setSellPrice] = useState<string>('100.00');
   const [targetNetPnL, setTargetNetPnL] = useState<string>('5000.00');
-  const [holdingMonths, setHoldingMonths] = useState<string>('8');
   const [exchange, setExchange] = useState<'NSE' | 'BSE'>(taxSettings.exchange || 'NSE');
 
   // Selected Broker: Only Zerodha or Groww
@@ -86,18 +85,16 @@ export const CalculatorTab: React.FC = () => {
     const buyP = Math.max(0, parseFloat(buyPrice) || 0);
     const sellP = Math.max(0, parseFloat(sellPrice) || 0);
     const targetPnL = parseFloat(targetNetPnL) || 0;
-    const months = parseFloat(holdingMonths) || 0;
 
     return calculateEquityDeliveryBrokerage({
       quantity: qty,
       buyPrice: buyP,
       sellPrice: sellP,
       targetNetPnL: targetPnL,
-      holdingMonths: months,
       taxSettings: { ...taxSettings, brokerPreset: activeBroker, exchange },
       mode,
     });
-  }, [mode, quantity, buyPrice, sellPrice, targetNetPnL, holdingMonths, taxSettings, activeBroker, exchange]);
+  }, [mode, quantity, buyPrice, sellPrice, targetNetPnL, taxSettings, activeBroker, exchange]);
 
   return (
     <div className="space-y-8">
@@ -230,28 +227,6 @@ export const CalculatorTab: React.FC = () => {
                 </span>
               </div>
             )}
-
-            <div>
-              <label className="block text-xs font-semibold text-[#8D99A8] mb-2 font-mono">
-                Holding Period: <span className="text-[#38BDF8] font-bold">{holdingMonths} months</span>
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="36"
-                value={holdingMonths}
-                onChange={(e) => setHoldingMonths(e.target.value)}
-                className="w-full accent-[#38BDF8] cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] font-semibold mt-2 font-mono">
-                <span className={result.isLongTerm ? 'text-[#596574]' : 'text-[#F59E0B] font-bold'}>
-                  Short-Term (&le; 12 mo) - STCG: {taxSettings.stcgRatePercent}%
-                </span>
-                <span className={result.isLongTerm ? 'text-[#22C55E] font-bold' : 'text-[#596574]'}>
-                  Long-Term (&gt; 12 mo) - LTCG: {taxSettings.ltcgRatePercent}%
-                </span>
-              </div>
-            </div>
           </div>
 
           {/* Broker Selector: ONLY Zerodha & Groww */}
