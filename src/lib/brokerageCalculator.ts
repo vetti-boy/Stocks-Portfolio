@@ -204,16 +204,15 @@ export function calculateEquityDeliveryBrokerage(params: {
       netRoiPercent,
     };
   } else {
-    // REVERSE MODE: Find required sell price per share
+    // REVERSE MODE: Find required sell price per share to achieve target net profit after charges
     const targetPnL = targetNetPnL || 0;
-    const targetGrossProfit = targetPnL > 0 ? targetPnL / (1 - taxRate / 100) : targetPnL;
 
     const baseDpCharge = isGroww ? 20.00 : 13.00;
     const dpGst = baseDpCharge * 0.18;
     const dpChargeTotal = baseDpCharge + dpGst;
 
     let reqSellP = buyP;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       const estSellTurnover = qty * reqSellP;
       let estSellBrokerage = 0;
       if (isGroww) {
@@ -231,7 +230,7 @@ export function calculateEquityDeliveryBrokerage(params: {
 
       const estTotalFees = totalBuyCharges + estTotalSellCharges;
       const currentNet = estSellTurnover - buyTurnover - estTotalFees;
-      const diff = targetGrossProfit - currentNet;
+      const diff = targetPnL - currentNet;
       reqSellP += diff / qty;
     }
 
