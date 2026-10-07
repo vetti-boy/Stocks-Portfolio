@@ -7,11 +7,61 @@ import {
   Target,
   IndianRupee,
   Receipt,
-  ArrowDownRight,
-  ArrowUpRight,
+  HelpCircle,
   Scale,
 } from 'lucide-react';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
+
+const CHARGE_DESCRIPTIONS = [
+  {
+    key: 'turnover',
+    label: 'Order Turnover',
+    title: 'Order Turnover',
+    desc: 'Total gross monetary value of traded orders (Quantity × Buy/Sell Price).',
+  },
+  {
+    key: 'brokerage',
+    label: 'Brokerage Charge',
+    title: 'Brokerage Fee',
+    desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 flat or 0.05% max per order.',
+  },
+  {
+    key: 'stt',
+    label: 'STT (0.1% Buy / 0.1% Sell)',
+    title: 'Securities Transaction Tax (STT)',
+    desc: 'Statutory tax levied by Central Govt under SEBI rules at 0.1% on Buy and 0.1% on Sell value for Equity Delivery.',
+  },
+  {
+    key: 'exchange',
+    label: 'Exchange Txn Charge',
+    title: 'Exchange Transaction Charge',
+    desc: 'Infrastructure fee charged by stock exchanges (NSE: 0.00307% for Zerodha / 0.00297% for Groww, BSE: 0.00375%).',
+  },
+  {
+    key: 'sebi',
+    label: 'SEBI Turnover Fee',
+    title: 'SEBI Regulatory Fee',
+    desc: 'Regulator charge collected by SEBI to regulate stock markets at ₹10 per crore (0.0001%) of turnover.',
+  },
+  {
+    key: 'gst',
+    label: 'GST (18%)',
+    title: 'Goods & Services Tax (GST)',
+    desc: '18% Govt tax levied on (Brokerage + Exchange Transaction Charges + SEBI Fees).',
+  },
+  {
+    key: 'stamp',
+    label: 'Stamp Duty (0.015% Buy)',
+    title: 'State Stamp Duty',
+    desc: 'State Govt stamp tax levied at 0.015% (₹1,500/Cr) on BUY side order value only.',
+  },
+  {
+    key: 'dp',
+    label: 'DP Charge (CDSL Sell)',
+    title: 'Depository Participant (DP) Charge',
+    desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹21.54 (18.25+18% GST).',
+  },
+];
 
 export const CalculatorTab: React.FC = () => {
   const { taxSettings, updateTaxSettings } = useStock();
@@ -59,7 +109,7 @@ export const CalculatorTab: React.FC = () => {
             <span>Zerodha & Groww Equity Delivery Brokerage Calculator</span>
           </h2>
           <p className="text-xs text-[#8D99A8] mt-1">
-            Itemized Buy & Sell side statutory charges (STT, Exchange Txn, SEBI, GST, Stamp Duty & DP charges) under Indian SEBI rules.
+            Hover over any charge category below to inspect full statutory rules & tax definitions.
           </p>
         </div>
 
@@ -258,7 +308,7 @@ export const CalculatorTab: React.FC = () => {
                     sttPercent: 0.1,
                     stampDutyPercent: 0.015,
                     gstPercent: 18,
-                    flatDpCharges: 15.93,
+                    flatDpCharges: 21.54,
                   })
                 }
                 className={`p-4 rounded-xl border text-left transition flex flex-col justify-between active:scale-95 ${
@@ -273,7 +323,7 @@ export const CalculatorTab: React.FC = () => {
                     {activeBroker === 'GROWW' && <span className="h-2.5 w-2.5 rounded-full bg-[#22C55E]" />}
                   </div>
                   <span className="text-xs text-[#22C55E] font-bold block mt-1">₹20 or 0.05% Max Order</span>
-                  <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹15.93 on Sell</span>
+                  <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹21.54 on Sell</span>
                 </div>
               </button>
             </div>
@@ -317,7 +367,7 @@ export const CalculatorTab: React.FC = () => {
               </span>
             </div>
 
-            {/* SEPARATE BUY SIDE vs SELL SIDE CHARGES TABLE */}
+            {/* SEPARATE BUY SIDE vs SELL SIDE CHARGES TABLE WITH INTERACTIVE HOVER TOOLTIPS */}
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-full text-xs font-mono text-left">
                 <thead>
@@ -329,76 +379,93 @@ export const CalculatorTab: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#202A35]/60 text-[#F4F7FA]">
-                  {/* Turnover */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">Order Turnover</td>
-                    <td className="py-2 text-right">₹{result.buyTurnover.toFixed(2)}</td>
-                    <td className="py-2 text-right">₹{result.sellTurnover.toFixed(2)}</td>
-                    <td className="py-2 text-right font-bold">₹{result.turnover.toFixed(2)}</td>
-                  </tr>
+                  {[
+                    {
+                      label: 'Order Turnover',
+                      buy: result.buyTurnover,
+                      sell: result.sellTurnover,
+                      total: result.turnover,
+                      info: CHARGE_DESCRIPTIONS[0],
+                    },
+                    {
+                      label: 'Brokerage Charge',
+                      buy: result.buyBrokerage,
+                      sell: result.sellBrokerage,
+                      total: result.totalBrokerage,
+                      info: CHARGE_DESCRIPTIONS[1],
+                    },
+                    {
+                      label: 'STT (0.1% Buy / 0.1% Sell)',
+                      buy: result.buyStt,
+                      sell: result.sellStt,
+                      total: result.totalStt,
+                      info: CHARGE_DESCRIPTIONS[2],
+                    },
+                    {
+                      label: `Exchange Txn (${exchange})`,
+                      buy: result.buyExchangeTxn,
+                      sell: result.sellExchangeTxn,
+                      total: result.totalExchangeTxn,
+                      info: CHARGE_DESCRIPTIONS[3],
+                    },
+                    {
+                      label: 'SEBI Turnover Fee',
+                      buy: result.buySebi,
+                      sell: result.sellSebi,
+                      total: result.totalSebi,
+                      info: CHARGE_DESCRIPTIONS[4],
+                    },
+                    {
+                      label: 'GST (18%)',
+                      buy: result.buyGst,
+                      sell: result.sellGst,
+                      total: result.totalGst,
+                      info: CHARGE_DESCRIPTIONS[5],
+                    },
+                    {
+                      label: 'Stamp Duty (0.015% Buy)',
+                      buy: result.buyStampDuty,
+                      sell: null,
+                      total: result.buyStampDuty,
+                      info: CHARGE_DESCRIPTIONS[6],
+                    },
+                    {
+                      label: 'DP Charge (CDSL Sell)',
+                      buy: null,
+                      sell: result.sellDpCharges,
+                      total: result.sellDpCharges,
+                      info: CHARGE_DESCRIPTIONS[7],
+                    },
+                  ].map((row, idx) => (
+                    <tr key={idx} className="group hover:bg-[#111820]/80 transition">
+                      <td className="py-2.5 pr-2 text-[#8D99A8] group-hover:text-white relative cursor-help">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <span>{row.label}</span>
+                          <HelpCircle className="h-3 w-3 text-[#596574] group-hover:text-[#38BDF8] shrink-0 transition" />
+                        </span>
 
-                  {/* Brokerage */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">Brokerage Charge</td>
-                    <td className="py-2 text-right">₹{result.buyBrokerage.toFixed(2)}</td>
-                    <td className="py-2 text-right">₹{result.sellBrokerage.toFixed(2)}</td>
-                    <td className="py-2 text-right font-bold">₹{result.totalBrokerage.toFixed(2)}</td>
-                  </tr>
-
-                  {/* STT */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">STT (0.1% Buy / 0.1% Sell)</td>
-                    <td className="py-2 text-right">₹{result.buyStt.toFixed(2)}</td>
-                    <td className="py-2 text-right">₹{result.sellStt.toFixed(2)}</td>
-                    <td className="py-2 text-right font-bold">₹{result.totalStt.toFixed(2)}</td>
-                  </tr>
-
-                  {/* Exchange Txn */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">Exchange Txn ({exchange})</td>
-                    <td className="py-2 text-right">₹{result.buyExchangeTxn.toFixed(2)}</td>
-                    <td className="py-2 text-right">₹{result.sellExchangeTxn.toFixed(2)}</td>
-                    <td className="py-2 text-right font-bold">₹{result.totalExchangeTxn.toFixed(2)}</td>
-                  </tr>
-
-                  {/* SEBI Charges */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">SEBI Turnover Fee</td>
-                    <td className="py-2 text-right">₹{result.buySebi.toFixed(2)}</td>
-                    <td className="py-2 text-right">₹{result.sellSebi.toFixed(2)}</td>
-                    <td className="py-2 text-right font-bold">₹{result.totalSebi.toFixed(2)}</td>
-                  </tr>
-
-                  {/* GST */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">GST (18%)</td>
-                    <td className="py-2 text-right">₹{result.buyGst.toFixed(2)}</td>
-                    <td className="py-2 text-right">₹{result.sellGst.toFixed(2)}</td>
-                    <td className="py-2 text-right font-bold">₹{result.totalGst.toFixed(2)}</td>
-                  </tr>
-
-                  {/* Stamp Duty (Buy Only) */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">Stamp Duty (0.015% Buy)</td>
-                    <td className="py-2 text-right">₹{result.buyStampDuty.toFixed(2)}</td>
-                    <td className="py-2 text-right text-[#596574]">-</td>
-                    <td className="py-2 text-right font-bold">₹{result.buyStampDuty.toFixed(2)}</td>
-                  </tr>
-
-                  {/* DP Charges (Sell Only) */}
-                  <tr>
-                    <td className="py-2 text-[#8D99A8]">DP Charge (CDSL Sell)</td>
-                    <td className="py-2 text-right text-[#596574]">-</td>
-                    <td className="py-2 text-right">₹{result.sellDpCharges.toFixed(2)}</td>
-                    <td className="py-2 text-right font-bold">₹{result.sellDpCharges.toFixed(2)}</td>
-                  </tr>
+                        {/* INTERACTIVE HOVER TOOLTIP POPUP */}
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:flex flex-col z-30 w-64 p-3 rounded-xl bg-[#0A0F15] border border-[#38BDF8]/40 shadow-2xl text-[11px] text-[#F4F7FA] font-sans leading-relaxed pointer-events-none animate-fadeIn">
+                          <span className="font-bold text-[#38BDF8] font-mono mb-1">{row.info.title}</span>
+                          <span className="text-slate-300">{row.info.desc}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-2 text-right">
+                        {row.buy !== null ? `₹${row.buy.toFixed(2)}` : <span className="text-[#596574]">-</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-right">
+                        {row.sell !== null ? `₹${row.sell.toFixed(2)}` : <span className="text-[#596574]">-</span>}
+                      </td>
+                      <td className="py-2.5 pl-2 text-right font-bold">₹{row.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
 
                   {/* Subtotal Row */}
                   <tr className="border-t-2 border-[#202A35] font-bold">
-                    <td className="py-2 text-[#F4F7FA]">Total Side Charges</td>
-                    <td className="py-2 text-right text-[#38BDF8]">₹{result.totalBuyCharges.toFixed(2)}</td>
-                    <td className="py-2 text-right text-[#22C55E]">₹{result.totalSellCharges.toFixed(2)}</td>
-                    <td className="py-2 text-right text-[#EF4444] text-sm">₹{result.totalFees.toFixed(2)}</td>
+                    <td className="py-3 text-[#F4F7FA]">Total Side Charges</td>
+                    <td className="py-3 text-right text-[#38BDF8]">₹{result.totalBuyCharges.toFixed(2)}</td>
+                    <td className="py-3 text-right text-[#22C55E]">₹{result.totalSellCharges.toFixed(2)}</td>
+                    <td className="py-3 text-right text-[#EF4444] text-sm">₹{result.totalFees.toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>

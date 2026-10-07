@@ -31,6 +31,7 @@ import {
   FileText,
   Eye,
   EyeOff,
+  HelpCircle,
 } from 'lucide-react';
 import { StockHolding, TradeRecord } from '@/types/stock';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
@@ -1511,36 +1512,27 @@ export const PortfolioTab: React.FC = () => {
                   <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider font-sans mb-1">
                     Statutory Duties & Broker Charges
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Brokerage ({activeHoldingBroker}):</span>
-                    <span>₹{calcRes.totalBrokerage.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">STT (Securities Transaction Tax 0.1%):</span>
-                    <span>₹{calcRes.sttCharges.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Exchange Txn Charge (NSE/BSE):</span>
-                    <span>₹{calcRes.exchangeTxnCharge.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">SEBI Turnover Charges:</span>
-                    <span>₹{calcRes.sebiCharges.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Stamp Duty (0.015% Buy):</span>
-                    <span>₹{calcRes.stampDuty.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">GST (18%):</span>
-                    <span>₹{calcRes.gstCharges.toFixed(2)}</span>
-                  </div>
-                  {calcRes.dpCharges > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">CDSL DP Charge (Sell):</span>
-                      <span>₹{calcRes.dpCharges.toFixed(2)}</span>
+                  {[
+                    { label: `Brokerage (${activeHoldingBroker})`, val: calcRes.totalBrokerage, title: 'Brokerage Fee', desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 flat or 0.05% max per order.' },
+                    { label: 'STT (0.1% Buy / 0.1% Sell)', val: calcRes.sttCharges, title: 'Securities Transaction Tax (STT)', desc: 'Statutory tax levied by Central Govt under SEBI rules at 0.1% on Buy and 0.1% on Sell value for Equity Delivery.' },
+                    { label: 'Exchange Txn Charge', val: calcRes.exchangeTxnCharge, title: 'Exchange Transaction Charge', desc: 'Infrastructure fee charged by stock exchanges (NSE: 0.00307% for Zerodha / 0.00297% for Groww, BSE: 0.00375%).' },
+                    { label: 'SEBI Turnover Charges', val: calcRes.sebiCharges, title: 'SEBI Regulatory Fee', desc: 'Regulator charge collected by SEBI to regulate stock markets at ₹10 per crore (0.0001%) of turnover.' },
+                    { label: 'Stamp Duty (0.015% Buy)', val: calcRes.stampDuty, title: 'State Stamp Duty', desc: 'State Govt stamp tax levied at 0.015% (₹1,500/Cr) on BUY side order value only.' },
+                    { label: 'GST (18%)', val: calcRes.gstCharges, title: 'Goods & Services Tax (GST)', desc: '18% Govt tax levied on (Brokerage + Exchange Transaction Charges + SEBI Fees).' },
+                    ...(calcRes.dpCharges > 0 ? [{ label: 'CDSL DP Charge (Sell)', val: calcRes.dpCharges, title: 'Depository Participant (DP) Charge', desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹21.54 (18.25+18% GST).' }] : []),
+                  ].map((item, idx) => (
+                    <div key={idx} className="group relative flex justify-between cursor-help hover:text-white transition">
+                      <span className="text-slate-400 group-hover:text-cyan-400 flex items-center gap-1 transition">
+                        <span>{item.label}</span>
+                        <HelpCircle className="h-3 w-3 text-slate-500 group-hover:text-cyan-400 shrink-0" />
+                      </span>
+                      <span>₹{item.val.toFixed(2)}</span>
+                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover:flex flex-col z-50 w-64 p-3 rounded-xl bg-slate-900 border border-cyan-500/40 shadow-2xl text-[11px] text-slate-200 font-sans leading-relaxed pointer-events-none">
+                        <span className="font-bold text-cyan-400 font-mono mb-1">{item.title}</span>
+                        <span>{item.desc}</span>
+                      </div>
                     </div>
-                  )}
+                  ))}
                   <div className="flex justify-between font-bold border-t border-white/10 pt-1 text-amber-400">
                     <span>Total Tax & Broker Charges:</span>
                     <span>-₹{totalFees.toFixed(2)}</span>
