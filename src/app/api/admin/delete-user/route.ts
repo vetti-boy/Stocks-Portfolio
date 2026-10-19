@@ -3,11 +3,6 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
 import { UserDataModel } from '@/models/UserData';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var fallbackUsersStore: any[] | undefined;
-}
-
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -22,35 +17,28 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'targetUserId is required' }, { status: 400 });
     }
 
-    // Protect master admin account from deletion
-    if (targetUserId === 'admin_master') {
-      return NextResponse.json({ error: 'Master Admin account cannot be deleted' }, { status: 400 });
-    }
-
     await connectToDatabase();
 
-    // Block deleting any Admin account in MongoDB
     const existingUser = await UserModel.findById(targetUserId);
-    if (existingUser && (existingUser.role === 'ADMIN' || existingUser.email === 'mailfortempusage@gmail.com')) {
-      return NextResponse.json({ error: 'Administrator accounts cannot be deleted.' }, { status: 400 });
+    if (!existingUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // 1. Delete user from MongoDB User collection & UserData collection
-    try {
-      await UserModel.findByIdAndDelete(targetUserId);
-      await UserDataModel.deleteMany({ userId: targetUserId });
-    } catch (err: any) {
-      console.warn('MongoDB user deletion failed:', err.message);
+    if (existingUser.email === 'mailfortempusage@gmail.com') {
+      return NextResponse.json({ error: 'Master Administrator account cannot be deleted.' }, { status: 400 });
     }
 
-    // 2. Remove from fallback user store if present
-    if (global.fallbackUsersStore) {
-      global.fallbackUsersStore = global.fallbackUsersStore.filter((u) => u.id !== targetUserId);
-    }
+    // 1. Delete user from MongoDB User collection
+    await UserModel.findByIdAndDelete(targetUserId);
+
+    // 2. Delete all portfolio data linked by userId OR email
+    await UserDataModel.deleteMany({
+      $or: [{ userId: targetUserId }, { userEmail: existingUser.email }],
+    });
 
     return NextResponse.json({
       success: true,
-      message: 'User account and encrypted portfolio data permanently deleted.',
+      message: 'User account and portfolio data permanently deleted from MongoDB.',
     });
   } catch (err: any) {
     console.error('Delete user account error:', err);

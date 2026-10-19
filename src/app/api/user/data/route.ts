@@ -8,22 +8,36 @@ export async function POST(req: Request) {
   try {
     const { userId, userEmail, holdings, watchlist, tradeHistory, taxSettings } = await req.json();
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    if (!userId && !userEmail) {
+      return NextResponse.json({ error: 'userId or userEmail is required' }, { status: 400 });
     }
 
-    const payload = { holdings, watchlist, tradeHistory, taxSettings, updatedAt: new Date().toISOString() };
+    const cleanEmail = userEmail ? userEmail.toLowerCase().trim() : '';
+    const payload = {
+      holdings: Array.isArray(holdings) ? holdings : [],
+      watchlist: Array.isArray(watchlist) ? watchlist : [],
+      tradeHistory: Array.isArray(tradeHistory) ? tradeHistory : [],
+      taxSettings: taxSettings || {},
+      updatedAt: new Date().toISOString(),
+    };
 
     await connectToDatabase();
 
+    // Query condition: match by userId OR userEmail
+    const queryConditions: any[] = [];
+    if (userId) queryConditions.push({ userId });
+    if (cleanEmail) queryConditions.push({ userEmail: cleanEmail });
+
+    const query = queryConditions.length > 1 ? { $or: queryConditions } : queryConditions[0];
+
     await UserDataModel.findOneAndUpdate(
-      { userId },
+      query,
       {
-        userId,
-        userEmail: userEmail || 'user@stocks.io',
+        userId: userId || cleanEmail,
+        userEmail: cleanEmail || 'user@stocks.io',
         payload,
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     return NextResponse.json({
@@ -41,19 +55,34 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
+    const userEmail = searchParams.get('userEmail');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId query parameter is required' }, { status: 400 });
+    if (!userId && !userEmail) {
+      return NextResponse.json({ error: 'userId or userEmail query parameter is required' }, { status: 400 });
     }
+
+    const cleanEmail = userEmail ? userEmail.toLowerCase().trim() : '';
 
     await connectToDatabase();
 
-    const record = await UserDataModel.findOne({ userId });
+    const queryConditions: any[] = [];
+    if (userId) queryConditions.push({ userId });
+    if (cleanEmail) queryConditions.push({ userEmail: cleanEmail });
+
+    const query = queryConditions.length > 1 ? { $or: queryConditions } : queryConditions[0];
+
+    const record = await UserDataModel.findOne(query);
     if (!record || (!record.payload && !record.encryptedPayload)) {
       return NextResponse.json({ data: null, message: 'No stored data found for user' });
     }
 
     const data = record.payload || decryptPayload(record.encryptedPayload);
+
+    // If record was found by email but had an outdated/different userId, keep it in sync
+    if (userId && record.userId !== userId) {
+      record.userId = userId;
+      await record.save().catch((e: any) => console.warn('Failed to sync userId on UserData:', e.message));
+    }
 
     return NextResponse.json({
       success: true,

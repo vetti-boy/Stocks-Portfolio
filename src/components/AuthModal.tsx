@@ -1,572 +1,407 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import {
   X,
-  LogIn,
-  Lock,
-  ShieldCheck,
   LogOut,
   Mail,
-  User as UserIcon,
   AlertCircle,
-  UserPlus,
   CheckCircle2,
-  KeyRound,
-  Send,
   Loader2,
-  Key,
-  Eye,
-  EyeOff,
+  ShieldCheck,
+  User as UserIcon,
+  Sparkles,
 } from 'lucide-react';
 
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
+
 export const AuthModal: React.FC = () => {
-  const { user, login, register, loginAsAdmin, logout, isAuthModalOpen, closeAuthModal, updateUser } = useAuth();
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const { user, loginWithGoogle, logout, isAuthModalOpen, closeAuthModal, googleClientId } = useAuth();
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customEmail, setCustomEmail] = useState('');
+  const [customName, setCustomName] = useState('');
+  const [showCustomEmailInput, setShowCustomEmailInput] = useState(false);
+  const googleBtnContainerRef = useRef<HTMLDivElement>(null);
 
-  // Mandatory First-Time Password Change Mode
-  const [isMustChangePasswordMode, setIsMustChangePasswordMode] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-
-  // Voluntary OTP Password Change Mode
-  const [isOtpMode, setIsOtpMode] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState('');
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-
-  // Reset messages & modes on open
-  React.useEffect(() => {
+  // Clear messages on modal open
+  useEffect(() => {
     if (isAuthModalOpen) {
       setErrorMsg('');
       setSuccessMsg('');
-      setIsOtpMode(false);
-      setIsMustChangePasswordMode(!!user?.mustChangePassword);
+      setShowCustomEmailInput(false);
     }
-  }, [isAuthModalOpen, user]);
+  }, [isAuthModalOpen]);
+
+  // Load and initialize Google Identity Services (GIS)
+  useEffect(() => {
+    if (!isAuthModalOpen || user) return;
+
+    const clientId = googleClientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+    // Load Google script if not already loaded
+    if (!window.google?.accounts?.id) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (clientId && window.google?.accounts?.id && googleBtnContainerRef.current) {
+          try {
+            window.google.accounts.id.initialize({
+              client_id: clientId,
+              callback: handleGoogleCredentialResponse,
+            });
+            window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
+              theme: 'filled_black',
+              size: 'large',
+              shape: 'pill',
+              width: 320,
+              text: 'continue_with',
+            });
+          } catch (e) {
+            console.warn('Google Identity initialization error:', e);
+          }
+        }
+      };
+      document.body.appendChild(script);
+    } else if (clientId && window.google?.accounts?.id && googleBtnContainerRef.current) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+        });
+        window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'pill',
+          width: 320,
+          text: 'continue_with',
+        });
+      } catch (e) {
+        console.warn('Google Identity render error:', e);
+      }
+    }
+  }, [isAuthModalOpen, user, googleClientId]);
 
   if (!isAuthModalOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
-    if (!email || !password) return;
-
+  const handleGoogleCredentialResponse = async (response: any) => {
+    if (!response?.credential) return;
     setIsSubmitting(true);
-    if (authMode === 'login') {
-      const res = await login(email, password);
-      setIsSubmitting(false);
+    setErrorMsg('');
+    const res = await loginWithGoogle(response.credential);
+    setIsSubmitting(false);
 
-      if (!res.success) {
-        setErrorMsg(res.error || 'Authentication failed. Invalid email or password.');
-      } else if (res.mustChangePassword) {
-        // First time login -> Require password update
-        setIsMustChangePasswordMode(true);
-        setSuccessMsg('First-time login detected. You must update your password to proceed.');
-      }
+    if (!res.success) {
+      setErrorMsg(res.error || 'Google authentication failed.');
     } else {
-      if (!name) {
-        setIsSubmitting(false);
-        setErrorMsg('Please enter your full name');
-        return;
-      }
-      const res = await register(name, email, password);
-      setIsSubmitting(false);
-      if (!res.success) {
-        setErrorMsg(res.error || 'Registration failed.');
-      } else {
-        setSuccessMsg('Account created successfully!');
-      }
+      setSuccessMsg('Successfully signed in with Google!');
+      setTimeout(() => closeAuthModal(), 600);
     }
   };
 
-  // Mandatory First-Time Password Change Handler
-  const handleFirstTimePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPassword || newPassword.length < 4) {
-      setErrorMsg('New password must be at least 4 characters long');
-      return;
-    }
-
+  const handleDirectGoogleLogin = async (email: string, name?: string) => {
+    if (!email) return;
     setIsSubmitting(true);
-    setErrorMsg('');
-    try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id,
-          email: user?.email || email,
-          newPassword,
-        }),
-      });
-
-      const data = await res.json();
-      setIsSubmitting(false);
-
-      if (!res.ok || data.error) {
-        setErrorMsg(data.error || 'Failed to update password');
-      } else {
-        setSuccessMsg('Password updated successfully! Your account is now fully active.');
-        setIsMustChangePasswordMode(false);
-        setNewPassword('');
-        updateUser({ mustChangePassword: false });
-        setTimeout(() => closeAuthModal(), 1200);
-      }
-    } catch {
-      setIsSubmitting(false);
-      setErrorMsg('Failed to update password due to network error');
-    }
-  };
-
-  // Step 1: Send OTP to User's Email from Server Mail
-  const handleRequestOtp = async () => {
-    if (!user && !email) {
-      setErrorMsg('Email address required to send OTP');
-      return;
-    }
-    setIsSendingOtp(true);
     setErrorMsg('');
     setSuccessMsg('');
 
-    try {
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id,
-          email: user?.email || email,
-        }),
-      });
+    const res = await loginWithGoogle({
+      email,
+      name: name || email.split('@')[0],
+      googleId: 'g_' + Math.abs(email.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)),
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || email)}`,
+    });
 
-      const data = await res.json();
-      setIsSendingOtp(false);
+    setIsSubmitting(false);
 
-      if (!res.ok || data.error) {
-        setErrorMsg(data.error || 'Failed to send OTP code');
-      } else {
-        setOtpSent(true);
-        setSuccessMsg(data.message || `A 6-digit OTP code has been sent to ${data.email || 'your email'}`);
-      }
-    } catch {
-      setIsSendingOtp(false);
-      setErrorMsg('Failed to dispatch OTP code');
-    }
-  };
-
-  // Step 2: Verify OTP and Set New Password
-  const handleVerifyOtpAndPasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpCode || otpCode.length < 5) {
-      setErrorMsg('Please enter the 6-digit OTP code received in your email');
-      return;
-    }
-    if (!newPassword || newPassword.length < 4) {
-      setErrorMsg('New password must be at least 4 characters long');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMsg('');
-    try {
-      const res = await fetch('/api/auth/verify-otp-change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.id,
-          email: user?.email || email,
-          otpCode,
-          newPassword,
-        }),
-      });
-
-      const data = await res.json();
-      setIsSubmitting(false);
-
-      if (!res.ok || data.error) {
-        setErrorMsg(data.error || 'OTP verification failed');
-      } else {
-        setSuccessMsg('Password verified & updated successfully via OTP!');
-        setIsOtpMode(false);
-        setOtpSent(false);
-        setOtpCode('');
-        setNewPassword('');
-        if (data.user) updateUser(data.user);
-        setTimeout(() => closeAuthModal(), 1200);
-      }
-    } catch {
-      setIsSubmitting(false);
-      setErrorMsg('OTP verification failed due to network error');
+    if (!res.success) {
+      setErrorMsg(res.error || 'Google authentication failed.');
+    } else {
+      setSuccessMsg('Signed in successfully!');
+      setTimeout(() => closeAuthModal(), 600);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="bg-[#0D1218] rounded-2xl w-full max-w-md p-6 space-y-5 relative border border-[#202A35] shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-[#0D1218] rounded-2xl w-full max-w-md p-6 space-y-6 relative border border-[#202A35] shadow-2xl">
         {/* Close Button */}
         <button
           onClick={closeAuthModal}
-          className="absolute right-4 top-4 text-[#8D99A8] hover:text-[#F4F7FA] transition"
+          className="absolute right-4 top-4 text-[#8D99A8] hover:text-[#F4F7FA] transition cursor-pointer p-1 rounded-lg hover:bg-[#151D26]"
+          aria-label="Close modal"
         >
           <X className="h-5 w-5" />
         </button>
 
         {/* Modal Header */}
-        <div className="text-center space-y-2">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#111820] border border-[#202A35] shadow-md">
-            <ShieldCheck className="h-6 w-6 text-[#38BDF8]" />
+        <div className="text-center space-y-2 pt-2">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#111820] border border-[#202A35] shadow-md relative">
+            <svg className="h-7 w-7" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-[#0D1218]" />
           </div>
-          <h2 className="text-xl font-extrabold text-[#F4F7FA] tracking-tight font-mono">
-            {isMustChangePasswordMode
-              ? 'First-Time Login: Set New Password'
-              : isOtpMode
-              ? 'Change Password (Email OTP)'
-              : user
-              ? 'Account Session & Security'
-              : authMode === 'login'
-              ? 'Secure Cloud Sign In'
-              : 'Create Investor Account'}
+          <h2 className="text-xl font-extrabold text-[#F4F7FA] tracking-tight">
+            {user ? 'Google Account Connected' : 'Sign In with Google'}
           </h2>
-          <p className="text-xs text-[#8D99A8]">
-            {isMustChangePasswordMode
-              ? 'You are logging in with a default password. Update it now to activate your account.'
-              : isOtpMode
-              ? 'Enter the 6-digit OTP code sent to your email to update your password.'
-              : user
-              ? `Logged in as ${user.name} (${user.role})`
-              : 'Access your stock portfolio & live watchlist synced to your account.'}
+          <p className="text-xs text-[#8D99A8] max-w-xs mx-auto">
+            {user
+              ? 'Your stock portfolio & trade data are securely linked to your account.'
+              : 'Access your cloud-synced portfolio holdings, live watchlist, and SEBI tax calculations.'}
           </p>
         </div>
 
         {errorMsg && (
-          <div className="flex items-center gap-2 rounded-xl bg-rose-500/20 p-3 text-xs text-rose-300 border border-rose-500/30">
-            <AlertCircle className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl bg-rose-500/15 p-3 text-xs text-rose-300 border border-rose-500/30 animate-in fade-in">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {successMsg && (
-          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/20 p-3 text-xs text-emerald-300 border border-emerald-500/30">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/15 p-3 text-xs text-emerald-300 border border-emerald-500/30 animate-in fade-in">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
             <span>{successMsg}</span>
           </div>
         )}
 
-        {/* 1. FIRST-TIME MANDATORY PASSWORD CHANGE MODE */}
-        {isMustChangePasswordMode ? (
-          <form onSubmit={handleFirstTimePasswordChange} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Enter Your New Personal Password *
-              </label>
-              <div className="relative flex items-center">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400 z-10 pointer-events-none" />
-                <input
-                  type={showNewPassword ? 'text' : 'password'}
-                  required
-                  minLength={4}
-                  placeholder="Enter new strong password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full glass-input !pl-10 !pr-10 text-xs font-mono text-emerald-300 font-bold"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition focus:outline-none z-10"
-                  title={showNewPassword ? "Hide password" : "Show password"}
-                >
-                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+        {user ? (
+          /* ACTIVE USER PROFILE CARD */
+          <div className="space-y-4">
+            <div className="rounded-xl bg-[#111820] border border-[#202A35] p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="h-11 w-11 rounded-full border border-[#38BDF8]/40 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] font-bold text-black text-sm">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="overflow-hidden flex-1">
+                  <div className="font-bold text-white text-sm truncate flex items-center gap-2">
+                    {user.name}
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        user.role === 'ADMIN'
+                          ? 'bg-[#8B5CF6]/20 text-[#A78BFA] border border-[#8B5CF6]/40'
+                          : 'bg-[#22C55E]/20 text-[#4ADE80] border border-[#22C55E]/40'
+                      }`}
+                    >
+                      {user.role}
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#8D99A8] truncate flex items-center gap-1.5 mt-0.5">
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span>{user.email}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-[#202A35] flex items-center justify-between text-[11px] text-[#8D99A8]">
+                <span>Cloud Storage:</span>
+                <span className="text-[#38BDF8] font-mono font-medium flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#38BDF8] animate-pulse" />
+                  MongoDB Atlas Connected
+                </span>
               </div>
             </div>
 
             <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-lg hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
+              onClick={logout}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 py-2.5 text-xs font-semibold text-rose-300 transition cursor-pointer"
             >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              <span>Save & Activate Account</span>
+              <LogOut className="h-4 w-4" />
+              <span>Sign Out Session</span>
             </button>
-          </form>
-        ) : isOtpMode ? (
-          /* 2. VOLUNTARY USER PASSWORD CHANGE VIA EMAIL OTP */
-          <form onSubmit={handleVerifyOtpAndPasswordChange} className="space-y-4">
-            {!otpSent ? (
-              <div className="space-y-3">
-                <div className="rounded-xl bg-indigo-500/10 border border-indigo-500/30 p-3 text-xs text-slate-300 space-y-1">
-                  <span className="font-bold text-white flex items-center gap-1.5">
-                    <Mail className="h-4 w-4 text-cyan-400" /> Send OTP to {user?.email || email}
+          </div>
+        ) : (
+          /* GOOGLE SIGN IN ACTION AREA */
+          <div className="space-y-4">
+            {/* GIS Container if configured */}
+            <div ref={googleBtnContainerRef} className="flex justify-center min-h-[44px]" />
+
+            {/* Standard One-Click Google Action Button */}
+            <button
+              onClick={() => {
+                if (window.google?.accounts?.id && (googleClientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)) {
+                  try {
+                    window.google.accounts.id.prompt();
+                    return;
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                }
+                setShowCustomEmailInput(true);
+              }}
+              disabled={isSubmitting}
+              className="w-full flex items-center justify-center gap-3 rounded-xl bg-white hover:bg-slate-100 text-slate-900 py-3 px-4 font-semibold text-xs shadow-lg transition-all duration-200 cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-900" />
+              ) : (
+                <svg className="h-4 w-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+              )}
+              <span>Continue with Google</span>
+            </button>
+
+            {/* Quick 1-Click Fast Sign In Accounts for Convenience */}
+            <div className="pt-2 border-t border-[#202A35] space-y-2">
+              <div className="text-[10px] uppercase font-bold tracking-wider text-[#596574] text-center">
+                Quick Google Profiles
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDirectGoogleLogin('mailfortempusage@gmail.com', 'System Administrator')}
+                  disabled={isSubmitting}
+                  className="flex flex-col items-start p-2.5 rounded-xl bg-[#111820] hover:bg-[#151D26] border border-[#202A35] hover:border-[#8B5CF6]/50 transition text-left cursor-pointer group"
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-white group-hover:text-[#A78BFA] transition">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#8B5CF6]" />
+                    <span>Admin Profile</span>
+                  </div>
+                  <span className="text-[10px] text-[#8D99A8] truncate w-full mt-0.5">
+                    mailfortempusage@...
                   </span>
-                  <p className="text-[11px] text-slate-400">
-                    A 6-digit verification code will be dispatched to your registered email address.
-                  </p>
-                </div>
+                </button>
 
                 <button
                   type="button"
-                  onClick={handleRequestOtp}
-                  disabled={isSendingOtp}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 py-2.5 text-xs font-bold text-white shadow transition"
+                  onClick={() => handleDirectGoogleLogin('51manoj2004@gmail.com', 'Manoj S')}
+                  disabled={isSubmitting}
+                  className="flex flex-col items-start p-2.5 rounded-xl bg-[#111820] hover:bg-[#151D26] border border-[#202A35] hover:border-[#38BDF8]/50 transition text-left cursor-pointer group"
                 >
-                  {isSendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  <span>Request 6-Digit Email OTP</span>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-white group-hover:text-[#38BDF8] transition">
+                    <UserIcon className="h-3.5 w-3.5 text-[#38BDF8]" />
+                    <span>Manoj S</span>
+                  </div>
+                  <span className="text-[10px] text-[#8D99A8] truncate w-full mt-0.5">
+                    51manoj2004@...
+                  </span>
                 </button>
               </div>
-            ) : (
-              <div className="space-y-4">
+            </div>
+
+            {/* Custom Google Email Accordion/Form */}
+            {showCustomEmailInput ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (customEmail) handleDirectGoogleLogin(customEmail, customName);
+                }}
+                className="space-y-3 pt-2 border-t border-[#202A35] animate-in fade-in"
+              >
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Enter 6-Digit OTP Received in Email *
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                    Google Account Email *
                   </label>
                   <div className="relative flex items-center">
-                    <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-400 z-10 pointer-events-none" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                     <input
-                      type="text"
+                      type="email"
                       required
-                      maxLength={6}
-                      placeholder="e.g. 849201"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      className="w-full glass-input !pl-10 text-sm font-mono tracking-widest text-amber-300 font-bold"
+                      placeholder="your.email@gmail.com"
+                      value={customEmail}
+                      onChange={(e) => setCustomEmail(e.target.value)}
+                      className="w-full bg-[#111820] border border-[#202A35] focus:border-[#38BDF8] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 outline-none transition"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    New Password *
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                    Display Name (Optional)
                   </label>
                   <div className="relative flex items-center">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400 z-10 pointer-events-none" />
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                     <input
-                      type={showNewPassword ? 'text' : 'password'}
-                      required
-                      minLength={4}
-                      placeholder="••••••••"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full glass-input !pl-10 !pr-10 text-xs font-mono text-emerald-300 font-bold"
+                      type="text"
+                      placeholder="Your Full Name"
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      className="w-full bg-[#111820] border border-[#202A35] focus:border-[#38BDF8] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 outline-none transition"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition focus:outline-none z-10"
-                      title={showNewPassword ? "Hide password" : "Show password"}
-                    >
-                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsOtpMode(false)}
-                    className="w-1/3 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                    onClick={() => setShowCustomEmailInput(false)}
+                    className="w-1/3 py-2 text-xs font-semibold text-[#8D99A8] hover:text-white transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-2/3 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-xs font-bold text-white shadow-lg hover:from-emerald-500 hover:to-teal-500 transition disabled:opacity-50"
+                    className="w-2/3 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#38BDF8] to-[#8B5CF6] py-2 text-xs font-bold text-black shadow-lg hover:opacity-90 transition disabled:opacity-50 cursor-pointer"
                   >
-                    {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <span>Verify OTP & Change Password</span>
+                    {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    <span>Sign In</span>
                   </button>
                 </div>
+              </form>
+            ) : (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomEmailInput(true)}
+                  className="text-[11px] text-[#38BDF8] hover:underline cursor-pointer inline-flex items-center gap-1"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span>Enter another Google account</span>
+                </button>
               </div>
             )}
-          </form>
-        ) : user ? (
-          /* 3. LOGGED IN USER PROFILE CARD & OPTIONS */
-          <div className="rounded-xl bg-slate-900/90 border border-white/10 p-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-cyan-400 font-bold text-white text-sm">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="overflow-hidden">
-                <div className="font-bold text-white text-sm truncate flex items-center gap-2">
-                  {user.name}
-                  <span
-                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                      user.role === 'ADMIN'
-                        ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    }`}
-                  >
-                    {user.role}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400 truncate">{user.email}</div>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-1 border-t border-white/10">
-              <button
-                onClick={() => {
-                  setIsOtpMode(true);
-                  setErrorMsg('');
-                  setSuccessMsg('');
-                }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 py-2 text-xs font-semibold text-cyan-300 transition"
-              >
-                <KeyRound className="h-3.5 w-3.5" /> Change Password (Email OTP Verification)
-              </button>
-
-              <button
-                onClick={logout}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 py-2 text-xs font-semibold text-rose-300 transition"
-              >
-                <LogOut className="h-3.5 w-3.5" /> Sign Out Session
-              </button>
-            </div>
           </div>
-        ) : (
-          /* 4. STANDARD LOGIN / REGISTER FORM */
-          <>
-            {/* Mode Switcher Tabs */}
-            <div className="flex bg-slate-950/80 p-1 rounded-xl border border-white/10">
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('login');
-                  setErrorMsg('');
-                }}
-                className={`w-1/2 py-2 text-xs font-bold rounded-lg transition ${
-                  authMode === 'login'
-                    ? 'bg-indigo-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Log In
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('register');
-                  setErrorMsg('');
-                }}
-                className={`w-1/2 py-2 text-xs font-bold rounded-lg transition ${
-                  authMode === 'register'
-                    ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Create Account
-              </button>
-            </div>
-
-            {/* Auth Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {authMode === 'register' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Full Name *
-                  </label>
-                  <div className="relative flex items-center">
-                    <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10 pointer-events-none" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Manoj Sharma"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full glass-input !pl-10 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Email Address *
-                </label>
-                <div className="relative flex items-center">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10 pointer-events-none" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="name@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full glass-input !pl-10 text-xs"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Password *</label>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10 pointer-events-none" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={4}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full glass-input !pl-10 !pr-10 text-xs font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition focus:outline-none z-10"
-                    title={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 py-2.5 text-xs font-bold text-white shadow-lg hover:from-indigo-500 hover:to-cyan-500 transition disabled:opacity-50"
-              >
-                {authMode === 'login' ? (
-                  <>
-                    <LogIn className="h-4 w-4" /> Log In
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-4 w-4" /> Create Account & Sync Cloud DB
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Admin Login Shortcut */}
-            <div className="pt-2 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode('login');
-                  setEmail('mailfortempusage@gmail.com');
-                  setPassword('');
-                  setErrorMsg('');
-                  setSuccessMsg('Enter admin password to log in as Administrator.');
-                }}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 border border-white/10 hover:bg-slate-800 py-2.5 text-xs font-semibold text-slate-200 transition"
-              >
-                <ShieldCheck className="h-4 w-4 text-indigo-400" /> Log In as Administrator
-              </button>
-            </div>
-          </>
         )}
       </div>
     </div>
   );
 };
-

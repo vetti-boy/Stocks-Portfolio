@@ -8,8 +8,8 @@ export interface User {
   role: UserRole;
   avatar?: string;
   currency: 'INR';
-  isGuest: boolean;
-  mustChangePassword?: boolean;
+  googleId?: string;
+  isGuest?: boolean;
   isDisabled?: boolean;
 }
 

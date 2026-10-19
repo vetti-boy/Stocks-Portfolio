@@ -6,23 +6,15 @@ import {
   ShieldCheck,
   UserPlus,
   Users,
-  Lock,
   CheckCircle2,
   AlertCircle,
-  Database,
-  ShieldAlert,
   RefreshCw,
-  KeyRound,
   X,
   Mail,
   Loader2,
   Eye,
-  EyeOff,
   Briefcase,
-  TrendingUp,
   Activity,
-  DollarSign,
-  PieChart,
   UserX,
   UserCheck,
   Trash2,
@@ -33,36 +25,20 @@ export const AdminPanel: React.FC = () => {
   const { user } = useAuth();
 
   const [usersList, setUsersList] = useState<any[]>([]);
-  const [userStats, setUserStats] = useState<{ totalCount: number; mongoCount: number; fallbackCount: number }>({
-    totalCount: 0,
-    mongoCount: 0,
-    fallbackCount: 0,
-  });
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
-    null
-  );
+  const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // New User Form State
+  // Pre-authorize User Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<UserRole>('USER');
-
-  // Admin Direct Password Reset Modal State
-  const [resetTargetUser, setResetTargetUser] = useState<any | null>(null);
-  const [resetPasswordValue, setResetPasswordValue] = useState('');
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [isResetSubmitting, setIsResetSubmitting] = useState(false);
-  const [resetStatusMsg, setResetStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // User Portfolio Inspection Modal State
   const [inspectingUser, setInspectingUser] = useState<any | null>(null);
   const [inspectingPortfolio, setInspectingPortfolio] = useState<any | null>(null);
   const [isInspectingLoading, setIsInspectingLoading] = useState(false);
 
-  const isAdmin = user?.role === 'ADMIN' || user?.id === 'admin_master';
+  const isAdmin = user?.role === 'ADMIN' || user?.email === 'mailfortempusage@gmail.com';
 
   const fetchUsers = async () => {
     if (!isAdmin) return;
@@ -72,11 +48,6 @@ export const AdminPanel: React.FC = () => {
       const data = await res.json();
       if (data.users) {
         setUsersList(data.users);
-        setUserStats({
-          totalCount: data.totalCount ?? data.users.length,
-          mongoCount: data.mongoCount ?? 0,
-          fallbackCount: data.fallbackCount ?? 0,
-        });
       }
     } catch {
       console.warn('Could not connect to MongoDB server for user directory');
@@ -93,7 +64,7 @@ export const AdminPanel: React.FC = () => {
     e.preventDefault();
     setStatusMsg(null);
 
-    if (!email || !password || !name) return;
+    if (!email || !name) return;
 
     try {
       const res = await fetch('/api/admin/create-user', {
@@ -101,10 +72,9 @@ export const AdminPanel: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           adminUserId: user?.id,
-          adminRole: user?.role,
+          adminRole: user?.role || 'ADMIN',
           name,
           email,
-          password,
           role,
           currency: 'INR',
         }),
@@ -113,68 +83,23 @@ export const AdminPanel: React.FC = () => {
       const data = await res.json();
 
       if (!res.ok || data.error) {
-        setStatusMsg({ type: 'error', text: data.error || 'Failed to create user account' });
+        setStatusMsg({ type: 'error', text: data.error || 'Failed to authorize user account' });
         return;
       }
 
       setStatusMsg({
         type: 'success',
-        text: `Account created for ${data.user.name} (${data.user.email}). Credentials emailed!`,
+        text: `Google account authorized for ${data.user.name} (${data.user.email}).`,
       });
 
       setName('');
       setEmail('');
-      setPassword('');
       fetchUsers();
     } catch {
       setStatusMsg({
         type: 'error',
         text: 'Network error creating user account.',
       });
-    }
-  };
-
-  // Direct Admin Password Reset Handler
-  const handleAdminResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetTargetUser || !resetPasswordValue) return;
-
-    setIsResetSubmitting(true);
-    setResetStatusMsg(null);
-
-    try {
-      const res = await fetch('/api/admin/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUserId: user?.id,
-          adminRole: user?.role,
-          targetUserId: resetTargetUser.id,
-          targetEmail: resetTargetUser.email,
-          newPassword: resetPasswordValue,
-          requirePasswordChangeOnLogin: false,
-        }),
-      });
-
-      const data = await res.json();
-      setIsResetSubmitting(false);
-
-      if (!res.ok || data.error) {
-        setResetStatusMsg({ type: 'error', text: data.error || 'Failed to reset user password' });
-      } else {
-        setResetStatusMsg({
-          type: 'success',
-          text: `Password updated and credentials emailed to ${resetTargetUser.email}!`,
-        });
-        setTimeout(() => {
-          setResetTargetUser(null);
-          setResetPasswordValue('');
-          setResetStatusMsg(null);
-        }, 1500);
-      }
-    } catch {
-      setIsResetSubmitting(false);
-      setResetStatusMsg({ type: 'error', text: 'Network error resetting user password' });
     }
   };
 
@@ -186,7 +111,7 @@ export const AdminPanel: React.FC = () => {
 
     try {
       const res = await fetch(
-        `/api/admin/user-portfolio?targetUserId=${targetUser.id}&adminRole=${user?.role || 'ADMIN'}&adminUserId=${user?.id}`
+        `/api/admin/user-portfolio?targetUserId=${targetUser.id}&adminRole=${user?.role || 'ADMIN'}`
       );
       const data = await res.json();
       if (data.success && data.data) {
@@ -203,14 +128,14 @@ export const AdminPanel: React.FC = () => {
 
   // Toggle User Account Disabled Status
   const handleToggleDisableUser = async (targetUser: any) => {
-    if (targetUser.id === 'admin_master') {
-      alert('Master Admin account status cannot be modified.');
+    if (targetUser.email === 'mailfortempusage@gmail.com') {
+      alert('Master Administrator account status cannot be modified.');
       return;
     }
 
     const newStatus = !targetUser.isDisabled;
     const confirmMsg = newStatus
-      ? `Are you sure you want to DISABLE the account for "${targetUser.name}" (${targetUser.email})?\nThe user will be blocked from logging in until re-enabled.`
+      ? `Are you sure you want to DISABLE "${targetUser.name}" (${targetUser.email})?\nThe user will be blocked from logging in with Google.`
       : `Re-enable account for "${targetUser.name}" (${targetUser.email})?`;
 
     if (!window.confirm(confirmMsg)) return;
@@ -238,7 +163,7 @@ export const AdminPanel: React.FC = () => {
 
   // Change User Role (ADMIN <-> USER)
   const handleChangeUserRole = async (targetUser: any, newRole: 'ADMIN' | 'USER') => {
-    if (targetUser.id === 'admin_master' || targetUser.email === 'mailfortempusage@gmail.com') {
+    if (targetUser.email === 'mailfortempusage@gmail.com') {
       alert('System Administrator role cannot be changed.');
       return;
     }
@@ -268,17 +193,16 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
-
   // Permanently Delete User Account
   const handleDeleteUser = async (targetUser: any) => {
-    if (targetUser.id === 'admin_master') {
-      alert('Master Admin account cannot be deleted.');
+    if (targetUser.email === 'mailfortempusage@gmail.com') {
+      alert('Master Administrator account cannot be deleted.');
       return;
     }
 
     if (
       !window.confirm(
-        `PERMANENT DELETION WARNING:\nAre you sure you want to permanently delete user account "${targetUser.name}" (${targetUser.email})?\n\nThis will destroy all their cloud encrypted holdings and account records permanently.`
+        `PERMANENT DELETION WARNING:\nAre you sure you want to permanently delete user account "${targetUser.name}" (${targetUser.email})?\n\nThis will destroy all their cloud portfolio holdings in MongoDB permanently.`
       )
     ) {
       return;
@@ -302,15 +226,14 @@ export const AdminPanel: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div className="glass-panel p-12 text-center space-y-4 max-w-xl mx-auto border-rose-500/30">
-        <ShieldAlert className="h-12 w-12 text-rose-400 mx-auto animate-bounce" />
+      <div className="bg-[#0D1218] p-12 text-center space-y-4 max-w-xl mx-auto border border-rose-500/30 rounded-2xl">
+        <ShieldCheck className="h-12 w-12 text-rose-400 mx-auto" />
         <h3 className="text-xl font-bold text-white">Admin Authorization Required</h3>
-        <p className="text-xs text-slate-400">
-          User account creation and security administration can only be performed by an authenticated
-          Administrator.
+        <p className="text-xs text-[#8D99A8]">
+          User account management can only be performed by an authenticated Administrator.
         </p>
-        <p className="text-xs font-mono text-cyan-400">
-          Log in with Administrator credentials to manage user access.
+        <p className="text-xs font-mono text-[#38BDF8]">
+          Sign in with the Administrator Google Account (mailfortempusage@gmail.com).
         </p>
       </div>
     );
@@ -321,11 +244,11 @@ export const AdminPanel: React.FC = () => {
       {/* Top Banner */}
       <div className="bg-[#0D1218] rounded-xl p-5 border border-[#202A35] shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-extrabold text-[#F4F7FA] flex items-center gap-2 font-mono">
-            <ShieldCheck className="h-5 w-5 text-[#38BDF8]" /> Enterprise Admin Console & User Provisioning
+          <h2 className="text-lg font-extrabold text-[#F4F7FA] flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-[#38BDF8]" /> Enterprise Admin Console
           </h2>
           <p className="text-xs text-[#8D99A8] mt-1">
-            Account management restricted to System Administrator. Cloud data encrypted with AES-256-GCM.
+            Manage authenticated Google accounts and inspect user stock portfolios stored in MongoDB.
           </p>
         </div>
 
@@ -337,16 +260,15 @@ export const AdminPanel: React.FC = () => {
               {usersList.length}
             </span>
           </div>
-
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Admin Account Creation Form (5 Cols) */}
+        {/* Left: Pre-authorize Google User (5 Cols) */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#202A35] shadow-lg">
-            <h3 className="text-xs font-bold text-[#F4F7FA] uppercase tracking-wider border-b border-[#202A35] pb-3 flex items-center gap-2 font-mono">
-              <UserPlus className="h-4 w-4 text-[#38BDF8]" /> PROVISION NEW USER ACCOUNT
+            <h3 className="text-xs font-bold text-[#F4F7FA] uppercase tracking-wider border-b border-[#202A35] pb-3 flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-[#38BDF8]" /> PRE-AUTHORIZE GOOGLE ACCOUNT
             </h3>
 
             {statusMsg && (
@@ -383,42 +305,16 @@ export const AdminPanel: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-[#8D99A8] mb-1">
-                  User Email Address *
+                  Google Email Address *
                 </label>
                 <input
                   type="email"
                   required
-                  placeholder="ramesh.trader@stocks.in"
+                  placeholder="ramesh.trader@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#080B10] text-[#F4F7FA] border border-[#202A35] rounded-lg p-2.5 text-xs outline-none focus:border-[#38BDF8]"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#8D99A8] mb-1">
-                  Initial Password (Emailed to User) *
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-[#080B10] text-[#F4F7FA] border border-[#202A35] rounded-lg p-2.5 text-xs font-mono pr-10 outline-none focus:border-[#38BDF8]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-[#596574] hover:text-[#F4F7FA] transition"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <span className="text-[10px] text-[#596574] mt-1 block">
-                  User will receive this initial password via email.
-                </span>
               </div>
 
               <div>
@@ -435,9 +331,9 @@ export const AdminPanel: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#38BDF8] hover:bg-[#38BDF8]/90 py-2.5 text-xs font-bold text-[#080B10] shadow transition active:scale-95 font-mono"
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#38BDF8] hover:bg-[#38BDF8]/90 py-2.5 text-xs font-bold text-[#080B10] shadow transition active:scale-95 cursor-pointer"
               >
-                <UserPlus className="h-4 w-4" /> Provision Account & Dispatch Credentials
+                <UserPlus className="h-4 w-4" /> Pre-Authorize Google Account
               </button>
             </form>
           </div>
@@ -447,12 +343,12 @@ export const AdminPanel: React.FC = () => {
         <div className="lg:col-span-7 space-y-4">
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#202A35] shadow-lg">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
-              <h3 className="text-xs font-bold text-[#F4F7FA] uppercase tracking-wider flex items-center gap-2 font-mono">
-                <Users className="h-4 w-4 text-[#22C55E]" /> USER ACCOUNTS DIRECTORY ({usersList.length})
+              <h3 className="text-xs font-bold text-[#F4F7FA] uppercase tracking-wider flex items-center gap-2">
+                <Users className="h-4 w-4 text-[#22C55E]" /> GOOGLE ACCOUNTS DIRECTORY ({usersList.length})
               </h3>
               <button
                 onClick={fetchUsers}
-                className="text-xs text-[#8D99A8] hover:text-[#F4F7FA] flex items-center gap-1 font-mono"
+                className="text-xs text-[#8D99A8] hover:text-[#F4F7FA] flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
               </button>
@@ -474,25 +370,35 @@ export const AdminPanel: React.FC = () => {
                   {usersList.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-[#8D99A8]">
-                        No users provisioned in MongoDB yet. Provision your first account using the form!
+                        No users registered in MongoDB yet.
                       </td>
                     </tr>
                   ) : (
                     usersList.map((u, i) => (
                       <tr key={i} className="hover:bg-[#111820] transition">
                         <td className="px-4 py-3">
-                          <div className="font-bold text-[#F4F7FA] flex items-center gap-2">
-                            <span>{u.name}</span>
-                            {u.mustChangePassword && (
-                              <span className="rounded bg-[#F59E0B]/20 text-[#F59E0B] px-1.5 py-0.5 text-[9px] font-bold border border-[#F59E0B]/30 font-mono">
-                                Password Reset Pending
-                              </span>
+                          <div className="flex items-center gap-2.5">
+                            {u.avatar ? (
+                              <img
+                                src={u.avatar}
+                                alt={u.name}
+                                className="h-7 w-7 rounded-full object-cover border border-[#38BDF8]/30"
+                              />
+                            ) : (
+                              <div className="h-7 w-7 rounded-full bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center font-bold text-[10px] text-black">
+                                {u.name?.charAt(0)?.toUpperCase() || 'U'}
+                              </div>
                             )}
+                            <div>
+                              <div className="font-bold text-[#F4F7FA] flex items-center gap-2">
+                                <span>{u.name}</span>
+                              </div>
+                              <div className="text-[11px] text-[#8D99A8] font-mono">{u.email}</div>
+                            </div>
                           </div>
-                          <div className="text-[11px] text-[#8D99A8] font-mono">{u.email}</div>
                         </td>
                         <td className="px-3 py-3">
-                          {u.id === 'admin_master' || u.email === 'mailfortempusage@gmail.com' ? (
+                          {u.email === 'mailfortempusage@gmail.com' ? (
                             <span className="rounded bg-[#8B5CF6]/20 text-[#8B5CF6] px-2 py-0.5 text-[10px] font-bold font-mono border border-[#8B5CF6]/30">
                               ADMIN
                             </span>
@@ -526,31 +432,19 @@ export const AdminPanel: React.FC = () => {
                         <td className="px-3 py-3 text-center">
                           <button
                             onClick={() => handleInspectUserPortfolio(u)}
-                            className="flex items-center gap-1.5 rounded-lg border border-[#38BDF8]/30 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 px-2.5 py-1 text-[11px] font-semibold text-[#38BDF8] transition mx-auto font-mono"
+                            className="flex items-center gap-1.5 rounded-lg border border-[#38BDF8]/30 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 px-2.5 py-1 text-[11px] font-semibold text-[#38BDF8] transition mx-auto font-mono cursor-pointer"
                           >
                             <Eye className="h-3 w-3 text-[#38BDF8]" /> Inspect
                           </button>
                         </td>
                         <td className="px-3 py-3 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => {
-                                setResetTargetUser(u);
-                                setResetPasswordValue('');
-                                setResetStatusMsg(null);
-                              }}
-                              title="Direct Admin Password Reset"
-                              className="flex items-center gap-1 rounded-lg border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 hover:bg-[#8B5CF6]/20 px-2 py-1 text-[11px] font-semibold text-[#8B5CF6] transition font-mono"
-                            >
-                              <KeyRound className="h-3 w-3 text-[#8B5CF6]" /> Reset
-                            </button>
-
-                            {u.role !== 'ADMIN' && u.id !== 'admin_master' && u.email !== 'mailfortempusage@gmail.com' && (
+                            {u.email !== 'mailfortempusage@gmail.com' && (
                               <>
                                 <button
                                   onClick={() => handleToggleDisableUser(u)}
                                   title={u.isDisabled ? 'Enable user account' : 'Disable user account'}
-                                  className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition font-mono ${
+                                  className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition font-mono cursor-pointer ${
                                     u.isDisabled
                                       ? 'border-[#22C55E]/30 bg-[#22C55E]/10 text-[#22C55E] hover:bg-[#22C55E]/20'
                                       : 'border-[#F59E0B]/30 bg-[#F59E0B]/10 text-[#F59E0B] hover:bg-[#F59E0B]/20'
@@ -570,7 +464,7 @@ export const AdminPanel: React.FC = () => {
                                 <button
                                   onClick={() => handleDeleteUser(u)}
                                   title="Delete user account"
-                                  className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 p-1 text-[#EF4444] transition"
+                                  className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 hover:bg-[#EF4444]/20 p-1 text-[#EF4444] transition cursor-pointer"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -585,11 +479,11 @@ export const AdminPanel: React.FC = () => {
               </table>
             </div>
 
-            {/* User Directory Mobile Cards (< 640px) */}
+            {/* Mobile Cards */}
             <div className="block sm:hidden divide-y divide-[#202A35]">
               {usersList.length === 0 ? (
                 <div className="py-6 text-center text-[#8D99A8] text-xs">
-                  No users provisioned in MongoDB yet.
+                  No users registered in MongoDB yet.
                 </div>
               ) : (
                 usersList.map((u, i) => (
@@ -598,7 +492,7 @@ export const AdminPanel: React.FC = () => {
                       <div>
                         <div className="font-bold text-[#F4F7FA] text-xs flex items-center gap-1.5">
                           <span>{u.name}</span>
-                          {u.id === 'admin_master' || u.email === 'mailfortempusage@gmail.com' ? (
+                          {u.email === 'mailfortempusage@gmail.com' ? (
                             <span className="rounded px-1.5 py-0.2 text-[9px] font-bold font-mono bg-[#8B5CF6]/20 text-[#8B5CF6] border border-[#8B5CF6]/30">
                               ADMIN
                             </span>
@@ -633,17 +527,7 @@ export const AdminPanel: React.FC = () => {
                       >
                         <Eye className="h-3 w-3" /> Inspect
                       </button>
-                      <button
-                        onClick={() => {
-                          setResetTargetUser(u);
-                          setResetPasswordValue('');
-                          setResetStatusMsg(null);
-                        }}
-                        className="flex items-center gap-1 rounded-lg border border-[#8B5CF6]/30 bg-[#8B5CF6]/10 px-2.5 py-1 text-[10px] font-semibold text-[#8B5CF6] font-mono"
-                      >
-                        <KeyRound className="h-3 w-3" /> Reset
-                      </button>
-                      {u.role !== 'ADMIN' && u.id !== 'admin_master' && u.email !== 'mailfortempusage@gmail.com' && (
+                      {u.email !== 'mailfortempusage@gmail.com' && (
                         <>
                           <button
                             onClick={() => handleToggleDisableUser(u)}
@@ -668,114 +552,22 @@ export const AdminPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal 1: Admin Direct Password Reset Modal */}
-      {resetTargetUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="bg-[#0D1218] rounded-2xl w-full max-w-md p-6 space-y-4 relative border border-[#8B5CF6]/40 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
-              <div>
-                <h3 className="text-base font-extrabold text-[#F4F7FA] flex items-center gap-2 font-mono">
-                  <KeyRound className="h-5 w-5 text-[#8B5CF6]" /> Admin Direct Password Override
-                </h3>
-                <p className="text-xs text-[#8D99A8]">Target User: {resetTargetUser.name} ({resetTargetUser.email})</p>
-              </div>
-              <button
-                onClick={() => setResetTargetUser(null)}
-                className="text-[#8D99A8] hover:text-[#F4F7FA]"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {resetStatusMsg && (
-              <div
-                className={`p-3 rounded-lg text-xs flex items-center gap-2 border ${
-                  resetStatusMsg.type === 'success'
-                    ? 'bg-[#22C55E]/10 text-[#22C55E] border-[#22C55E]/30'
-                    : 'bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/30'
-                }`}
-              >
-                {resetStatusMsg.type === 'success' ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                )}
-                <span>{resetStatusMsg.text}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAdminResetPassword} className="space-y-4">
-              <div className="rounded-xl bg-[#8B5CF6]/10 border border-[#8B5CF6]/20 p-3 text-xs text-[#8B5CF6] space-y-1">
-                <div className="font-bold text-[#F4F7FA] flex items-center gap-1.5 font-mono">
-                  <Mail className="h-4 w-4 text-[#38BDF8]" /> Server Mail Dispatch
-                </div>
-                <p className="text-[11px] text-[#8D99A8]">
-                  Set new password directly without current password verification. Updated password will be emailed to user.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#8D99A8] mb-1">
-                  Set New Password for User *
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type={showResetPassword ? 'text' : 'password'}
-                    required
-                    minLength={4}
-                    placeholder="Enter new password for user"
-                    value={resetPasswordValue}
-                    onChange={(e) => setResetPasswordValue(e.target.value)}
-                    className="w-full bg-[#080B10] text-[#F4F7FA] border border-[#202A35] rounded-lg p-2.5 font-mono text-xs pr-10 outline-none focus:border-[#38BDF8]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPassword(!showResetPassword)}
-                    className="absolute right-3 text-[#596574] hover:text-[#F4F7FA] transition"
-                  >
-                    {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setResetTargetUser(null)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-[#8D99A8] hover:text-[#F4F7FA]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isResetSubmitting}
-                  className="rounded-lg bg-[#8B5CF6] hover:bg-[#8B5CF6]/90 px-5 py-2 text-xs font-bold text-white shadow flex items-center gap-2 font-mono transition"
-                >
-                  {isResetSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  <span>Reset & Dispatch Email</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 2: Admin User Portfolio Inspector Modal */}
+      {/* Admin User Portfolio Inspector Modal */}
       {inspectingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md overflow-y-auto">
           <div className="bg-[#0D1218] rounded-2xl w-full max-w-4xl p-6 space-y-5 relative border border-[#38BDF8]/40 shadow-2xl my-8">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-4">
               <div>
-                <h3 className="text-lg font-extrabold text-[#F4F7FA] flex items-center gap-2 font-mono">
+                <h3 className="text-lg font-extrabold text-[#F4F7FA] flex items-center gap-2">
                   <Eye className="h-5 w-5 text-[#38BDF8]" /> Admin User Portfolio Inspection
                 </h3>
                 <p className="text-xs text-[#8D99A8]">
-                  Viewing decrypted portfolio for: <strong className="text-[#F4F7FA]">{inspectingUser.name}</strong> ({inspectingUser.email})
+                  Viewing portfolio for: <strong className="text-[#F4F7FA]">{inspectingUser.name}</strong> ({inspectingUser.email})
                 </p>
               </div>
               <button
                 onClick={() => setInspectingUser(null)}
-                className="text-[#8D99A8] hover:text-[#F4F7FA] rounded-lg p-1"
+                className="text-[#8D99A8] hover:text-[#F4F7FA] rounded-lg p-1 cursor-pointer"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -784,11 +576,11 @@ export const AdminPanel: React.FC = () => {
             {isInspectingLoading ? (
               <div className="py-16 text-center space-y-3">
                 <Loader2 className="h-8 w-8 animate-spin text-[#38BDF8] mx-auto" />
-                <p className="text-xs text-[#8D99A8]">Decrypting user portfolio payload from MongoDB Cloud DB...</p>
+                <p className="text-xs text-[#8D99A8]">Fetching user portfolio from MongoDB Atlas...</p>
               </div>
             ) : inspectingPortfolio ? (
               <div className="space-y-6">
-                {/* User Portfolio Metrics Header */}
+                {/* Metrics Header */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="bg-[#080B10] p-4 rounded-xl border border-[#202A35]">
                     <span className="text-[#8D99A8] text-xs font-semibold block">Total Invested</span>
@@ -811,14 +603,14 @@ export const AdminPanel: React.FC = () => {
                   </div>
 
                   <div className="bg-[#080B10] p-4 rounded-xl border border-[#202A35]">
-                    <span className="text-[#8D99A8] text-xs font-semibold block">Active Holdings Count</span>
+                    <span className="text-[#8D99A8] text-xs font-semibold block">Active Holdings</span>
                     <div className="text-xl font-bold font-mono text-[#38BDF8] mt-1">
                       {(inspectingPortfolio.holdings || []).length} Stocks
                     </div>
                   </div>
                 </div>
 
-                {/* User Owned Stock Holdings Table */}
+                {/* Stock Holdings Table */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-[#F4F7FA] uppercase tracking-wider flex items-center gap-2 font-mono">
                     <Briefcase className="h-4 w-4 text-[#8B5CF6]" /> OWNED STOCK HOLDINGS ({(inspectingPortfolio.holdings || []).length})
@@ -864,7 +656,7 @@ export const AdminPanel: React.FC = () => {
                   </div>
                 </div>
 
-                {/* User Watchlist Table - Only rendered if user actually has items in watchlist */}
+                {/* Watchlist */}
                 {inspectingPortfolio.watchlist && inspectingPortfolio.watchlist.length > 0 && (
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold text-[#F4F7FA] uppercase tracking-wider flex items-center gap-2 font-mono">

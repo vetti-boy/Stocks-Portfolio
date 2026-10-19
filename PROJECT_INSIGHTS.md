@@ -1,41 +1,30 @@
 # Project Insights & Architecture Documentation
 
 ## Executive Overview
-**StockPulse PRO** is an enterprise-grade stock portfolio tracker and live financial analytics application. It features **application-level AES-256-GCM encryption**, **cloud database persistence with MongoDB Atlas**, **Admin-only user account provisioning & lifecycle management (Disable/Delete)**, automated **Email OTP & credential dispatch via Nodemailer**, real-time market tickers, and an advanced **Net P&L & Target Selling Price Calculator**.
+**StockPulse PRO** is an enterprise-grade stock portfolio tracker and live financial analytics application. It features **single Google Sign-In authentication**, **cloud database persistence with MongoDB Atlas**, **Admin user management & account controls (Toggle/Delete/Portfolio Inspection)**, real-time market tickers, and an advanced **Net P&L & Target Selling Price Calculator**.
 
 ---
 
 ## Security & Database Architecture
 
-### 1. Application-Level AES-256-GCM Cloud Encryption
-All user stock holdings, watchlists, trade history, and tax settings are encrypted server-side before being written to MongoDB:
-- **Encryption Standard**: `AES-256-GCM` (Galois/Counter Mode with 128-bit Authentication Tag & 16-byte random IV).
-- **Encryption Flow**:
-  1. Client sends portfolio payload to `/api/user/data`.
-  2. Next.js Server API route converts payload to JSON string and encrypts it with `ENCRYPTION_KEY`.
-  3. Formatted encrypted string (`iv:authTag:encryptedHex`) is saved to MongoDB in the `UserData` collection.
-- **Decryption Flow**:
-  1. Authenticated user requests portfolio data via `GET /api/user/data`.
-  2. Server queries MongoDB `UserData` document, extracts `encryptedPayload` string, verifies auth tag, and decrypts the string server-side.
-  3. Clean JSON data is delivered to the user session.
+### 1. Cloud Database Persistence with MongoDB Atlas
+All user stock holdings, watchlists, trade history, and tax settings are persisted server-side directly to MongoDB Atlas:
+- **Persistence Standard**: MongoDB Atlas `UserData` collection with strict schema integrity (`minimize: false` to ensure empty/mixed sub-objects are never stripped).
+- **Persistence Flow**:
+  1. Client sends portfolio payload to `POST /api/user/data` containing `userId`, `userEmail`, `holdings`, `watchlist`, `tradeHistory`, and `taxSettings`.
+  2. Server uses atomic upsert matching `{ $or: [{ userId }, { userEmail }] }` to link portfolio data to the user's permanent identity.
+  3. Returns confirmation and updates client sync status to `synced`.
+- **Query & Session Retrieval Flow**:
+  1. Authenticated user requests portfolio data via `GET /api/user/data?userId=...&userEmail=...`.
+  2. Server queries MongoDB `UserData` document by `userId` or `userEmail`.
+  3. Clean JSON data is delivered to the user session. If user previously added stocks as guest, the client automatically migrates local holdings to their Google MongoDB document.
 
-### 2. Admin User Lifecycle & Account Control Architecture
-- **Admin Account Provisioning (`/api/admin/create-user`)**:
-  - Admins can provision user accounts with: Full Name, Email, Role (`USER` / `ADMIN`), Temporary Password (hashed with `bcryptjs`), and Default Currency (`INR`).
-  - Users created by Admin are flagged with `mustChangePassword: true`, requiring a passcode change on first login.
-- **Account Disabling & Blocking (`/api/admin/toggle-user`)**:
-  - Admins can toggle user accounts between `ACTIVE` and `DISABLED`.
-  - When an account is disabled, the login API endpoint (`/api/auth/login`) rejects login attempts with an HTTP 403 Forbidden status: *"Your account has been disabled by Administrator. Access is blocked until re-enabled."*
-- **Permanent Account Deletion (`/api/admin/delete-user`)**:
-  - Admins can permanently remove user accounts and erase all associated AES-256-GCM encrypted portfolio data from MongoDB.
-- **Decrypted Portfolio Inspection (`/api/admin/user-portfolio`)**:
-  - Authorized Admins can inspect decrypted user stock holdings. The Watchlist section is conditionally rendered only when the inspected user actually has watchlist stocks.
-- **Show/Hide Password UI Controls**:
-  - Interactive password visibility toggles (`Eye` / `EyeOff` icons) are implemented across all password input fields (Login, Registration, Admin Account Creation, Direct Admin Reset, First-Time Passcode Update, Email OTP Passcode Update, and Broker API Secret inputs).
-
-### 3. Automated Email Dispatch & OTP Verification (Nodemailer)
-- **Email Credentials Dispatch**: Automated email notifications sent upon user creation and password overrides.
-- **Voluntary Passcode Reset via Email OTP**: Users can request a 6-digit OTP code dispatched to their email address to update their passcode securely.
+### 2. Single Google Authentication Flow (`/api/auth/google`)
+All fragmented email/password, guest, and OTP login flows have been unified into **Google Sign-In as the single authentication type**:
+- **Google Identity Services (GIS)**: Accepts signed Google ID tokens (`credential` JWT) and verifies user identity (`email`, `name`, `sub`, `avatar`).
+- **One-Click Account Provisioning**: If user doesn't exist in MongoDB, auto-provisions user account with default role `USER` (or `ADMIN` for `mailfortempusage@gmail.com`).
+- **Account Disabling Enforcement**: If user is disabled by Administrator, authentication returns HTTP 403 Forbidden.
+- **Client Session**: Clean `localStorage` session persistence (`stocks_app_user`) linking all client operations to the Google account.
 
 ---
 

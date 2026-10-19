@@ -61,7 +61,7 @@ function DashboardContent() {
   };
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
-  const isAdmin = user?.role === 'ADMIN' || user?.id === 'admin_master';
+  const isAdmin = user?.role === 'ADMIN' || user?.email === 'mailfortempusage@gmail.com';
 
   // Listen for global Ctrl + K / Cmd + K keyboard shortcut
   useEffect(() => {

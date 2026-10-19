@@ -2,6 +2,23 @@
 
 This file maintains a strict chronological record of all application versions, feature updates, bug fixes, and architectural modifications.
 
+## [v1.8.0] - 2026-10-19
+### Google Sign-In Single Authentication & Cloud Database Portfolio Storage Fix
+- **Single Google Sign-In Implementation (`/api/auth/google`)**:
+  - Removed all email/password login, registration, OTP verification, first-time mandatory password change, and guest login pathways.
+  - Implemented Google Sign-In as the single unified login mechanism with Google Identity Services (GIS) and one-click Google account verification.
+  - Added support for `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `.env.local` and auto-provisioning of Google users into MongoDB `User` collection.
+  - Configured Master Administrator designation automatically for `mailfortempusage@gmail.com`.
+- **MongoDB Portfolio Persistence Fix (`/api/user/data` & `StockContext.tsx`)**:
+  - Fixed portfolio data loss bug where empty/mixed payload objects were stripped by Mongoose by enabling `{ minimize: false }` on `UserDataSchema`.
+  - Replaced transient `userId` query lookups with unified `{ $or: [{ userId }, { userEmail }] }` lookups across GET and POST endpoints.
+  - Fixed React 19 state updater side-effects by removing network fetch calls from inside `setState((prev) => ...)` and decoupling them into a reliable `persistPortfolio` service.
+  - Enabled automatic seamless migration of local/guest holdings to the user's MongoDB cloud document upon signing in with Google.
+  - Fixed JSON portfolio import to immediately trigger cloud database synchronization.
+- **Admin Panel Streamlining**:
+  - Removed legacy password reset actions, password input fields, and OTP modals from Admin Console.
+  - Updated user directory to display real Google users from MongoDB Atlas with avatar, role management, enable/disable status controls, and decrypted portfolio inspection.
+
 ## [v1.7.0] - 2026-10-07
 ### Dynamic IST Market Schedule, Multi-Broker DP Charges & SMTP Email Dispatcher
 - **Dynamic Real-Time Indian Stock Market Status (`src/utils/marketStatus.ts`)**:

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { StockHolding, WatchlistItem, TaxSettings, PricePoint, TradeRecord } from '@/types/stock';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { StockHolding, WatchlistItem, TaxSettings, PricePoint, TradeRecord, User } from '@/types/stock';
 import { useAuth } from './AuthContext';
 import { getIndianMarketStatus, MarketStatusInfo } from '@/utils/marketStatus';
 
@@ -50,12 +50,6 @@ const generateHistory = (basePrice: number): PricePoint[] => {
   return points;
 };
 
-const INITIAL_HOLDINGS: StockHolding[] = [];
-
-const DEMO_HOLDINGS: StockHolding[] = [];
-
-const INITIAL_WATCHLIST: WatchlistItem[] = [];
-
 const DEFAULT_TAX_SETTINGS: TaxSettings = {
   holdingPeriodMonths: 12,
   stcgRatePercent: 20.0,
@@ -69,15 +63,13 @@ const DEFAULT_TAX_SETTINGS: TaxSettings = {
   gstPercent: 18.0,
 };
 
-const INITIAL_TRADE_HISTORY: TradeRecord[] = [];
-
 const StockContext = createContext<StockContextType | undefined>(undefined);
 
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [holdings, setHoldings] = useState<StockHolding[]>(INITIAL_HOLDINGS);
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(INITIAL_WATCHLIST);
-  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>(INITIAL_TRADE_HISTORY);
+  const [holdings, setHoldings] = useState<StockHolding[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>([]);
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [isLiveTickerActive, setIsLiveTickerActive] = useState<boolean>(true);
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<string>('');
@@ -86,16 +78,28 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isFetchingLiveQuotes, setIsFetchingLiveQuotes] = useState<boolean>(false);
   const [marketStatus, setMarketStatus] = useState<MarketStatusInfo>(getIndianMarketStatus());
 
+  // Mutable refs to prevent race conditions during rapid state transitions
+  const userRef = useRef(user);
+  const holdingsRef = useRef<StockHolding[]>(holdings);
+  const watchlistRef = useRef<WatchlistItem[]>(watchlist);
+  const tradeHistoryRef = useRef<TradeRecord[]>(tradeHistory);
+  const taxSettingsRef = useRef<TaxSettings>(taxSettings);
+
+  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { holdingsRef.current = holdings; }, [holdings]);
+  useEffect(() => { watchlistRef.current = watchlist; }, [watchlist]);
+  useEffect(() => { tradeHistoryRef.current = tradeHistory; }, [tradeHistory]);
+  useEffect(() => { taxSettingsRef.current = taxSettings; }, [taxSettings]);
+
+  // Market status timer
   useEffect(() => {
     const timer = setInterval(() => {
       setMarketStatus(getIndianMarketStatus());
-    }, 30000); // refresh every 30 seconds
+    }, 30000);
     return () => clearInterval(timer);
   }, []);
 
-  const storageKey = user ? `stocks_data_${user.id}` : 'stocks_data_guest';
-
-  // Helper to normalize and match stock symbols (e.g. SOLARA.NS vs SOLARA)
+  // Helper to normalize and match stock symbols
   const isSymbolMatch = (sym1?: string, sym2?: string) => {
     if (!sym1 || !sym2) return false;
     const s1 = sym1.replace(/\.NS$/i, '').replace(/\.BO$/i, '').toUpperCase();
@@ -104,11 +108,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Real-Time Quote Fetcher from Live API Server
-  const fetchLiveQuotesNow = async () => {
+  const fetchLiveQuotesNow = useCallback(async () => {
     const allSymbols = Array.from(
       new Set([
-        ...watchlist.map((w) => w.symbol),
-        ...holdings.map((h) => h.symbol),
+        ...watchlistRef.current.map((w) => w.symbol),
+        ...holdingsRef.current.map((h) => h.symbol),
       ])
     );
     if (allSymbols.length === 0) return;
@@ -151,7 +155,6 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           })
         );
 
-        // Also update live prices in holdings table
         setHoldings((prevHoldings) =>
           prevHoldings.map((h) => {
             const liveMatch = data.quotes.find((q: any) =>
@@ -173,136 +176,194 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } finally {
       setIsFetchingLiveQuotes(false);
     }
-  };
+  }, []);
 
-  // Poll real-time stock prices every 15 seconds automatically for live market watching
+  // Periodic price polling every 15 seconds
   useEffect(() => {
-    fetchLiveQuotesNow(); // Immediate initial fetch
+    if (holdings.length === 0 && watchlist.length === 0) return;
     const interval = setInterval(fetchLiveQuotesNow, 15000);
-
     return () => clearInterval(interval);
-  }, [watchlist.length, holdings.length]);
+  }, [fetchLiveQuotesNow, holdings.length, watchlist.length]);
 
-  const isCloudDataLoadedRef = useRef(false);
-
-  // Helper to immediately persist data locally & to server database
-  const saveDataImmediately = async (
-    currentHoldings = holdings,
-    currentWatchlist = watchlist,
-    currentHistory = tradeHistory,
-    currentTax = taxSettings
+  // Master persistence function: Saves to local cache immediately and syncs with MongoDB
+  const persistPortfolio = async (
+    nextHoldings: StockHolding[],
+    nextWatchlist: WatchlistItem[],
+    nextHistory: TradeRecord[],
+    nextTax: TaxSettings,
+    targetUser?: User | null
   ) => {
-    if (!user) return;
+    const currentUser = targetUser || userRef.current || user;
 
-    // 1. Instant Local Cache Save (synchronous)
+    // 1. Instant Synchronous Local Storage Persistence
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(
-          `stocks_user_data_${user.id}`,
-          JSON.stringify({
-            holdings: currentHoldings,
-            watchlist: currentWatchlist,
-            tradeHistory: currentHistory,
-            taxSettings: currentTax,
-          })
-        );
-      } catch {
-        // Ignored
+        const payloadStr = JSON.stringify({
+          holdings: nextHoldings,
+          watchlist: nextWatchlist,
+          tradeHistory: nextHistory,
+          taxSettings: nextTax,
+        });
+
+        if (currentUser) {
+          localStorage.setItem(`stocks_user_data_${currentUser.id}`, payloadStr);
+          if (currentUser.email) {
+            localStorage.setItem(`stocks_user_data_${currentUser.email}`, payloadStr);
+          }
+        } else {
+          localStorage.setItem('stocks_user_data_guest', payloadStr);
+        }
+      } catch (e) {
+        console.warn('LocalStorage save error:', e);
       }
     }
 
-    // 2. Instant Server Database Save
-    try {
+    // 2. Persist to MongoDB Cloud Database if user is authenticated
+    if (currentUser) {
       setSyncStatus('encrypting');
-      await fetch('/api/user/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          userEmail: user.email,
-          holdings: currentHoldings,
-          watchlist: currentWatchlist,
-          tradeHistory: currentHistory,
-          taxSettings: currentTax,
-        }),
-      });
-      setSyncStatus('synced');
-    } catch (err) {
-      console.warn('Server database save error:', err);
-      setSyncStatus('offline');
+      try {
+        const res = await fetch('/api/user/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            userEmail: currentUser.email,
+            holdings: nextHoldings,
+            watchlist: nextWatchlist,
+            tradeHistory: nextHistory,
+            taxSettings: nextTax,
+          }),
+        });
+
+        if (res.ok) {
+          setSyncStatus('synced');
+        } else {
+          setSyncStatus('offline');
+        }
+      } catch (err) {
+        console.warn('Server database save error:', err);
+        setSyncStatus('offline');
+      }
     }
   };
 
-  // Load holdings from Local Session Cache & Server Database
+  // Synchronize portfolio state when user session loads or changes
   useEffect(() => {
-    isCloudDataLoadedRef.current = false;
-    setHoldings([]);
-    setWatchlist([]);
-    setTradeHistory([]);
+    if (!user) {
+      // If no user is logged in, restore guest cache if available
+      if (typeof window !== 'undefined') {
+        try {
+          const guestCached = localStorage.getItem('stocks_user_data_guest');
+          if (guestCached) {
+            const parsed = JSON.parse(guestCached);
+            if (Array.isArray(parsed.holdings)) setHoldings(parsed.holdings);
+            if (Array.isArray(parsed.watchlist)) setWatchlist(parsed.watchlist);
+            if (Array.isArray(parsed.tradeHistory)) setTradeHistory(parsed.tradeHistory);
+            if (parsed.taxSettings) setTaxSettings(parsed.taxSettings);
+          }
+        } catch {
+          // Ignored
+        }
+      }
+      return;
+    }
 
-    if (!user) return;
-
-    // 1. Restore from Local Session Cache instantly so UI never displays empty state
-    let cachedData: any = null;
+    // 1. Instantly check local cache for this specific user so UI does not flicker
+    let localCache: any = null;
+    let guestCache: any = null;
     if (typeof window !== 'undefined') {
       try {
-        const localCacheKey = `stocks_user_data_${user.id}`;
-        const cached = localStorage.getItem(localCacheKey);
+        const cached =
+          localStorage.getItem(`stocks_user_data_${user.id}`) ||
+          (user.email ? localStorage.getItem(`stocks_user_data_${user.email}`) : null);
+
         if (cached) {
-          cachedData = JSON.parse(cached);
-          if (Array.isArray(cachedData.holdings)) setHoldings(cachedData.holdings);
-          if (Array.isArray(cachedData.watchlist)) setWatchlist(cachedData.watchlist);
-          if (Array.isArray(cachedData.tradeHistory)) setTradeHistory(cachedData.tradeHistory);
-          if (cachedData.taxSettings) setTaxSettings(cachedData.taxSettings);
+          localCache = JSON.parse(cached);
+          if (Array.isArray(localCache.holdings)) setHoldings(localCache.holdings);
+          if (Array.isArray(localCache.watchlist)) setWatchlist(localCache.watchlist);
+          if (Array.isArray(localCache.tradeHistory)) setTradeHistory(localCache.tradeHistory);
+          if (localCache.taxSettings) setTaxSettings(localCache.taxSettings);
         }
+
+        const guestRaw = localStorage.getItem('stocks_user_data_guest');
+        if (guestRaw) guestCache = JSON.parse(guestRaw);
       } catch {
         // Ignored
       }
     }
 
-    // 2. Sync with Server Database
-    const fetchCloudData = async () => {
+    // 2. Fetch authentic data from MongoDB Atlas Cloud Database
+    const syncWithCloud = async () => {
       setSyncStatus('encrypting');
       try {
-        const res = await fetch(`/api/user/data?userId=${user.id}`);
+        const queryParams = new URLSearchParams();
+        if (user.id) queryParams.set('userId', user.id);
+        if (user.email) queryParams.set('userEmail', user.email);
+
+        const res = await fetch(`/api/user/data?${queryParams.toString()}`);
         const result = await res.json();
+
         if (result.success && result.data) {
           const cloudHoldings = Array.isArray(result.data.holdings) ? result.data.holdings : [];
           const cloudWatchlist = Array.isArray(result.data.watchlist) ? result.data.watchlist : [];
           const cloudHistory = Array.isArray(result.data.tradeHistory) ? result.data.tradeHistory : [];
+          const cloudTax = result.data.taxSettings || DEFAULT_TAX_SETTINGS;
+
+          holdingsRef.current = cloudHoldings;
+          watchlistRef.current = cloudWatchlist;
+          tradeHistoryRef.current = cloudHistory;
+          taxSettingsRef.current = cloudTax;
 
           setHoldings(cloudHoldings);
           setWatchlist(cloudWatchlist);
           setTradeHistory(cloudHistory);
-          if (result.data.taxSettings) setTaxSettings(result.data.taxSettings);
+          setTaxSettings(cloudTax);
 
-          // Update local session cache
           if (typeof window !== 'undefined') {
             try {
-              localStorage.setItem(`stocks_user_data_${user.id}`, JSON.stringify(result.data));
+              const payloadStr = JSON.stringify(result.data);
+              localStorage.setItem(`stocks_user_data_${user.id}`, payloadStr);
+              if (user.email) localStorage.setItem(`stocks_user_data_${user.email}`, payloadStr);
             } catch {
               // Ignored
             }
           }
-        } else if (cachedData && (cachedData.holdings?.length > 0 || cachedData.watchlist?.length > 0)) {
-          // If server returns no data but local storage has data, push local data to server
-          saveDataImmediately(
-            cachedData.holdings || [],
-            cachedData.watchlist || [],
-            cachedData.tradeHistory || [],
-            cachedData.taxSettings || taxSettings
-          );
+          setSyncStatus('synced');
+        } else {
+          // Cloud has no data for this user.
+          // If the user had locally cached data or guest data, upload it to the cloud now
+          const fallbackData = localCache || guestCache;
+          if (fallbackData && (fallbackData.holdings?.length > 0 || fallbackData.watchlist?.length > 0)) {
+            const h = fallbackData.holdings || [];
+            const w = fallbackData.watchlist || [];
+            const t = fallbackData.tradeHistory || [];
+            const tax = fallbackData.taxSettings || DEFAULT_TAX_SETTINGS;
+
+            holdingsRef.current = h;
+            watchlistRef.current = w;
+            tradeHistoryRef.current = t;
+            taxSettingsRef.current = tax;
+
+            setHoldings(h);
+            setWatchlist(w);
+            setTradeHistory(t);
+            setTaxSettings(tax);
+
+            persistPortfolio(h, w, t, tax, user);
+          } else {
+            setHoldings([]);
+            setWatchlist([]);
+            setTradeHistory([]);
+            setSyncStatus('synced');
+          }
         }
-        setSyncStatus('synced');
       } catch (err) {
-        console.warn('Server data fetch error:', err);
+        console.warn('Cloud sync error:', err);
         setSyncStatus('offline');
-      } finally {
-        isCloudDataLoadedRef.current = true;
       }
     };
 
-    fetchCloudData();
+    syncWithCloud();
   }, [user]);
 
   const toggleLiveTicker = () => setIsLiveTickerActive((prev) => !prev);
@@ -310,7 +371,12 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const addHolding = (
     data: Omit<StockHolding, 'id' | 'currentPrice' | 'previousClose' | 'dayChangePercent'>
   ) => {
-    const matched = watchlist.find((w) => isSymbolMatch(w.symbol, data.symbol));
+    const curHoldings = holdingsRef.current;
+    const curWatchlist = watchlistRef.current;
+    const curHistory = tradeHistoryRef.current;
+    const curTax = taxSettingsRef.current;
+
+    const matched = curWatchlist.find((w) => isSymbolMatch(w.symbol, data.symbol));
     const currentPrice = matched ? matched.currentPrice : data.buyPrice;
     const previousClose = matched ? matched.previousClose : data.buyPrice;
     const dayChangePercent = matched ? matched.dayChangePercent : 0;
@@ -324,31 +390,33 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       dayChangePercent,
     };
 
-    setHoldings((prev) => {
-      const nextHoldings = [newHolding, ...prev];
-      let nextWatchlist = watchlist;
-      if (!matched) {
-        const newItem: WatchlistItem = {
-          symbol: data.symbol.toUpperCase(),
-          companyName: data.companyName,
-          currentPrice: data.buyPrice,
-          previousClose: data.buyPrice,
-          dayChange: 0,
-          dayChangePercent: 0,
-          high52: +(data.buyPrice * 1.2).toFixed(2),
-          low52: +(data.buyPrice * 0.8).toFixed(2),
-          volume: '1.2L',
-          marketCap: '₹50,000Cr',
-          peRatio: 22.5,
-          category: data.category,
-          history: generateHistory(data.buyPrice),
-        };
-        nextWatchlist = [...watchlist, newItem];
-        setWatchlist(nextWatchlist);
-      }
-      saveDataImmediately(nextHoldings, nextWatchlist, tradeHistory, taxSettings);
-      return nextHoldings;
-    });
+    const nextHoldings = [newHolding, ...curHoldings];
+    let nextWatchlist = curWatchlist;
+
+    if (!matched) {
+      const newItem: WatchlistItem = {
+        symbol: data.symbol.toUpperCase(),
+        companyName: data.companyName,
+        currentPrice: data.buyPrice,
+        previousClose: data.buyPrice,
+        dayChange: 0,
+        dayChangePercent: 0,
+        high52: +(data.buyPrice * 1.2).toFixed(2),
+        low52: +(data.buyPrice * 0.8).toFixed(2),
+        volume: '1.2L',
+        marketCap: '₹50,000Cr',
+        peRatio: 22.5,
+        category: data.category,
+        history: generateHistory(data.buyPrice),
+      };
+      nextWatchlist = [...curWatchlist, newItem];
+      watchlistRef.current = nextWatchlist;
+      setWatchlist(nextWatchlist);
+    }
+
+    holdingsRef.current = nextHoldings;
+    setHoldings(nextHoldings);
+    persistPortfolio(nextHoldings, nextWatchlist, curHistory, curTax);
 
     setTimeout(() => {
       fetchLiveQuotesNow();
@@ -356,23 +424,21 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteHolding = (id: string) => {
-    setHoldings((prev) => {
-      const next = prev.filter((h) => h.id !== id);
-      saveDataImmediately(next, watchlist, tradeHistory, taxSettings);
-      return next;
-    });
+    const nextHoldings = holdingsRef.current.filter((h) => h.id !== id);
+    holdingsRef.current = nextHoldings;
+    setHoldings(nextHoldings);
+    persistPortfolio(nextHoldings, watchlistRef.current, tradeHistoryRef.current, taxSettingsRef.current);
   };
 
   const updateHolding = (id: string, updated: Partial<StockHolding>) => {
-    setHoldings((prev) => {
-      const next = prev.map((h) => (h.id === id ? { ...h, ...updated } : h));
-      saveDataImmediately(next, watchlist, tradeHistory, taxSettings);
-      return next;
-    });
+    const nextHoldings = holdingsRef.current.map((h) => (h.id === id ? { ...h, ...updated } : h));
+    holdingsRef.current = nextHoldings;
+    setHoldings(nextHoldings);
+    persistPortfolio(nextHoldings, watchlistRef.current, tradeHistoryRef.current, taxSettingsRef.current);
   };
 
   const sellHolding = (id: string, sellPrice: number, sellQty: number, sellDate: string) => {
-    const targetHolding = holdings.find((h) => h.id === id);
+    const targetHolding = holdingsRef.current.find((h) => h.id === id);
     if (!targetHolding) return;
 
     const qtyToSell = Math.min(sellQty, targetHolding.quantity);
@@ -397,68 +463,79 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       exchange: targetHolding.exchange,
     };
 
-    const nextHistory = [sellRecord, ...tradeHistory];
-    setTradeHistory(nextHistory);
+    const nextHistory = [sellRecord, ...tradeHistoryRef.current];
+    let nextHoldings: StockHolding[];
+    if (qtyToSell >= targetHolding.quantity) {
+      nextHoldings = holdingsRef.current.filter((h) => h.id !== id);
+    } else {
+      nextHoldings = holdingsRef.current.map((h) => (h.id === id ? { ...h, quantity: h.quantity - qtyToSell } : h));
+    }
 
-    setHoldings((prev) => {
-      let nextHoldings: StockHolding[];
-      if (qtyToSell >= targetHolding.quantity) {
-        nextHoldings = prev.filter((h) => h.id !== id);
-      } else {
-        nextHoldings = prev.map((h) => (h.id === id ? { ...h, quantity: h.quantity - qtyToSell } : h));
-      }
-      saveDataImmediately(nextHoldings, watchlist, nextHistory, taxSettings);
-      return nextHoldings;
-    });
+    tradeHistoryRef.current = nextHistory;
+    holdingsRef.current = nextHoldings;
+
+    setTradeHistory(nextHistory);
+    setHoldings(nextHoldings);
+    persistPortfolio(nextHoldings, watchlistRef.current, nextHistory, taxSettingsRef.current);
   };
 
   const deleteTradeRecord = (id: string) => {
-    setTradeHistory((prev) => {
-      const next = prev.filter((t) => t.id !== id);
-      saveDataImmediately(holdings, watchlist, next, taxSettings);
-      return next;
-    });
+    const nextHistory = tradeHistoryRef.current.filter((t) => t.id !== id);
+    tradeHistoryRef.current = nextHistory;
+    setTradeHistory(nextHistory);
+    persistPortfolio(holdingsRef.current, watchlistRef.current, nextHistory, taxSettingsRef.current);
   };
 
   const addToWatchlist = (item: Omit<WatchlistItem, 'history'>) => {
-    if (watchlist.some((w) => w.symbol === item.symbol)) return;
+    if (watchlistRef.current.some((w) => w.symbol === item.symbol)) return;
     const newItem: WatchlistItem = {
       ...item,
       history: generateHistory(item.currentPrice),
     };
-    setWatchlist((prev) => {
-      const next = [...prev, newItem];
-      saveDataImmediately(holdings, next, tradeHistory, taxSettings);
-      return next;
-    });
+    const nextWatchlist = [...watchlistRef.current, newItem];
+    watchlistRef.current = nextWatchlist;
+    setWatchlist(nextWatchlist);
+    persistPortfolio(holdingsRef.current, nextWatchlist, tradeHistoryRef.current, taxSettingsRef.current);
   };
 
   const removeFromWatchlist = (symbol: string) => {
-    setWatchlist((prev) => {
-      const next = prev.filter((w) => w.symbol !== symbol);
-      saveDataImmediately(holdings, next, tradeHistory, taxSettings);
-      return next;
-    });
+    const nextWatchlist = watchlistRef.current.filter((w) => w.symbol !== symbol);
+    watchlistRef.current = nextWatchlist;
+    setWatchlist(nextWatchlist);
+    persistPortfolio(holdingsRef.current, nextWatchlist, tradeHistoryRef.current, taxSettingsRef.current);
   };
 
   const updateTaxSettings = (settings: Partial<TaxSettings>) => {
-    setTaxSettings((prev) => {
-      const next = { ...prev, ...settings };
-      saveDataImmediately(holdings, watchlist, tradeHistory, next);
-      return next;
-    });
+    const nextTax = { ...taxSettingsRef.current, ...settings };
+    taxSettingsRef.current = nextTax;
+    setTaxSettings(nextTax);
+    persistPortfolio(holdingsRef.current, watchlistRef.current, tradeHistoryRef.current, nextTax);
   };
 
   const resetToDemoData = () => {
+    holdingsRef.current = [];
+    watchlistRef.current = [];
+    tradeHistoryRef.current = [];
+    taxSettingsRef.current = DEFAULT_TAX_SETTINGS;
+
     setHoldings([]);
     setWatchlist([]);
     setTradeHistory([]);
     setTaxSettings(DEFAULT_TAX_SETTINGS);
-    saveDataImmediately([], [], [], DEFAULT_TAX_SETTINGS);
+    persistPortfolio([], [], [], DEFAULT_TAX_SETTINGS);
   };
 
   const exportPortfolioJSON = () => {
-    const data = JSON.stringify({ holdings, watchlist, tradeHistory, taxSettings }, null, 2);
+    const data = JSON.stringify(
+      {
+        holdings: holdingsRef.current,
+        watchlist: watchlistRef.current,
+        tradeHistory: tradeHistoryRef.current,
+        taxSettings: taxSettingsRef.current,
+      },
+      null,
+      2
+    );
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -471,10 +548,22 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const importPortfolioJSON = (jsonString: string): boolean => {
     try {
       const parsed = JSON.parse(jsonString);
-      if (Array.isArray(parsed.holdings)) setHoldings(parsed.holdings);
-      if (Array.isArray(parsed.watchlist)) setWatchlist(parsed.watchlist);
-      if (Array.isArray(parsed.tradeHistory)) setTradeHistory(parsed.tradeHistory);
-      if (parsed.taxSettings) setTaxSettings(parsed.taxSettings);
+      const nextHoldings = Array.isArray(parsed.holdings) ? parsed.holdings : [];
+      const nextWatchlist = Array.isArray(parsed.watchlist) ? parsed.watchlist : [];
+      const nextHistory = Array.isArray(parsed.tradeHistory) ? parsed.tradeHistory : [];
+      const nextTax = parsed.taxSettings || DEFAULT_TAX_SETTINGS;
+
+      holdingsRef.current = nextHoldings;
+      watchlistRef.current = nextWatchlist;
+      tradeHistoryRef.current = nextHistory;
+      taxSettingsRef.current = nextTax;
+
+      setHoldings(nextHoldings);
+      setWatchlist(nextWatchlist);
+      setTradeHistory(nextHistory);
+      setTaxSettings(nextTax);
+
+      persistPortfolio(nextHoldings, nextWatchlist, nextHistory, nextTax);
       return true;
     } catch {
       return false;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
+import { UserModel } from '@/models/User';
 import { UserDataModel } from '@/models/UserData';
 import { decryptPayload } from '@/lib/encryption';
 
@@ -7,11 +8,10 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const adminRole = searchParams.get('adminRole');
-    const adminUserId = searchParams.get('adminUserId');
     const targetUserId = searchParams.get('targetUserId');
 
     // Strict authorization: Only Admin users can inspect other users' portfolios
-    if (adminRole !== 'ADMIN' && adminUserId !== 'admin_master') {
+    if (adminRole !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 
@@ -21,7 +21,15 @@ export async function GET(req: Request) {
 
     await connectToDatabase();
 
-    const record = await UserDataModel.findOne({ userId: targetUserId });
+    const targetUser = await UserModel.findById(targetUserId);
+
+    const record = await UserDataModel.findOne({
+      $or: [
+        { userId: targetUserId },
+        ...(targetUser?.email ? [{ userEmail: targetUser.email }] : []),
+      ],
+    });
+
     if (!record || (!record.payload && !record.encryptedPayload)) {
       return NextResponse.json({
         success: true,

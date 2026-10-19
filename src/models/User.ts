@@ -3,7 +3,9 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IUser extends Document {
   name: string;
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
+  googleId?: string;
+  avatar?: string;
   role: 'ADMIN' | 'USER';
   currency: 'USD' | 'INR' | 'EUR' | 'GBP';
   createdByAdminId?: string;
@@ -18,8 +20,10 @@ export interface IUser extends Document {
 const UserSchema: Schema = new Schema<IUser>(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    passwordHash: { type: String, required: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
+    passwordHash: { type: String, required: false },
+    googleId: { type: String, sparse: true, index: true },
+    avatar: { type: String },
     role: { type: String, enum: ['ADMIN', 'USER'], default: 'USER' },
     currency: { type: String, enum: ['USD', 'INR', 'EUR', 'GBP'], default: 'INR' },
     createdByAdminId: { type: String },

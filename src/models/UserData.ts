@@ -11,13 +11,14 @@ export interface IUserData extends Document {
 
 const UserDataSchema: Schema = new Schema<IUserData>(
   {
-    userId: { type: String, required: true },
-    userEmail: { type: String, required: true },
+    userId: { type: String, required: true, index: true },
+    userEmail: { type: String, required: true, index: true, lowercase: true, trim: true },
     payload: { type: Schema.Types.Mixed },
     encryptedPayload: { type: String },
   },
   {
     timestamps: true,
+    minimize: false, // Ensures empty structures or mixed payloads are not stripped by Mongoose
   }
 );
 

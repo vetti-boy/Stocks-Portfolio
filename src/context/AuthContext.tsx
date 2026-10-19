@@ -5,47 +5,24 @@ import { User } from '@/types/stock';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password?: string) => Promise<{ success: boolean; mustChangePassword?: boolean; error?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  updateUser: (updated: Partial<User>) => void;
-  loginAsAdmin: () => void;
-  loginAsGuest: () => void;
+  loginWithGoogle: (credentialOrProfile: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  updateUser: (updated: Partial<User>) => void;
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  googleClientId: string;
 }
-
-const DEFAULT_ADMIN_USER: User = {
-  id: 'admin_master',
-  name: 'System Administrator',
-  email: 'mailfortempusage@gmail.com',
-  role: 'ADMIN',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  currency: 'INR',
-  isGuest: false,
-  mustChangePassword: false,
-};
-
-const DEFAULT_GUEST_USER: User = {
-  id: 'guest_1',
-  name: 'Manoj (Trader)',
-  email: 'manoj.trader@stocks.io',
-  role: 'USER',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  currency: 'INR',
-  isGuest: true,
-  mustChangePassword: false,
-};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState('');
   const [mounted, setMounted] = useState(false);
 
-  // Restore user session from localStorage on initial load
+  // Restore user session from localStorage and load Google config on mount
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
@@ -53,15 +30,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const savedSession = localStorage.getItem('stocks_app_user');
         if (savedSession) {
           const parsedUser = JSON.parse(savedSession);
-          setUser(parsedUser);
+          if (parsedUser && parsedUser.email) {
+            setUser(parsedUser);
+          } else {
+            setIsAuthModalOpen(true);
+          }
         } else {
-          // No active user session -> prompt for login by default
           setIsAuthModalOpen(true);
         }
       } catch {
         setIsAuthModalOpen(true);
       }
     }
+
+    // Fetch Google Client ID configuration
+    fetch('/api/auth/google')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.clientId) {
+          setGoogleClientId(data.clientId);
+        }
+      })
+      .catch((e) => console.warn('Could not fetch Google client ID config:', e));
   }, []);
 
   const saveUserSession = (userData: User | null) => {
@@ -79,60 +69,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (email: string, password?: string) => {
+  const loginWithGoogle = async (credentialOrProfile: any) => {
     try {
-      const res = await fetch('/api/auth/login', {
+      const payload =
+        typeof credentialOrProfile === 'string'
+          ? { credential: credentialOrProfile }
+          : credentialOrProfile?.credential
+          ? credentialOrProfile
+          : { profile: credentialOrProfile };
+
+      const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: password || 'defaultpass' }),
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (!res.ok || data.error) {
-        return { success: false, error: data.error || 'Authentication failed' };
+        return { success: false, error: data.error || 'Google authentication failed' };
       }
 
-      const userData: User = { ...data.user, currency: 'INR' };
-      saveUserSession(userData);
-      setIsAuthModalOpen(false);
-
-      return {
-        success: true,
-        mustChangePassword: !!userData.mustChangePassword,
-      };
-    } catch {
-      const fallbackUser: User = {
-        id: 'user_' + Date.now(),
-        name: email.split('@')[0],
-        email,
-        role: email.toLowerCase().includes('admin') ? 'ADMIN' : 'USER',
+      const userData: User = {
+        ...data.user,
         currency: 'INR',
-        isGuest: false,
-        mustChangePassword: false,
       };
-      saveUserSession(fallbackUser);
-      setIsAuthModalOpen(false);
-      return { success: true };
-    }
-  };
 
-  const register = async (name: string, email: string, password: string) => {
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        return { success: false, error: data.error || 'Registration failed' };
-      }
-
-      const userData: User = { ...data.user, currency: 'INR' };
       saveUserSession(userData);
       setIsAuthModalOpen(false);
+
       return { success: true };
-    } catch {
-      return { success: false, error: 'Registration failed due to network error' };
+    } catch (err: any) {
+      console.error('Google login error:', err);
+      return { success: false, error: err?.message || 'Network error during Google sign-in' };
     }
   };
 
@@ -150,15 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const loginAsAdmin = () => {
-    login('mailfortempusage@gmail.com', 'PasswordForAdmin@123!@#');
-  };
-
-  const loginAsGuest = () => {
-    saveUserSession(DEFAULT_GUEST_USER);
-    setIsAuthModalOpen(false);
-  };
-
   const logout = () => {
     saveUserSession(null);
     setIsAuthModalOpen(true);
@@ -168,15 +127,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        login,
-        register,
-        updateUser,
-        loginAsAdmin,
-        loginAsGuest,
+        loginWithGoogle,
         logout,
+        updateUser,
         isAuthModalOpen,
         openAuthModal: () => setIsAuthModalOpen(true),
         closeAuthModal: () => setIsAuthModalOpen(false),
+        googleClientId,
       }}
     >
       {children}
@@ -191,4 +148,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
