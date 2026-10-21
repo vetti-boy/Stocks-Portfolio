@@ -2,6 +2,35 @@
 
 This file maintains a strict chronological record of all application versions, feature updates, bug fixes, and architectural modifications.
 
+## [v1.10.0] - 2026-10-21
+### Smart MTF Multipliers, Stock & Broker Leverage Intelligence, and Automatic Share Splitter
+- **Intelligent Stock & Broker MTF Lending Multipliers (`src/lib/mtfUtils.ts`)**:
+  - Implemented comprehensive broker- and stock-specific MTF lending factor engine for Zerodha, Groww, and Angel One.
+  - Added verified stock configuration catalog:
+    - `RATNAVEER` (Ratnaveer Precision Engineering): Zerodha lending factor **2.4x** (e.g. ₹10k user cash + ₹24k broker lending = ₹34k purchasing power, 3.4x total leverage / ~29.41% margin requirement).
+    - Large caps (`RELIANCE`, `TCS`, `INFY`, `HDFCBANK`, `ICICIBANK`, `TATAMOTORS`, `LT`, etc.): 3.0x on Zerodha & Groww (4.0x total power), up to 4.0x on Angel One (5.0x total power).
+    - Mid caps (`TRENT`, `DIXON`, `POLYCAB`, `CDSL`, `KPITTECH`, `HAL`, etc.): 2.4x - 2.5x standard factors.
+    - Volatile / Lower margin stocks (`ZOMATO`, `SUZLON`, `IRFC`, `RVNL`, `YESBANK`): 1.5x - 2.2x.
+  - Added Quick Multiplier Presets: `2.0x` (3.0x Power), `2.4x` (Ratnaveer standard), `2.5x` (Midcap), `3.0x` (Largecap), `4.0x` (Angel One), and `Custom` decimal entry.
+- **Dual-Mode MTF Calculation Engine**:
+  - **Mode A: By Available Cash (₹)**:
+    - User inputs cash on hand (e.g. ₹10,000) and stock price; app calculates broker lended funds (₹24,000), total buying power (₹34,000), total shares purchasable, and automatically splits into Own Shares and Broker Shares.
+  - **Mode B: By Total Order Quantity**:
+    - User specifies total shares; app calculates exact own margin cash needed, broker loan amount, and share split based on the active multiplier.
+- **Interactive MTF Input Section (`src/components/MtfInputSection.tsx`)**:
+  - Integrated into both "Record Stock Purchase" and "Edit Stock Holding" modals in `PortfolioTab.tsx`.
+  - Automatically detects verified multiplier when selecting or typing a stock symbol (e.g. Ratnaveer auto-selects 2.4x for Zerodha).
+  - Displays dynamic visual capital split meter (Own Cash % vs Broker Lended %).
+  - Real-time statutory daily interest counter (0.04%/day Zerodha, 0.041%/day Groww & Angel One) and pledge fee breakdown (₹35.40 Zerodha / ₹47.20 Groww & Angel One).
+- **Dedicated MTF Leverage & Share Split Analyzer Modal (`src/components/MtfCalculatorModal.tsx`)**:
+  - Added "⚡ MTF Analyzer" button to Portfolio Tab toolbar and Calculator Tab.
+  - Provides pre-trade simulations: holding duration interest projections (7d to 180d), breakeven share price recovery targets, and Return On Equity (ROE) amplifier simulations comparing Normal Delivery vs MTF Delivery.
+  - Included 1-click "Apply to Trade Form" action that pre-fills and opens the Add Stock Purchase modal.
+- **Holdings Table & Mobile Cards MTF Display**:
+  - Added MTF multiplier badges (`MTF 2.4x`) and subtext showing exact split: `Own: X (₹...) • Lended: Y (₹...) • Daily Int: ₹.../d`.
+- **Tax P&L Engine Integration (`src/components/CalculatorTab.tsx`)**:
+  - Upgraded MTF Margin Trade section with multiplier chips, dual input mode, and live visual capital split meter.
+
 ## [v1.9.0] - 2026-10-21
 ### Angel One Integration, Search Autocomplete Fix, Session-Only Guest Mode & UI Polish
 - **Angel One Broker Integration & UI Alignment**:

@@ -38,6 +38,7 @@ export function calculateEquityDeliveryBrokerage(params: {
   taxSettings: TaxSettings;
   mode?: 'forward' | 'reverse';
   isMTF?: boolean;
+  mtfMultiplier?: number;
   ownQuantity?: number;
   mtfQuantity?: number;
   mtfDays?: number;
@@ -51,6 +52,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     taxSettings,
     mode = 'forward',
     isMTF = false,
+    mtfMultiplier,
     ownQuantity,
     mtfQuantity,
     mtfDays = 0,
@@ -77,9 +79,13 @@ export function calculateEquityDeliveryBrokerage(params: {
     } else if (mtfQuantity !== undefined && mtfQuantity >= 0) {
       mtfQty = Math.min(qty, mtfQuantity);
       ownQty = Math.max(0, qty - mtfQty);
+    } else if (mtfMultiplier !== undefined && mtfMultiplier > 0) {
+      const marginShare = 1 / (1 + mtfMultiplier);
+      ownQty = Math.round(qty * marginShare);
+      mtfQty = Math.max(0, qty - ownQty);
     } else {
-      ownQty = qty * 0.25; // Default 25% own margin
-      mtfQty = qty * 0.75; // Default 75% MTF funded
+      ownQty = Math.round(qty * 0.2941); // Default 2.4x multiplier (29.41% own margin)
+      mtfQty = Math.max(0, qty - ownQty);
     }
   }
 
@@ -272,6 +278,7 @@ export function calculateEquityDeliveryBrokerage(params: {
 
       // MTF Details
       isMTF,
+      mtfMultiplier,
       ownQuantity: ownQty,
       mtfQuantity: mtfQty,
       ownInvestment,
@@ -424,6 +431,7 @@ export function calculateEquityDeliveryBrokerage(params: {
 
       // MTF Details
       isMTF,
+      mtfMultiplier,
       ownQuantity: ownQty,
       mtfQuantity: mtfQty,
       ownInvestment,

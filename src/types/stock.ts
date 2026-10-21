@@ -29,6 +29,7 @@ export interface StockHolding {
   dayChangePercent: number;
   // MTF (Margin Trading Facility) Properties
   isMTF?: boolean;
+  mtfMultiplier?: number;
   ownQuantity?: number;
   mtfQuantity?: number;
   ownAmount?: number;
@@ -53,6 +54,7 @@ export interface TradeRecord {
   exchange: string;
   // MTF Realized Trade Details
   isMTF?: boolean;
+  mtfMultiplier?: number;
   ownQuantity?: number;
   mtfQuantity?: number;
   mtfBorrowedAmount?: number;
@@ -111,6 +113,7 @@ export interface CalculatorInput {
   holdingPeriodMonths: number;
   mode: 'forward' | 'reverse';
   isMTF?: boolean;
+  mtfMultiplier?: number;
   ownQuantity?: number;
   mtfQuantity?: number;
   mtfDays?: number;
@@ -164,6 +167,7 @@ export interface CalculationResult {
   requiredGrossSaleValue?: number;
   // MTF Breakdown Details
   isMTF?: boolean;
+  mtfMultiplier?: number;
   ownQuantity?: number;
   mtfQuantity?: number;
   ownInvestment?: number;
