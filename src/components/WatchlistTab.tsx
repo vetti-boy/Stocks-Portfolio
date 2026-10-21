@@ -61,6 +61,7 @@ export const WatchlistTab: React.FC = () => {
     addHolding,
     fetchLiveQuotesNow,
     isFetchingLiveQuotes,
+    taxSettings,
   } = useStock();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -167,7 +168,8 @@ export const WatchlistTab: React.FC = () => {
         buyDate: new Date().toISOString().slice(0, 10),
         exchange: 'NSE',
         category: (activeStock.category as any) || 'Tech',
-        notes: `Executed via Zerodha Quick Order (${productType})`,
+        broker: taxSettings.brokerPreset || 'ZERODHA',
+        notes: `Executed via ${taxSettings.brokerPreset || 'Zerodha'} Quick Order (${productType})`,
       });
     }
 

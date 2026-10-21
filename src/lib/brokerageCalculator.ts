@@ -64,6 +64,7 @@ export function calculateEquityDeliveryBrokerage(params: {
   const taxRate = isLongTerm ? taxSettings.ltcgRatePercent : taxSettings.stcgRatePercent;
 
   const isGroww = taxSettings.brokerPreset === 'GROWW';
+  const isAngelOne = taxSettings.brokerPreset === 'ANGELONE';
   const exchange = taxSettings.exchange || 'NSE';
 
   // MTF Own vs Borrowed Capital Split
@@ -88,28 +89,33 @@ export function calculateEquityDeliveryBrokerage(params: {
   const totalInvestment = buyTurnover;
 
   // MTF Interest Rates & Pledge Fees
-  const mtfDailyInterestRatePercent = isGroww ? 0.041 : 0.04;
+  const mtfDailyInterestRatePercent = (isGroww || isAngelOne) ? 0.041 : 0.04;
   const mtfHoldingDays = isMTF ? Math.max(0, mtfDays) : 0;
   const mtfInterestCost = isMTF
     ? mtfBorrowedAmount * (mtfDailyInterestRatePercent / 100) * mtfHoldingDays
     : 0;
-  const mtfPledgeUnpledgeFee = isMTF ? (isGroww ? 47.20 : 35.40) : 0;
+  const mtfPledgeUnpledgeFee = isMTF ? ((isGroww || isAngelOne) ? 47.20 : 35.40) : 0;
 
   // ----------------------------------------------------
   // 1. BROKERAGE CHARGES
   // Zerodha Normal: ₹0 | Zerodha MTF: Min(₹20, 0.3%)
   // Groww Normal: Min(₹20, Max(5, 0.1%)) | Groww MTF: Min(₹20, Max(5, 0.1%))
+  // Angel One Normal: ₹0 Buy, ₹20 Sell | Angel One MTF: Min(₹20, 0.1%)
   // ----------------------------------------------------
   let buyBrokerage = 0;
   if (isMTF) {
     if (isGroww) {
       buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.001)) : 0;
+    } else if (isAngelOne) {
+      buyBrokerage = buyTurnover > 0 ? Math.min(20, (buyTurnover * 0.1) / 100) : 0;
     } else {
       buyBrokerage = buyTurnover > 0 ? Math.min(20, (buyTurnover * 0.3) / 100) : 0;
     }
   } else {
     if (isGroww) {
       buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.001)) : 0;
+    } else if (isAngelOne) {
+      buyBrokerage = 0;
     } else {
       buyBrokerage = 0;
     }
@@ -123,11 +129,11 @@ export function calculateEquityDeliveryBrokerage(params: {
 
   // ----------------------------------------------------
   // 3. EXCHANGE TRANSACTION CHARGES & IPFT
-  // Zerodha NSE: 0.00307% | Groww NSE: 0.00297% | BSE: 0.00375%
+  // Zerodha NSE: 0.00307% | Groww & Angel One NSE: 0.00297% | BSE: 0.00375%
   // ----------------------------------------------------
-  const exchangeTxnRateBuy = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
+  const exchangeTxnRateBuy = exchange === 'BSE' ? 0.00375 : (isGroww || isAngelOne) ? 0.00297 : 0.00307;
   const buyExchangeTxn = (buyTurnover * exchangeTxnRateBuy) / 100;
-  const buyIpft = (isGroww && exchange === 'NSE') ? (buyTurnover * 0.0001) / 100 : 0;
+  const buyIpft = ((isGroww || isAngelOne) && exchange === 'NSE') ? (buyTurnover * 0.0001) / 100 : 0;
 
   // ----------------------------------------------------
   // 4. SEBI TURNOVER CHARGES
@@ -146,7 +152,7 @@ export function calculateEquityDeliveryBrokerage(params: {
   // 0.015% (₹1500 / crore) on Buy Turnover
   // ----------------------------------------------------
   const rawBuyStampDuty = (buyTurnover * 0.015) / 100;
-  const buyStampDuty = isGroww ? rawBuyStampDuty : Math.ceil(rawBuyStampDuty);
+  const buyStampDuty = (isGroww || isAngelOne) ? rawBuyStampDuty : Math.ceil(rawBuyStampDuty);
 
   const totalBuyCharges = buyBrokerage + buyStt + buyExchangeTxn + buySebi + buyIpft + buyGst + buyStampDuty;
 
@@ -160,12 +166,16 @@ export function calculateEquityDeliveryBrokerage(params: {
     if (isMTF) {
       if (isGroww) {
         sellBrokerage = sellTurnover > 0 ? Math.min(20, Math.max(5, sellTurnover * 0.001)) : 0;
+      } else if (isAngelOne) {
+        sellBrokerage = sellTurnover > 0 ? Math.min(20, (sellTurnover * 0.1) / 100) : 0;
       } else {
         sellBrokerage = sellTurnover > 0 ? Math.min(20, (sellTurnover * 0.3) / 100) : 0;
       }
     } else {
       if (isGroww && sellTurnover > 0) {
         sellBrokerage = Math.min(20, Math.max(5, sellTurnover * 0.001));
+      } else if (isAngelOne && sellTurnover > 0) {
+        sellBrokerage = 20;
       } else {
         sellBrokerage = 0;
       }
@@ -175,22 +185,24 @@ export function calculateEquityDeliveryBrokerage(params: {
     const sellStt = (sellTurnover * 0.1) / 100;
 
     // SELL SIDE EXCHANGE TXN & IPFT
-    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
+    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : (isGroww || isAngelOne) ? 0.00297 : 0.00307;
     const sellExchangeTxn = (sellTurnover * exchangeTxnRateSell) / 100;
-    const sellIpft = (isGroww && exchange === 'NSE') ? (sellTurnover * 0.0001) / 100 : 0;
+    const sellIpft = ((isGroww || isAngelOne) && exchange === 'NSE') ? (sellTurnover * 0.0001) / 100 : 0;
 
     // SELL SIDE SEBI
     const sellSebi = (sellTurnover * 0.0001) / 100;
 
-    // SELL SIDE GST
-    const sellGst = 0.18 * (sellBrokerage + sellExchangeTxn + sellSebi + sellIpft);
-
     // ----------------------------------------------------
     // 7. DP CHARGES (SELL SIDE ONLY)
+    // Zerodha: ₹15.34 (13+GST) | Groww: ₹23.60 (20+GST) | Angel One: ₹20 base (+ GST in GST breakdown)
     // ----------------------------------------------------
-    const baseDpCharge = isGroww ? 20.00 : 13.00;
+    const baseDpCharge = isAngelOne ? 20.00 : isGroww ? 20.00 : 13.00;
     const dpGst = baseDpCharge * 0.18;
-    const sellDpCharges = sellTurnover > (isGroww ? 100 : 0) ? (baseDpCharge + dpGst) : 0;
+    const sellDpCharges = isAngelOne ? (sellTurnover > 0 ? 20.00 : 0) : sellTurnover > (isGroww ? 100 : 0) ? (baseDpCharge + dpGst) : 0;
+
+    // SELL SIDE GST: 18% on (Brokerage + Txn + SEBI + IPFT + DP base if Angel One)
+    const taxableSellBase = sellBrokerage + sellExchangeTxn + sellSebi + sellIpft + (isAngelOne && sellTurnover > 0 ? 20.00 : 0);
+    const sellGst = 0.18 * taxableSellBase;
 
     const totalSellCharges = sellBrokerage + sellStt + sellExchangeTxn + sellSebi + sellIpft + sellGst + sellDpCharges;
 
@@ -273,9 +285,9 @@ export function calculateEquityDeliveryBrokerage(params: {
   } else {
     // REVERSE MODE: Find required sell price per share
     const targetPnL = targetNetPnL || 0;
-    const baseDpCharge = isGroww ? 20.00 : 13.00;
+    const baseDpCharge = isAngelOne ? 20.00 : isGroww ? 20.00 : 13.00;
     const dpGst = baseDpCharge * 0.18;
-    const dpChargeTotal = baseDpCharge + dpGst;
+    const dpChargeTotal = isAngelOne ? 20.00 : (baseDpCharge + dpGst);
 
     let reqSellP = buyP;
     for (let i = 0; i < 10; i++) {
@@ -284,24 +296,29 @@ export function calculateEquityDeliveryBrokerage(params: {
       if (isMTF) {
         if (isGroww) {
           estSellBrokerage = estSellTurnover > 0 ? Math.min(20, Math.max(5, estSellTurnover * 0.001)) : 0;
+        } else if (isAngelOne) {
+          estSellBrokerage = estSellTurnover > 0 ? Math.min(20, (estSellTurnover * 0.1) / 100) : 0;
         } else {
           estSellBrokerage = estSellTurnover > 0 ? Math.min(20, (estSellTurnover * 0.3) / 100) : 0;
         }
       } else {
         if (isGroww && estSellTurnover > 0) {
           estSellBrokerage = Math.min(20, Math.max(5, estSellTurnover * 0.001));
+        } else if (isAngelOne && estSellTurnover > 0) {
+          estSellBrokerage = 20;
         } else {
           estSellBrokerage = 0;
         }
       }
 
       const estSellStt = (estSellTurnover * 0.1) / 100;
-      const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
+      const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : (isGroww || isAngelOne) ? 0.00297 : 0.00307;
       const estSellExch = (estSellTurnover * exchangeTxnRateSell) / 100;
       const estSellSebi = (estSellTurnover * 0.0001) / 100;
-      const estSellIpft = (isGroww && exchange === 'NSE') ? (estSellTurnover * 0.0001) / 100 : 0;
-      const estSellGst = 0.18 * (estSellBrokerage + estSellExch + estSellSebi + estSellIpft);
-      const estDp = estSellTurnover > (isGroww ? 100 : 0) ? dpChargeTotal : 0;
+      const estSellIpft = ((isGroww || isAngelOne) && exchange === 'NSE') ? (estSellTurnover * 0.0001) / 100 : 0;
+      const estDp = isAngelOne ? (estSellTurnover > 0 ? 20.00 : 0) : estSellTurnover > (isGroww ? 100 : 0) ? dpChargeTotal : 0;
+      const estTaxableSellBase = estSellBrokerage + estSellExch + estSellSebi + estSellIpft + (isAngelOne && estSellTurnover > 0 ? 20.00 : 0);
+      const estSellGst = 0.18 * estTaxableSellBase;
       const estTotalSellCharges = estSellBrokerage + estSellStt + estSellExch + estSellSebi + estSellIpft + estSellGst + estDp;
 
       const estTotalFees = totalBuyCharges + estTotalSellCharges + (isMTF ? mtfInterestCost + mtfPledgeUnpledgeFee : 0);
@@ -317,25 +334,29 @@ export function calculateEquityDeliveryBrokerage(params: {
     if (isMTF) {
       if (isGroww) {
         sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, Math.max(5, requiredGrossSaleValue * 0.001)) : 0;
+      } else if (isAngelOne) {
+        sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, (requiredGrossSaleValue * 0.1) / 100) : 0;
       } else {
         sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, (requiredGrossSaleValue * 0.3) / 100) : 0;
       }
     } else {
       if (isGroww && requiredGrossSaleValue > 0) {
         sellBrokerage = Math.min(20, Math.max(5, requiredGrossSaleValue * 0.001));
+      } else if (isAngelOne && requiredGrossSaleValue > 0) {
+        sellBrokerage = 20;
       } else {
         sellBrokerage = 0;
       }
     }
 
     const sellStt = (requiredGrossSaleValue * 0.1) / 100;
-    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : isGroww ? 0.00297 : 0.00307;
+    const exchangeTxnRateSell = exchange === 'BSE' ? 0.00375 : (isGroww || isAngelOne) ? 0.00297 : 0.00307;
     const sellExchangeTxn = (requiredGrossSaleValue * exchangeTxnRateSell) / 100;
     const sellSebi = (requiredGrossSaleValue * 0.0001) / 100;
-    const sellIpft = (isGroww && exchange === 'NSE') ? (requiredGrossSaleValue * 0.0001) / 100 : 0;
-    const sellGst = 0.18 * (sellBrokerage + sellExchangeTxn + sellSebi + sellIpft);
-    const sellDpCharges = requiredGrossSaleValue > (isGroww ? 100 : 0) ? dpChargeTotal : 0;
-
+    const sellIpft = ((isGroww || isAngelOne) && exchange === 'NSE') ? (requiredGrossSaleValue * 0.0001) / 100 : 0;
+    const sellDpCharges = isAngelOne ? (requiredGrossSaleValue > 0 ? 20.00 : 0) : requiredGrossSaleValue > (isGroww ? 100 : 0) ? dpChargeTotal : 0;
+    const taxableSellBase = sellBrokerage + sellExchangeTxn + sellSebi + sellIpft + (isAngelOne && requiredGrossSaleValue > 0 ? 20.00 : 0);
+    const sellGst = 0.18 * taxableSellBase;
     const totalSellCharges = sellBrokerage + sellStt + sellExchangeTxn + sellSebi + sellIpft + sellGst + sellDpCharges;
 
     const totalBrokerage = buyBrokerage + sellBrokerage;

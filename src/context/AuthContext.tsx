@@ -6,6 +6,7 @@ import { User } from '@/types/stock';
 interface AuthContextType {
   user: User | null;
   loginWithGoogle: (credentialOrProfile: any) => Promise<{ success: boolean; error?: string }>;
+  continueAsGuest: () => void;
   logout: () => void;
   updateUser: (updated: Partial<User>) => void;
   isAuthModalOpen: boolean;
@@ -22,22 +23,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [googleClientId, setGoogleClientId] = useState('');
   const [mounted, setMounted] = useState(false);
 
-  // Restore user session from localStorage and load Google config on mount
+  // Restore user session on mount
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
       try {
+        // 1. Check temporary guest session (sessionStorage only, cleared on tab close)
+        const guestSession = sessionStorage.getItem('stocks_app_guest_session');
+        if (guestSession) {
+          const parsed = JSON.parse(guestSession);
+          if (parsed && parsed.isGuest) {
+            setUser(parsed);
+            return;
+          }
+        }
+
+        // 2. Check persistent Google authenticated session in localStorage
         const savedSession = localStorage.getItem('stocks_app_user');
         if (savedSession) {
           const parsedUser = JSON.parse(savedSession);
-          if (parsedUser && parsedUser.email) {
+          if (parsedUser && parsedUser.email && !parsedUser.isGuest) {
             setUser(parsedUser);
-          } else {
-            setIsAuthModalOpen(true);
+            return;
           }
-        } else {
-          setIsAuthModalOpen(true);
         }
+
+        setIsAuthModalOpen(true);
       } catch {
         setIsAuthModalOpen(true);
       }
@@ -104,12 +115,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const continueAsGuest = () => {
+    const guestUser: User = {
+      id: 'guest',
+      name: 'Guest User',
+      email: 'guest@portfolio.local',
+      role: 'USER',
+      currency: 'INR',
+      isGuest: true,
+    };
+    setUser(guestUser);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('stocks_app_guest_session', JSON.stringify(guestUser));
+        localStorage.removeItem('stocks_app_user');
+      } catch {
+        // Ignored
+      }
+    }
+    setIsAuthModalOpen(false);
+  };
+
   const updateUser = (updatedFields: Partial<User>) => {
     setUser((prev) => {
       const updated = prev ? { ...prev, ...updatedFields } : null;
       if (typeof window !== 'undefined' && updated) {
         try {
-          localStorage.setItem('stocks_app_user', JSON.stringify(updated));
+          if (updated.isGuest) {
+            sessionStorage.setItem('stocks_app_guest_session', JSON.stringify(updated));
+          } else {
+            localStorage.setItem('stocks_app_user', JSON.stringify(updated));
+          }
         } catch {
           // Ignored
         }
@@ -120,6 +156,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     saveUserSession(null);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('stocks_app_guest_session');
+        sessionStorage.removeItem('stocks_guest_portfolio');
+        localStorage.removeItem('stocks_user_data_guest');
+      } catch {
+        // Ignored
+      }
+    }
     setIsAuthModalOpen(true);
   };
 
@@ -128,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         loginWithGoogle,
+        continueAsGuest,
         logout,
         updateUser,
         isAuthModalOpen,

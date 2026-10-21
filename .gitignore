@@ -8,12 +8,13 @@
 /build
 /dist
 
-# Environment variables
+# Environment variables & secrets
 .env
 .env*.local
 .env.production
 .env.development
 atlas-credentials.env
+client_secret*.json
 
 # Debug & logs
 npm-debug.log*

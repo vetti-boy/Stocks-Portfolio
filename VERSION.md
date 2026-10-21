@@ -2,6 +2,28 @@
 
 This file maintains a strict chronological record of all application versions, feature updates, bug fixes, and architectural modifications.
 
+## [v1.9.0] - 2026-10-21
+### Angel One Integration, Search Autocomplete Fix, Session-Only Guest Mode & UI Polish
+- **Angel One Broker Integration & UI Alignment**:
+  - Integrated **Angel One** across the Brokerage Calculator, Navbar presets, Trade History, and Stock Purchase/Edit forms.
+  - Added Angel One brokerage rate calculations: ₹0 Buy / ₹20 Sell (Delivery), 0.1% max ₹20 (MTF), and ₹20.00 DP charge (+ 18% GST).
+  - Redesigned Broker Platform selection in both "Record Stock Purchase" and "Edit Stock Holding" modals into a full-width 3-column grid (`grid grid-cols-3 gap-2`), completely eliminating button overflow past the modal box border.
+  - Streamlined modal layout by pairing Exchange and Purchase Date in a balanced 2-column row.
+- **Stock Autocomplete Re-Opening Fix (`PortfolioTab.tsx`)**:
+  - Fixed issue where selecting a stock suggestion re-triggered the search debounce `useEffect` due to `formData.symbol` mutation, which previously caused suggestions to pop back open over the form.
+  - Introduced `isSuggestionSelectedRef` guard to immediately clear search results and prevent re-querying upon selection.
+  - Added `onBlur` dismiss timer so clicking into other fields cleanly hides the suggestion dropdown.
+- **Single Google Sign-In & Temporary Guest Mode (`AuthModal.tsx` & `AuthContext.tsx`)**:
+  - Streamlined the sign-in modal to display a single, unified Google Sign-In option and removed duplicate buttons and test profiles.
+  - Implemented **Temporary Guest Mode**:
+    - Guest session and portfolio data are strictly isolated to `sessionStorage`.
+    - Zero database overhead: Guest actions never send write operations to MongoDB Atlas and never persist to `localStorage`.
+    - Data is automatically discarded when the browser tab or app is closed.
+- **Code Audit & Dead Code Removal**:
+  - Cleaned up unused icon imports across `PortfolioTab.tsx` and `AuthModal.tsx`.
+  - Added `client_secret*.json` to `.gitignore` to prevent committing Google Cloud OAuth credentials.
+  - Verified clean TypeScript compilation (`npx tsc --noEmit`) and successful Next.js production bundle build (`npm run build`).
+
 ## [v1.8.0] - 2026-10-19
 ### Google Sign-In Single Authentication & Cloud Database Portfolio Storage Fix
 - **Single Google Sign-In Implementation (`/api/auth/google`)**:

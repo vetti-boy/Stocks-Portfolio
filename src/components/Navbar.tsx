@@ -24,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
 
   const activeBroker = taxSettings.brokerPreset || 'ZERODHA';
 
-  const setBrokerPreset = (preset: 'ZERODHA' | 'GROWW') => {
+  const setBrokerPreset = (preset: 'ZERODHA' | 'GROWW' | 'ANGELONE') => {
     if (preset === 'ZERODHA') {
       updateTaxSettings({
         brokerPreset: 'ZERODHA',
@@ -34,9 +34,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
         sttPercent: 0.1,
         stampDutyPercent: 0.015,
         gstPercent: 18,
-        flatDpCharges: 15.93,
+        flatDpCharges: 15.34,
       });
-    } else {
+    } else if (preset === 'GROWW') {
       updateTaxSettings({
         brokerPreset: 'GROWW',
         flatBrokerageBuy: 20,
@@ -46,6 +46,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
         stampDutyPercent: 0.015,
         gstPercent: 18,
         flatDpCharges: 23.60,
+      });
+    } else {
+      updateTaxSettings({
+        brokerPreset: 'ANGELONE',
+        flatBrokerageBuy: 0,
+        flatBrokerageSell: 20,
+        brokeragePercent: 0,
+        sttPercent: 0.1,
+        stampDutyPercent: 0.015,
+        gstPercent: 18,
+        flatDpCharges: 20.00,
       });
     }
   };

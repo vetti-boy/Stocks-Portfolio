@@ -22,7 +22,7 @@ export interface StockHolding {
   buyDate: string;
   exchange: 'NSE' | 'BSE' | 'US' | 'CRYPTO';
   category: 'Tech' | 'Financials' | 'Consumer' | 'Energy' | 'Automotive' | 'Industrial' | 'Pharma' | 'Crypto' | 'Other';
-  broker?: 'ZERODHA' | 'GROWW';
+  broker?: 'ZERODHA' | 'GROWW' | 'ANGELONE';
   notes?: string;
   currentPrice: number;
   previousClose: number;
@@ -47,7 +47,7 @@ export interface TradeRecord {
   price: number;
   totalValue: number;
   date: string;
-  broker?: 'ZERODHA' | 'GROWW';
+  broker?: 'ZERODHA' | 'GROWW' | 'ANGELONE';
   realizedPnL?: number;
   realizedPnLPercent?: number;
   exchange: string;
@@ -86,7 +86,7 @@ export interface WatchlistItem {
 }
 
 export interface TaxSettings {
-  brokerPreset?: 'ZERODHA' | 'GROWW';
+  brokerPreset?: 'ZERODHA' | 'GROWW' | 'ANGELONE';
   exchange?: 'NSE' | 'BSE';
   holdingPeriodMonths: number;
   stcgRatePercent: number;

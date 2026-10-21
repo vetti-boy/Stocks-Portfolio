@@ -29,7 +29,7 @@ const CHARGE_DESCRIPTIONS = [
     key: 'brokerage',
     label: 'Brokerage Charge',
     title: 'Brokerage Fee',
-    desc: 'Broker execution fee. Normal Delivery: Zerodha = ₹0, Groww = ₹20 or 0.1% (min ₹5). MTF Trade: Zerodha = 0.3% max ₹20, Groww = 0.1% max ₹20.',
+    desc: 'Broker execution fee. Normal Delivery: Zerodha = ₹0, Groww = ₹20 or 0.1% (min ₹5), Angel One = ₹0 Buy / ₹20 Sell (or ₹20 flat). MTF Trade: Zerodha = 0.3% max ₹20, Groww = 0.1% max ₹20, Angel One = 0.1% max ₹20.',
   },
   {
     key: 'stt',
@@ -41,7 +41,7 @@ const CHARGE_DESCRIPTIONS = [
     key: 'exchange',
     label: 'Exchange Txn Charge',
     title: 'Exchange Transaction Charge',
-    desc: 'Infrastructure fee charged by stock exchanges (NSE: 0.00307% for Zerodha / 0.00297% for Groww, BSE: 0.00375%).',
+    desc: 'Infrastructure fee charged by stock exchanges (NSE: 0.00307% for Zerodha / 0.00297% for Groww & Angel One, BSE: 0.00375%).',
   },
   {
     key: 'sebi',
@@ -65,19 +65,19 @@ const CHARGE_DESCRIPTIONS = [
     key: 'dp',
     label: 'DP Charge (CDSL Sell)',
     title: 'Depository Participant (DP) Charge',
-    desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹23.60 (₹3.5 CDSL + ₹16.5 Groww = ₹20 base + ₹3.60 GST). ₹0 if sell value < ₹100.',
+    desc: 'CDSL & broker fee charged on SELL transactions. Zerodha = ₹15.34 (13+18% GST), Groww = ₹23.60 (20+18% GST), Angel One = ₹20.00 (+18% GST).',
   },
   {
     key: 'mtfInterest',
     label: 'MTF Daily Interest',
     title: 'MTF Margin Funded Interest',
-    desc: 'Daily interest charged on broker funded amount. Zerodha = 0.04% / day (₹40/lakh/day = 14.6% p.a.), Groww = 0.041% / day (14.95% p.a.). Charged for all days including weekends & holidays.',
+    desc: 'Daily interest charged on broker funded amount. Zerodha = 0.04% / day (₹40/lakh/day = 14.6% p.a.), Groww & Angel One = 0.041% / day (14.99% p.a.). Charged for all days including weekends & holidays.',
   },
   {
     key: 'mtfPledge',
     label: 'MTF Pledge / Unpledge',
     title: 'MTF Pledge & Unpledge Fee',
-    desc: 'Statutory depository fee for pledging MTF stocks on buy and unpledging on sell. Zerodha = ₹35.40 (17.70 + 17.70), Groww = ₹47.20 (23.60 + 23.60).',
+    desc: 'Statutory depository fee for pledging MTF stocks on buy and unpledging on sell. Zerodha = ₹35.40, Groww & Angel One = ₹47.20.',
   },
 ];
 
@@ -151,8 +151,8 @@ export const CalculatorTab: React.FC = () => {
     }
   }, [taxSettings.exchange]);
 
-  // Selected Broker: Only Zerodha or Groww
-  const activeBroker = (taxSettings.brokerPreset === 'GROWW' ? 'GROWW' : 'ZERODHA') as 'ZERODHA' | 'GROWW';
+  // Selected Broker: Zerodha, Groww, or Angel One
+  const activeBroker = (taxSettings.brokerPreset || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE';
 
   // Itemized Calculations (Forward or Reverse mode depending on activeInput)
   const result = useMemo(() => {
@@ -197,7 +197,7 @@ export const CalculatorTab: React.FC = () => {
         <div>
           <h2 className="text-lg sm:text-xl font-extrabold text-[#F4F7FA] font-mono flex items-center gap-2.5">
             <Calculator className="h-5 w-5 text-[#38BDF8]" />
-            <span>Zerodha & Groww Equity Delivery & MTF Calculator</span>
+            <span>Zerodha, Groww & Angel One Brokerage Calculator</span>
           </h2>
           <p className="text-xs text-[#8D99A8] mt-1">
             Unified interactive calculator — calculate for your actual portfolio stocks or custom manual trades.
@@ -523,7 +523,7 @@ export const CalculatorTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Broker Selector: ONLY Zerodha & Groww */}
+          {/* Broker Selector: Zerodha, Groww & Angel One */}
           <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#202A35] shadow-lg">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B5CF6] flex items-center gap-2 font-mono">
@@ -532,8 +532,8 @@ export const CalculatorTab: React.FC = () => {
               <span className="text-[10px] text-[#8D99A8] font-mono">SEBI Equity Delivery</span>
             </div>
 
-            {/* Zerodha & Groww Selector Cards */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Zerodha, Groww & Angel One Selector Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Zerodha */}
               <button
                 type="button"
@@ -593,6 +593,37 @@ export const CalculatorTab: React.FC = () => {
                   </div>
                   <span className="text-xs text-[#22C55E] font-bold block mt-1">₹20 or 0.1% Lower (Min ₹5)</span>
                   <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹23.60 on Sell</span>
+                </div>
+              </button>
+
+              {/* Angel One */}
+              <button
+                type="button"
+                onClick={() =>
+                  updateTaxSettings({
+                    brokerPreset: 'ANGELONE',
+                    flatBrokerageBuy: 0,
+                    flatBrokerageSell: 20,
+                    brokeragePercent: 0,
+                    sttPercent: 0.1,
+                    stampDutyPercent: 0.015,
+                    gstPercent: 18,
+                    flatDpCharges: 20.00,
+                  })
+                }
+                className={`p-4 rounded-xl border text-left transition flex flex-col justify-between active:scale-95 ${
+                  activeBroker === 'ANGELONE'
+                    ? 'bg-[#111820] border-[#F97316] shadow-lg ring-2 ring-[#F97316]/40'
+                    : 'bg-[#080B10] border-[#202A35] hover:border-[#F97316]/40'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-[#F4F7FA] text-sm font-mono">Angel One</span>
+                    {activeBroker === 'ANGELONE' && <span className="h-2.5 w-2.5 rounded-full bg-[#F97316]" />}
+                  </div>
+                  <span className="text-xs text-[#F97316] font-bold block mt-1">₹20 Flat (Free Buy)</span>
+                  <span className="text-[11px] text-[#8D99A8] block mt-0.5">DP Charge: ₹20.00 on Sell</span>
                 </div>
               </button>
             </div>

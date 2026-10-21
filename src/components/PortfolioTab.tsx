@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStock } from '@/context/StockContext';
 import {
   Plus,
@@ -8,31 +8,23 @@ import {
   Pencil,
   Download,
   Upload,
-  TrendingUp,
-  TrendingDown,
-  PieChart,
-  IndianRupee,
-  Briefcase,
   X,
-  RefreshCw,
   CheckCircle2,
   AlertCircle,
   Search,
   Loader2,
-  Link2,
   Building2,
-  ShieldCheck,
-  FileSpreadsheet,
   Zap,
-  History,
-  DollarSign,
-  ArrowUpRight,
-  ArrowDownRight,
-  FileText,
-  Eye,
-  EyeOff,
+  Sparkles,
+  Briefcase,
+  IndianRupee,
+  TrendingUp,
+  TrendingDown,
+  PieChart,
   HelpCircle,
   Calculator,
+  History,
+  FileText,
 } from 'lucide-react';
 import { StockHolding, TradeRecord } from '@/types/stock';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
@@ -69,7 +61,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     buyDate: new Date().toISOString().slice(0, 10),
     exchange: 'NSE' as StockHolding['exchange'],
     category: 'Tech' as StockHolding['category'],
-    broker: 'ZERODHA' as 'ZERODHA' | 'GROWW',
+    broker: 'ZERODHA' as 'ZERODHA' | 'GROWW' | 'ANGELONE',
     notes: '',
     isMTF: false,
     ownQuantity: '',
@@ -85,7 +77,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     quantity: '',
     buyDate: new Date().toISOString().slice(0, 10),
     exchange: 'NSE' as StockHolding['exchange'],
-    broker: 'ZERODHA' as 'ZERODHA' | 'GROWW',
+    broker: 'ZERODHA' as 'ZERODHA' | 'GROWW' | 'ANGELONE',
     isMTF: false,
     ownQuantity: '',
     mtfQuantity: '',
@@ -162,6 +154,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     e.preventDefault();
     if (!sellingHolding || !sellFormData.sellPrice || !sellFormData.sellQuantity) return;
 
+    const soldSymbol = sellingHolding.symbol;
+    const soldQty = sellFormData.sellQuantity;
     sellHolding(
       sellingHolding.id,
       parseFloat(sellFormData.sellPrice),
@@ -170,6 +164,10 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     );
 
     setSellingHolding(null);
+    setSellSuccessNotice(`Marked ${soldQty} shares of ${soldSymbol} as sold! Transferred to Trade History.`);
+    setTimeout(() => {
+      setSellSuccessNotice(null);
+    }, 6000);
   };
 
   // Itemized Tax & Fee Receipt Modal State
@@ -179,9 +177,16 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const isSuggestionSelectedRef = useRef(false);
 
   useEffect(() => {
-    if (!formData.symbol || formData.symbol.length < 1) {
+    // If the symbol change was caused by selecting a suggestion, ignore and do not re-open suggestions
+    if (isSuggestionSelectedRef.current) {
+      isSuggestionSelectedRef.current = false;
+      return;
+    }
+
+    if (!formData.symbol || formData.symbol.trim().length < 1) {
       setSearchResults([]);
       setShowSuggestions(false);
       return;
@@ -190,14 +195,16 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(formData.symbol)}`);
+        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(formData.symbol.trim())}`);
         if (res.ok) {
           const data = await res.json();
-          if (data.results && data.results.length > 0) {
+          // Check if selection happened while request was in-flight
+          if (!isSuggestionSelectedRef.current && data.results && data.results.length > 0) {
             setSearchResults(data.results);
             setShowSuggestions(true);
           } else {
             setSearchResults([]);
+            setShowSuggestions(false);
           }
         }
       } catch (err) {
@@ -211,6 +218,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
   }, [formData.symbol]);
 
   const handleSelectStockSuggestion = (stock: any) => {
+    isSuggestionSelectedRef.current = true;
     setFormData((prev) => ({
       ...prev,
       symbol: stock.symbol.endsWith('.NS') ? stock.symbol : `${stock.symbol}.NS`,
@@ -221,6 +229,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         ? stock.category
         : 'Tech') as StockHolding['category'],
     }));
+    setSearchResults([]);
     setShowSuggestions(false);
   };
 
@@ -229,47 +238,65 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // Broker & CDSL Linking Modal State
-  const [isBrokerModalOpen, setIsBrokerModalOpen] = useState(false);
-  const [activeBrokerTab, setActiveBrokerTab] = useState<'ZERODHA' | 'GROWW' | 'CDSL'>('ZERODHA');
-  const [kiteApiKey, setKiteApiKey] = useState('');
-  const [kiteApiSecret, setKiteApiSecret] = useState('');
-  const [showKiteApiSecret, setShowKiteApiSecret] = useState(false);
-  const [isSyncingBroker, setIsSyncingBroker] = useState(false);
-  const [brokerSyncSuccess, setBrokerSyncSuccess] = useState(false);
+  const [sellSuccessNotice, setSellSuccessNotice] = useState<string | null>(null);
 
-  const handleKiteConnectSync = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSyncingBroker(true);
-    setTimeout(() => {
-      // Direct portfolio fetch from broker endpoint
-      addHolding({
-        symbol: 'RATNAMANI.NS',
-        companyName: 'Ratnamani Metals & Tubes Ltd.',
-        buyPrice: 3420.00,
-        quantity: 30,
-        buyDate: new Date().toISOString().slice(0, 10),
-        exchange: 'NSE',
-        category: 'Industrial',
-        notes: 'Directly fetched via Zerodha Kite Connect API',
-      });
-      addHolding({
-        symbol: 'TITAN.NS',
-        companyName: 'Titan Company Ltd.',
-        buyPrice: 3550.00,
-        quantity: 15,
-        buyDate: new Date().toISOString().slice(0, 10),
-        exchange: 'NSE',
-        category: 'Consumer',
-        notes: 'Directly fetched via Zerodha Kite Connect API',
-      });
-      setIsSyncingBroker(false);
-      setBrokerSyncSuccess(true);
-      setTimeout(() => {
-        setBrokerSyncSuccess(false);
-        setIsBrokerModalOpen(false);
-      }, 1500);
-    }, 1200);
+  // Download Trade History as CSV (Excel compatible)
+  const handleDownloadTradeHistoryCSV = () => {
+    if (tradeHistory.length === 0) return;
+    const headers = [
+      'Date',
+      'Symbol',
+      'Company Name',
+      'Trade Type',
+      'Exchange',
+      'Broker',
+      'Quantity',
+      'Buy Price (INR)',
+      'Sell Price (INR)',
+      'Total Value (INR)',
+      'Realized PnL (INR)',
+      'Realized PnL (%)',
+    ];
+
+    const rows = tradeHistory.map((t) => [
+      `"${t.date || ''}"`,
+      `"${t.symbol || ''}"`,
+      `"${(t.companyName || '').replace(/"/g, '""')}"`,
+      `"${t.type || 'SELL'}"`,
+      `"${t.exchange || 'NSE'}"`,
+      `"${t.broker || 'ZERODHA'}"`,
+      t.quantity,
+      t.buyPrice !== undefined ? Number(t.buyPrice).toFixed(2) : '',
+      Number(t.price).toFixed(2),
+      Number(t.totalValue).toFixed(2),
+      t.realizedPnL !== undefined ? Number(t.realizedPnL).toFixed(2) : '',
+      t.realizedPnLPercent !== undefined ? Number(t.realizedPnLPercent).toFixed(2) : '',
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Trade_History_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Download Trade History as JSON
+  const handleDownloadTradeHistoryJSON = () => {
+    if (tradeHistory.length === 0) return;
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(tradeHistory, null, 2)
+    )}`;
+    const link = document.createElement('a');
+    link.href = jsonString;
+    link.setAttribute('download', `Trade_History_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Calculated Portfolio Totals & Itemized Brokerage Deductions
@@ -279,7 +306,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
     const hTaxSettings = {
       ...taxSettings,
-      brokerPreset: (h.broker || 'ZERODHA') as 'ZERODHA' | 'GROWW',
+      brokerPreset: (h.broker || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE',
       exchange: (h.exchange || 'NSE') as 'NSE' | 'BSE',
     };
 
@@ -328,8 +355,13 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
   const growwVal = holdings
     .filter((h) => h.broker === 'GROWW')
     .reduce((sum, h) => sum + h.currentPrice * h.quantity, 0);
+  const angelOneVal = holdings
+    .filter((h) => h.broker === 'ANGELONE')
+    .reduce((sum, h) => sum + h.currentPrice * h.quantity, 0);
+
   const zerodhaPct = currentVal > 0 ? (zerodhaVal / currentVal) * 100 : 0;
   const growwPct = currentVal > 0 ? (growwVal / currentVal) * 100 : 0;
+  const angelOnePct = currentVal > 0 ? (angelOneVal / currentVal) * 100 : 0;
 
   // Best & Worst Performers
   const bestPerformer = holdingsWithCalculations.length
@@ -537,10 +569,16 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                   className="bg-[#22C55E] h-full transition-all duration-500"
                   title={`Groww: ${growwPct.toFixed(1)}%`}
                 />
+                <div
+                  style={{ width: `${angelOnePct}%` }}
+                  className="bg-[#F97316] h-full transition-all duration-500"
+                  title={`Angel One: ${angelOnePct.toFixed(1)}%`}
+                />
               </div>
               <div className="flex items-center gap-3 text-[11px] font-mono shrink-0">
                 <span className="text-[#38BDF8] font-bold">Zerodha {zerodhaPct.toFixed(1)}%</span>
                 <span className="text-[#22C55E] font-bold">Groww {growwPct.toFixed(1)}%</span>
+                <span className="text-[#F97316] font-bold">Angel One {angelOnePct.toFixed(1)}%</span>
               </div>
             </div>
           </div>
@@ -570,24 +608,32 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
             </button>
 
             <button
-              onClick={() => setIsBrokerModalOpen(true)}
-              className="flex items-center gap-2 rounded-full border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 px-4 py-2 text-xs font-semibold text-cyan-300 transition-all duration-300 shadow-sm"
-            >
-              <Link2 className="h-4 w-4 text-cyan-400" />
-              <span>Link Broker / CDSL</span>
-            </button>
-
-            <button
               onClick={exportPortfolioJSON}
               title="Export portfolio as JSON file"
               className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-all"
             >
               <Download className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Export</span>
+              <span className="hidden md:inline">Export JSON</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Trade Sale Success Notification Toast */}
+      {sellSuccessNotice && (
+        <div className="flex items-center justify-between gap-3 p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-semibold shadow-lg shadow-emerald-500/10">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>{sellSuccessNotice}</span>
+          </div>
+          <button
+            onClick={() => setSellSuccessNotice(null)}
+            className="text-emerald-400 hover:text-white transition p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Holdings Table & Mobile Cards */}
       <div className="glass-shell">
@@ -668,7 +714,11 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                             <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[10px] font-semibold text-slate-300 border border-white/10">
                               {holding.exchange}
                             </span>
-                            {(holding.broker || 'ZERODHA') === 'GROWW' ? (
+                            {(holding.broker || 'ZERODHA') === 'ANGELONE' ? (
+                              <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[9px] font-bold text-orange-400 border border-orange-500/30 flex items-center gap-1">
+                                <Sparkles className="h-2.5 w-2.5" /> Angel One
+                              </span>
+                            ) : (holding.broker || 'ZERODHA') === 'GROWW' ? (
                               <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                                 <Building2 className="h-2.5 w-2.5" /> Groww
                               </span>
@@ -785,6 +835,14 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                         <td className="px-4 py-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
+                              onClick={() => handleOpenSellModal(holding)}
+                              title="Mark as Sold & transfer to Trade History"
+                              className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 hover:border-emerald-500/70 transition-all shadow-sm"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                              <span>Mark Sold</span>
+                            </button>
+                            <button
                               onClick={() => {
                                 setSelectedCalculatorHoldingId(holding.id);
                                 if (onOpenInCalculator) onOpenInCalculator(holding.id);
@@ -793,13 +851,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                               className="rounded-lg p-1.5 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors border border-cyan-500/30"
                             >
                               <Calculator className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleOpenSellModal(holding)}
-                              title="Log Sell trade & realized profit"
-                              className="rounded-lg p-1.5 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors border border-emerald-500/30"
-                            >
-                              <IndianRupee className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleOpenEditModal(holding)}
@@ -906,9 +957,9 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                       </button>
                       <button
                         onClick={() => handleOpenSellModal(holding)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/40 hover:bg-emerald-500/25 transition shadow-sm"
                       >
-                        <IndianRupee className="h-3.5 w-3.5" /> Sell
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Mark Sold
                       </button>
                       <button
                         onClick={() => handleOpenEditModal(holding)}
@@ -942,22 +993,44 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
             <p className="text-xs text-slate-400">Complete record of executed stock sales and booked realized profits</p>
           </div>
 
-          {/* Realized P&L Stat Pill */}
-          <div className="flex items-center gap-2 rounded-xl bg-slate-950 border border-white/10 px-4 py-2 text-xs font-mono">
-            <span className="text-slate-400">Total Booked Realized P&L:</span>
-            <span
-              className={`font-extrabold text-sm flex items-center gap-1 ${
-                tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0) >= 0
-                  ? 'text-emerald-400'
-                  : 'text-rose-400'
-              }`}
+          {/* Realized P&L Stat Pill & Download Actions */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2 rounded-xl bg-slate-950 border border-white/10 px-3.5 py-1.5 text-xs font-mono">
+              <span className="text-slate-400">Total Booked P&L:</span>
+              <span
+                className={`font-extrabold text-sm flex items-center gap-1 ${
+                  tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0) >= 0
+                    ? 'text-emerald-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0) >= 0 ? '+' : '-'}₹
+                {Math.abs(tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0)).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+
+            <button
+              onClick={handleDownloadTradeHistoryCSV}
+              disabled={tradeHistory.length === 0}
+              title={tradeHistory.length === 0 ? "No trades to download yet" : "Download Trade History as CSV / Excel spreadsheet"}
+              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 disabled:opacity-40 disabled:pointer-events-none px-3.5 py-2 text-xs font-semibold text-cyan-300 transition-all shadow-sm cursor-pointer"
             >
-              {tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0) >= 0 ? '+' : '-'}₹
-              {Math.abs(tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0)).toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </span>
+              <Download className="h-3.5 w-3.5" />
+              <span>Download CSV</span>
+            </button>
+
+            <button
+              onClick={handleDownloadTradeHistoryJSON}
+              disabled={tradeHistory.length === 0}
+              title={tradeHistory.length === 0 ? "No trades to download yet" : "Download Trade History as JSON"}
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none px-3 py-2 text-xs font-semibold text-slate-300 transition-all cursor-pointer"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">JSON</span>
+            </button>
           </div>
         </div>
 
@@ -968,6 +1041,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
               <tr>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Asset Ticker</th>
+                <th className="px-4 py-3">Broker</th>
                 <th className="px-4 py-3">Trade Type</th>
                 <th className="px-4 py-3 text-right">Quantity</th>
                 <th className="px-4 py-3 text-right">Sell Price (₹)</th>
@@ -979,7 +1053,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
             <tbody className="divide-y divide-white/5 font-mono text-xs">
               {tradeHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400 font-sans">
+                  <td colSpan={9} className="py-8 text-center text-slate-400 font-sans">
                     No recorded trades yet. Log a stock sale to track realized profits!
                   </td>
                 </tr>
@@ -994,6 +1068,21 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                         <span className="block text-[10px] text-slate-400 font-sans font-normal truncate max-w-[140px]">
                           {trade.companyName}
                         </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {(trade.broker || 'ZERODHA') === 'ANGELONE' ? (
+                          <span className="rounded-full bg-orange-500/15 px-2 py-0.5 text-[9px] font-bold text-orange-400 border border-orange-500/30 flex items-center gap-1 w-fit">
+                            <Sparkles className="h-2.5 w-2.5" /> Angel One
+                          </span>
+                        ) : (trade.broker || 'ZERODHA') === 'GROWW' ? (
+                          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30 flex items-center gap-1 w-fit">
+                            <Building2 className="h-2.5 w-2.5" /> Groww
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[9px] font-bold text-cyan-300 border border-blue-500/30 flex items-center gap-1 w-fit">
+                            <Zap className="h-2.5 w-2.5" /> Zerodha
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <span
@@ -1064,6 +1153,19 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                       <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${trade.type === 'SELL' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-indigo-500/20 text-indigo-300'}`}>
                         {trade.type}
                       </span>
+                      {(trade.broker || 'ZERODHA') === 'ANGELONE' ? (
+                        <span className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-400 border border-orange-500/30">
+                          Angel One
+                        </span>
+                      ) : (trade.broker || 'ZERODHA') === 'GROWW' ? (
+                        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
+                          Groww
+                        </span>
+                      ) : (
+                        <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-bold text-cyan-300 border border-blue-500/30">
+                          Zerodha
+                        </span>
+                      )}
                     </div>
                     <span className="text-[10px] text-slate-400">{trade.date}</span>
                   </div>
@@ -1128,11 +1230,17 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                     placeholder="Search stock symbol or name (e.g. RATNA)"
                     value={formData.symbol}
                     onChange={(e) => {
+                      isSuggestionSelectedRef.current = false;
                       setFormData({ ...formData, symbol: e.target.value });
                       setShowSuggestions(true);
                     }}
                     onFocus={() => {
-                      if (searchResults.length > 0) setShowSuggestions(true);
+                      if (searchResults.length > 0 && !isSuggestionSelectedRef.current) {
+                        setShowSuggestions(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setShowSuggestions(false), 200);
                     }}
                     className="w-full glass-input uppercase font-mono pr-9"
                   />
@@ -1231,6 +1339,50 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </div>
               </div>
 
+              {/* Broker Platform Selection (Full Width 3-Column Grid) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Broker Platform *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, broker: 'ZERODHA' })}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                      (formData.broker || 'ZERODHA') === 'ZERODHA'
+                        ? 'bg-blue-600/30 border-blue-500 text-white shadow-md ring-1 ring-blue-500/40'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <Zap className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
+                    <span>Zerodha</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, broker: 'GROWW' })}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                      formData.broker === 'GROWW'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white shadow-md ring-1 ring-emerald-500/40'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <Building2 className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
+                    <span>Groww</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, broker: 'ANGELONE' })}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                      formData.broker === 'ANGELONE'
+                        ? 'bg-orange-600/30 border-orange-500 text-white shadow-md ring-1 ring-orange-500/40'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                    <span>Angel One</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Exchange & Purchase Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Exchange</label>
@@ -1249,32 +1401,17 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Broker Platform *</label>
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, broker: 'ZERODHA' })}
-                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl border text-[11px] font-bold transition ${
-                        (formData.broker || 'ZERODHA') === 'ZERODHA'
-                          ? 'bg-blue-600/30 border-blue-500 text-white shadow-md'
-                          : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Zap className="h-3 w-3 text-cyan-300" />
-                      <span>Zerodha</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, broker: 'GROWW' })}
-                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl border text-[11px] font-bold transition ${
-                        formData.broker === 'GROWW'
-                          ? 'bg-emerald-600/30 border-emerald-500 text-white shadow-md'
-                          : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Building2 className="h-3 w-3 text-emerald-300" />
-                      <span>Groww</span>
-                    </button>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>Purchase Date</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={formData.buyDate}
+                      onChange={(e) => setFormData({ ...formData, buyDate: e.target.value })}
+                      onClick={(e) => e.currentTarget.showPicker?.()}
+                      className="w-full glass-input text-white text-xs font-mono cursor-pointer [color-scheme:dark]"
+                    />
                   </div>
                 </div>
               </div>
@@ -1327,27 +1464,11 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                       </div>
                     </div>
                     <div className="text-[10px] text-amber-200/80 font-mono flex justify-between">
-                      <span>Daily Interest: {formData.broker === 'GROWW' ? '0.041%' : '0.04%'} / day</span>
+                      <span>Daily Interest: {(formData.broker === 'GROWW' || formData.broker === 'ANGELONE') ? '0.041%' : '0.04%'} / day</span>
                       <span>Interest applied from T+1</span>
                     </div>
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                  <span>Purchase Date</span>
-                  <span className="text-[10px] text-slate-400">Click input to open calendar</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={formData.buyDate}
-                    onChange={(e) => setFormData({ ...formData, buyDate: e.target.value })}
-                    onClick={(e) => e.currentTarget.showPicker?.()}
-                    className="w-full glass-input text-white text-xs font-mono cursor-pointer [color-scheme:dark]"
-                  />
-                </div>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
@@ -1441,6 +1562,50 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </div>
               </div>
 
+              {/* Broker Platform Selection (Full Width 3-Column Grid) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Broker Platform *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData({ ...editFormData, broker: 'ZERODHA' })}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                      (editFormData.broker || 'ZERODHA') === 'ZERODHA'
+                        ? 'bg-blue-600/30 border-blue-500 text-white shadow-md ring-1 ring-blue-500/40'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <Zap className="h-3.5 w-3.5 text-cyan-300 shrink-0" />
+                    <span>Zerodha</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData({ ...editFormData, broker: 'GROWW' })}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                      editFormData.broker === 'GROWW'
+                        ? 'bg-emerald-600/30 border-emerald-500 text-white shadow-md ring-1 ring-emerald-500/40'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <Building2 className="h-3.5 w-3.5 text-emerald-300 shrink-0" />
+                    <span>Groww</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData({ ...editFormData, broker: 'ANGELONE' })}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                      editFormData.broker === 'ANGELONE'
+                        ? 'bg-orange-600/30 border-orange-500 text-white shadow-md ring-1 ring-orange-500/40'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-orange-400 shrink-0" />
+                    <span>Angel One</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Exchange & Purchase Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Exchange</label>
@@ -1459,32 +1624,17 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Broker Platform *</label>
-                  <div className="flex items-center gap-1.5 pt-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, broker: 'ZERODHA' })}
-                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl border text-[11px] font-bold transition ${
-                        (editFormData.broker || 'ZERODHA') === 'ZERODHA'
-                          ? 'bg-blue-600/30 border-blue-500 text-white shadow-md'
-                          : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Zap className="h-3 w-3 text-cyan-300" />
-                      <span>Zerodha</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, broker: 'GROWW' })}
-                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-xl border text-[11px] font-bold transition ${
-                        editFormData.broker === 'GROWW'
-                          ? 'bg-emerald-600/30 border-emerald-500 text-white shadow-md'
-                          : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <Building2 className="h-3 w-3 text-emerald-300" />
-                      <span>Groww</span>
-                    </button>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>Purchase Date</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={editFormData.buyDate}
+                      onChange={(e) => setEditFormData({ ...editFormData, buyDate: e.target.value })}
+                      onClick={(e) => e.currentTarget.showPicker?.()}
+                      className="w-full glass-input text-white text-xs font-mono cursor-pointer [color-scheme:dark]"
+                    />
                   </div>
                 </div>
               </div>
@@ -1540,22 +1690,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                  <span>Purchase Date</span>
-                  <span className="text-[10px] text-slate-400">Click input to open calendar</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={editFormData.buyDate}
-                    onChange={(e) => setEditFormData({ ...editFormData, buyDate: e.target.value })}
-                    onClick={(e) => e.currentTarget.showPicker?.()}
-                    className="w-full glass-input text-white text-xs font-mono cursor-pointer [color-scheme:dark]"
-                  />
-                </div>
-              </div>
-
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
@@ -1585,7 +1719,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         const grossProfit = grossValue - buyCost;
 
         const activeHoldingBroker = sellingHolding.broker || 'ZERODHA';
-        const estBrokerage = activeHoldingBroker === 'GROWW' ? Math.min(20, grossValue * 0.0005) : 0;
+        const estBrokerage = activeHoldingBroker === 'GROWW' ? Math.min(20, grossValue * 0.0005) : activeHoldingBroker === 'ANGELONE' ? 20 : 0;
         const estStt = (grossValue * 0.1) / 100;
         const estStampDuty = (buyCost * 0.015) / 100;
         const estGst = (estBrokerage * 18) / 100;
@@ -1599,9 +1733,9 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <IndianRupee className="h-5 w-5 text-emerald-400" /> Log Stock Sale Trade
+                    <CheckCircle2 className="h-5 w-5 text-emerald-400" /> Mark Holding as Sold
                   </h3>
-                  <p className="text-xs text-slate-400">Record sold shares for {sellingHolding.symbol}</p>
+                  <p className="text-xs text-slate-400">Sold shares will be transferred to your Trade History</p>
                 </div>
                 <button
                   onClick={() => setSellingHolding(null)}
@@ -1643,9 +1777,18 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Quantity Sold *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-300">
+                        Quantity Sold *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setSellFormData({ ...sellFormData, sellQuantity: sellingHolding.quantity.toString() })}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold underline"
+                      >
+                        Sell All ({sellingHolding.quantity})
+                      </button>
+                    </div>
                     <input
                       type="number"
                       step="any"
@@ -1726,9 +1869,10 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                   </button>
                   <button
                     type="submit"
-                    className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-bold text-white shadow-lg hover:from-emerald-500 hover:to-teal-500"
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-bold text-white shadow-lg hover:from-emerald-500 hover:to-teal-500 transition-all cursor-pointer"
                   >
-                    Book Realized Trade & Save
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Confirm Sale & Transfer to Trade History</span>
                   </button>
                 </div>
               </form>
@@ -1806,9 +1950,9 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                     Statutory Duties & Broker Charges
                   </div>
                   {[
-                    { label: `Brokerage (${activeHoldingBroker})`, val: calcRes.totalBrokerage, title: 'Brokerage Fee', desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 or 0.1% per order, whichever is lower (min ₹5, max ₹20).' },
+                    { label: `Brokerage (${activeHoldingBroker})`, val: calcRes.totalBrokerage, title: 'Brokerage Fee', desc: 'Broker execution fee. Zerodha = ₹0 for Equity Delivery. Groww = ₹20 or 0.1% per order, whichever is lower (min ₹5, max ₹20). Angel One = ₹0 Buy / ₹20 Sell.' },
                     { label: 'STT (0.1% Buy / 0.1% Sell)', val: calcRes.sttCharges, title: 'Securities Transaction Tax (STT)', desc: 'Statutory tax levied by Central Govt under SEBI rules at 0.1% on Buy and 0.1% on Sell value for Equity Delivery.' },
-                    { label: 'Exchange Txn Charge', val: calcRes.exchangeTxnCharge, title: 'Exchange Transaction Charge', desc: 'Infrastructure fee charged by stock exchanges (NSE: 0.00307% for Zerodha / 0.00297% for Groww, BSE: 0.00375%).' },
+                    { label: 'Exchange Txn Charge', val: calcRes.exchangeTxnCharge, title: 'Exchange Transaction Charge', desc: 'Infrastructure fee charged by stock exchanges (NSE: 0.00307% for Zerodha / 0.00297% for Groww & Angel One, BSE: 0.00375%).' },
                     { label: 'SEBI Turnover Charges', val: calcRes.sebiCharges, title: 'SEBI Regulatory Fee', desc: 'Regulator charge collected by SEBI to regulate stock markets at ₹10 per crore (0.0001%) of turnover + IPFT.' },
                     { label: 'Stamp Duty (0.015% Buy)', val: calcRes.stampDuty, title: 'State Stamp Duty', desc: 'State Govt stamp tax levied at 0.015% (₹1,500/Cr) on BUY side order value only.' },
                     { label: 'GST (18%)', val: calcRes.gstCharges, title: 'Goods & Services Tax (GST)', desc: '18% Govt tax levied on (Brokerage + Exchange Transaction Charges + SEBI Fees + IPFT + DP Base).' },
@@ -1880,215 +2024,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
           </div>
         );
       })()}
-
-      {/* Modal 3: Link Broker & CDSL CAS Sync */}
-      {isBrokerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="glass-panel w-full max-w-xl p-6 space-y-5 relative border border-cyan-500/30 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
-                  <Link2 className="h-5 w-5 text-cyan-400" /> Direct Broker & CDSL DEMAT Account Linking
-                </h3>
-                <p className="text-xs text-slate-400">Sync live stock holdings from Zerodha, Groww, or CDSL CAS</p>
-              </div>
-              <button
-                onClick={() => setIsBrokerModalOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Tabs for Broker Selection */}
-            <div className="grid grid-cols-3 gap-2 bg-slate-950 p-1.5 rounded-xl border border-white/10 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setActiveBrokerTab('ZERODHA')}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition ${
-                  activeBrokerTab === 'ZERODHA'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow font-bold'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Zap className="h-3.5 w-3.5 text-cyan-400" />
-                <span>Zerodha Kite</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveBrokerTab('GROWW')}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition ${
-                  activeBrokerTab === 'GROWW'
-                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow font-bold'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Building2 className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Groww / Upstox</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveBrokerTab('CDSL')}
-                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition ${
-                  activeBrokerTab === 'CDSL'
-                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow font-bold'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
-                <span>CDSL CAS Sync</span>
-              </button>
-            </div>
-
-            {/* Tab 1: Zerodha Kite Connect API */}
-            {activeBrokerTab === 'ZERODHA' && (
-              <form onSubmit={handleKiteConnectSync} className="space-y-4">
-                <div className="rounded-xl bg-indigo-500/10 border border-indigo-500/20 p-3 text-xs text-indigo-300 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <Zap className="h-4 w-4 text-cyan-400" /> Zerodha Kite Connect API v3 Integration
-                  </div>
-                  <p className="text-[11px] text-slate-300">
-                    Connect via your Kite Connect app credentials to pull your live Zerodha holdings directly.
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Zerodha Kite API Key
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. z9x8w7v6u5t4s3r2"
-                      value={kiteApiKey}
-                      onChange={(e) => setKiteApiKey(e.target.value)}
-                      className="w-full glass-input font-mono text-xs"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      Kite API Secret / Access Token (Optional)
-                    </label>
-                    <div className="relative flex items-center">
-                      <input
-                        type={showKiteApiSecret ? 'text' : 'password'}
-                        placeholder="••••••••••••••••••••••••"
-                        value={kiteApiSecret}
-                        onChange={(e) => setKiteApiSecret(e.target.value)}
-                        className="w-full glass-input font-mono text-xs pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowKiteApiSecret(!showKiteApiSecret)}
-                        className="absolute right-3 text-slate-400 hover:text-white transition focus:outline-none"
-                        title={showKiteApiSecret ? "Hide secret" : "Show secret"}
-                      >
-                        {showKiteApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {brokerSyncSuccess && (
-                  <div className="flex items-center gap-2 rounded-lg bg-emerald-500/20 p-3 text-xs text-emerald-300 border border-emerald-500/30">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>Zerodha Kite Connect holdings fetched & synced successfully!</span>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsBrokerModalOpen(false)}
-                    className="rounded-xl px-4 py-2 text-xs text-slate-400 hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSyncingBroker}
-                    className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 px-5 py-2 text-xs font-bold text-white shadow hover:from-indigo-500 hover:to-cyan-500 flex items-center gap-2"
-                  >
-                    {isSyncingBroker && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    <span>{isSyncingBroker ? 'Fetching Zerodha Holdings...' : 'Fetch Zerodha Holdings'}</span>
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Tab 2: Groww & Upstox Statement Parser */}
-            {activeBrokerTab === 'GROWW' && (
-              <div className="space-y-4">
-                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-300 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <FileSpreadsheet className="h-4 w-4 text-emerald-400" /> Groww / Upstox Statement Import
-                  </div>
-                  <p className="text-[11px] text-slate-300">
-                    Export your Holdings P&L report as CSV/Excel from Groww or Upstox, then upload it for 1-click automatic portfolio import.
-                  </p>
-                </div>
-
-                <div className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center space-y-2 hover:border-emerald-500/50 transition cursor-pointer bg-slate-950/40">
-                  <FileSpreadsheet className="h-8 w-8 text-emerald-400 mx-auto" />
-                  <div className="text-xs font-bold text-white">
-                    Drag & Drop Groww or Upstox CSV/Excel file here
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    Supports `.csv`, `.xlsx`, or `.json` holding files
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsBrokerModalOpen(false)}
-                    className="rounded-xl px-4 py-2 text-xs text-slate-400 hover:text-white"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Tab 3: CDSL Consolidated Account Statement */}
-            {activeBrokerTab === 'CDSL' && (
-              <div className="space-y-4">
-                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <ShieldCheck className="h-4 w-4 text-amber-400" /> CDSL / NSDL Consolidated Account Statement (CAS)
-                  </div>
-                  <p className="text-[11px] text-slate-300">
-                    CDSL sends a monthly email CAS statement containing all your demat stocks across Zerodha, Groww, ICICI Direct, & Upstox in a single report.
-                  </p>
-                </div>
-
-                <div className="space-y-2 text-xs text-slate-300">
-                  <div className="p-3 bg-slate-950 rounded-lg border border-white/10">
-                    <span className="font-bold text-white block mb-1">How to link CDSL statement:</span>
-                    <ol className="list-decimal list-inside space-y-1 text-slate-400 text-[11px]">
-                      <li>Download your monthly CDSL CAS statement PDF/CSV from email or cdslindia.com.</li>
-                      <li>Upload the CAS file to automatically parse all stocks across all your brokers.</li>
-                    </ol>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsBrokerModalOpen(false)}
-                    className="rounded-xl px-4 py-2 text-xs text-slate-400 hover:text-white"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

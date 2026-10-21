@@ -195,7 +195,26 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   ) => {
     const currentUser = targetUser || userRef.current || user;
 
-    // 1. Instant Synchronous Local Storage Persistence
+    // 1. GUEST USER: Store ONLY in sessionStorage (in-memory tab cache, discarded once app/tab is closed)
+    if (!currentUser || currentUser.isGuest) {
+      if (typeof window !== 'undefined') {
+        try {
+          const payloadStr = JSON.stringify({
+            holdings: nextHoldings,
+            watchlist: nextWatchlist,
+            tradeHistory: nextHistory,
+            taxSettings: nextTax,
+          });
+          sessionStorage.setItem('stocks_guest_portfolio', payloadStr);
+        } catch (e) {
+          console.warn('SessionStorage save error:', e);
+        }
+      }
+      setSyncStatus('synced');
+      return; // Do NOT persist to localStorage or MongoDB Cloud Database
+    }
+
+    // 2. AUTHENTICATED USER: Instant Local Storage Persistence
     if (typeof window !== 'undefined') {
       try {
         const payloadStr = JSON.stringify({
@@ -205,66 +224,66 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           taxSettings: nextTax,
         });
 
-        if (currentUser) {
-          localStorage.setItem(`stocks_user_data_${currentUser.id}`, payloadStr);
-          if (currentUser.email) {
-            localStorage.setItem(`stocks_user_data_${currentUser.email}`, payloadStr);
-          }
-        } else {
-          localStorage.setItem('stocks_user_data_guest', payloadStr);
+        localStorage.setItem(`stocks_user_data_${currentUser.id}`, payloadStr);
+        if (currentUser.email) {
+          localStorage.setItem(`stocks_user_data_${currentUser.email}`, payloadStr);
         }
       } catch (e) {
         console.warn('LocalStorage save error:', e);
       }
     }
 
-    // 2. Persist to MongoDB Cloud Database if user is authenticated
-    if (currentUser) {
-      setSyncStatus('encrypting');
-      try {
-        const res = await fetch('/api/user/data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            userEmail: currentUser.email,
-            holdings: nextHoldings,
-            watchlist: nextWatchlist,
-            tradeHistory: nextHistory,
-            taxSettings: nextTax,
-          }),
-        });
+    // 3. Persist to MongoDB Cloud Database if user is an authenticated Google user
+    setSyncStatus('encrypting');
+    try {
+      const res = await fetch('/api/user/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          userEmail: currentUser.email,
+          holdings: nextHoldings,
+          watchlist: nextWatchlist,
+          tradeHistory: nextHistory,
+          taxSettings: nextTax,
+        }),
+      });
 
-        if (res.ok) {
-          setSyncStatus('synced');
-        } else {
-          setSyncStatus('offline');
-        }
-      } catch (err) {
-        console.warn('Server database save error:', err);
+      if (res.ok) {
+        setSyncStatus('synced');
+      } else {
         setSyncStatus('offline');
       }
+    } catch (err) {
+      console.warn('Server database save error:', err);
+      setSyncStatus('offline');
     }
   };
 
   // Synchronize portfolio state when user session loads or changes
   useEffect(() => {
-    if (!user) {
-      // If no user is logged in, restore guest cache if available
+    if (!user || user.isGuest) {
+      // If Guest user, restore ONLY from temporary sessionStorage
       if (typeof window !== 'undefined') {
         try {
-          const guestCached = localStorage.getItem('stocks_user_data_guest');
+          const guestCached = sessionStorage.getItem('stocks_guest_portfolio');
           if (guestCached) {
             const parsed = JSON.parse(guestCached);
             if (Array.isArray(parsed.holdings)) setHoldings(parsed.holdings);
             if (Array.isArray(parsed.watchlist)) setWatchlist(parsed.watchlist);
             if (Array.isArray(parsed.tradeHistory)) setTradeHistory(parsed.tradeHistory);
             if (parsed.taxSettings) setTaxSettings(parsed.taxSettings);
+          } else {
+            setHoldings([]);
+            setWatchlist([]);
+            setTradeHistory([]);
+            setTaxSettings(DEFAULT_TAX_SETTINGS);
           }
         } catch {
           // Ignored
         }
       }
+      setSyncStatus('synced');
       return;
     }
 
@@ -461,6 +480,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       realizedPnL: +realizedPnL.toFixed(2),
       realizedPnLPercent: +realizedPnLPercent.toFixed(2),
       exchange: targetHolding.exchange,
+      isMTF: targetHolding.isMTF,
     };
 
     const nextHistory = [sellRecord, ...tradeHistoryRef.current];
