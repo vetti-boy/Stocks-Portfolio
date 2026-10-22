@@ -24,7 +24,8 @@ export const AuthModal: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gisRendered, setGisRendered] = useState(false);
-  const clientId = googleClientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+  const DEFAULT_GOOGLE_CLIENT_ID = '340953449815-qatnff0fgk0ee9jel8nk8o7tk1mlj4dp.apps.googleusercontent.com';
+  const clientId = googleClientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
   const googleBtnContainerRef = useRef<HTMLDivElement>(null);
 
   // Clear messages on modal open
@@ -94,64 +95,74 @@ export const AuthModal: React.FC = () => {
 
   // Fallback single Google Sign In handler (used only if GIS button doesn't mount)
   const handleContinueWithGoogle = async () => {
-    if (clientId && window.google?.accounts?.oauth2) {
-      setIsSubmitting(true);
-      setErrorMsg('');
-      try {
-        const tokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse?.error) {
-              setIsSubmitting(false);
-              const err = tokenResponse.error;
-              if (err === 'origin_mismatch' || err === 'idpiframe_initialization_failed') {
-                setErrorMsg('Google Origin Mismatch: Please ensure "http://localhost:3000" is added under "Authorized JavaScript origins" in Google Cloud Console.');
-              } else if (err !== 'popup_closed_by_user') {
-                setErrorMsg(`Google sign-in: ${tokenResponse.error_description || err}`);
-              }
-              return;
-            }
-            if (tokenResponse?.access_token) {
-              try {
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                });
-                const gProfile = await res.json();
-                if (gProfile?.email) {
-                  const loginRes = await loginWithGoogle({
-                    email: gProfile.email,
-                    name: gProfile.name || gProfile.given_name || 'Google User',
-                    avatar: gProfile.picture,
-                    googleId: gProfile.sub,
-                  });
-                  setIsSubmitting(false);
-                  if (loginRes.success) {
-                    setSuccessMsg('Successfully connected via Google!');
-                    setTimeout(() => closeAuthModal(), 600);
-                  } else {
-                    setErrorMsg(loginRes.error || 'Authentication failed');
-                  }
-                  return;
-                }
-              } catch (e: any) {
-                setIsSubmitting(false);
-                setErrorMsg('Failed to load Google profile data.');
-                return;
-              }
-            }
-            setIsSubmitting(false);
-          },
-        });
-        tokenClient.requestAccessToken({ prompt: 'select_account' });
-        return;
-      } catch (e: any) {
-        console.warn('OAuth popup launch fallback:', e);
-        setIsSubmitting(false);
-      }
+    const activeId = clientId || DEFAULT_GOOGLE_CLIENT_ID;
+    if (!activeId) {
+      setErrorMsg('Google OAuth Client ID is not configured.');
+      return;
     }
 
-    setErrorMsg('Google OAuth Client ID is required to connect to Google.');
+    if (!window.google?.accounts?.oauth2) {
+      setErrorMsg('Google services are still initializing. Please wait a moment and try again.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: activeId,
+        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse?.error) {
+            setIsSubmitting(false);
+            const err = tokenResponse.error;
+            if (err === 'origin_mismatch' || err === 'idpiframe_initialization_failed') {
+              const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://stocks-portfolio-kappa.vercel.app';
+              setErrorMsg(`Google Origin Mismatch: Please ensure "${currentOrigin}" is added under "Authorized JavaScript origins" in Google Cloud Console.`);
+            } else if (err === 'access_denied') {
+              setErrorMsg('Google 403 (Access Denied): Your Google Cloud OAuth Consent Screen is in "Testing" status. To allow other Google accounts to sign in: Go to Google Cloud Console > APIs & Services > OAuth consent screen, and either click "PUBLISH APP", or add this email to "Test users".');
+            } else if (err !== 'popup_closed_by_user') {
+              setErrorMsg(`Google sign-in error: ${tokenResponse.error_description || err}`);
+            }
+            return;
+          }
+          if (tokenResponse?.access_token) {
+            try {
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const gProfile = await res.json();
+              if (gProfile?.email) {
+                const loginRes = await loginWithGoogle({
+                  email: gProfile.email,
+                  name: gProfile.name || gProfile.given_name || 'Google User',
+                  avatar: gProfile.picture,
+                  googleId: gProfile.sub,
+                });
+                setIsSubmitting(false);
+                if (loginRes.success) {
+                  setSuccessMsg('Successfully connected via Google!');
+                  setTimeout(() => closeAuthModal(), 600);
+                } else {
+                  setErrorMsg(loginRes.error || 'Authentication failed');
+                }
+                return;
+              }
+            } catch (e: any) {
+              setIsSubmitting(false);
+              setErrorMsg('Failed to load Google profile data.');
+              return;
+            }
+          }
+          setIsSubmitting(false);
+        },
+      });
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
+    } catch (e: any) {
+      console.warn('OAuth popup launch error:', e);
+      setIsSubmitting(false);
+      setErrorMsg(e?.message || 'Failed to open Google authentication window.');
+    }
   };
 
   const isGuestUser = user?.isGuest;

@@ -121,11 +121,13 @@ export async function POST(req: Request) {
   }
 }
 
+const DEFAULT_GOOGLE_CLIENT_ID = '340953449815-qatnff0fgk0ee9jel8nk8o7tk1mlj4dp.apps.googleusercontent.com';
+
 export async function GET() {
   const clientId =
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
     process.env.GOOGLE_CLIENT_ID ||
-    '';
+    DEFAULT_GOOGLE_CLIENT_ID;
 
   return NextResponse.json({
     clientId,
