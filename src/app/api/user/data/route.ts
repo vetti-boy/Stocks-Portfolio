@@ -21,7 +21,13 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    await connectToDatabase();
+    const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { error: 'MongoDB connection failed. Please ensure 0.0.0.0/0 is allowed in Atlas Network Access.' },
+        { status: 503 }
+      );
+    }
 
     // Query condition: match by userId OR userEmail
     const queryConditions: any[] = [];
@@ -63,7 +69,13 @@ export async function GET(req: Request) {
 
     const cleanEmail = userEmail ? userEmail.toLowerCase().trim() : '';
 
-    await connectToDatabase();
+    const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { error: 'MongoDB connection failed. Please ensure 0.0.0.0/0 is allowed in Atlas Network Access.' },
+        { status: 503 }
+      );
+    }
 
     const queryConditions: any[] = [];
     if (userId) queryConditions.push({ userId });

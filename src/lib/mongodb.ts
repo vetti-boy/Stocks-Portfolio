@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/stocks-portfolio?retryWrites=true&w=majority';
+const MONGODB_URI =
+  process.env.MONGODB_URI ||
+  'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/stocks-portfolio?retryWrites=true&w=majority';
+
+// In serverless environments (Vercel), disable operation buffering so queries fail fast rather than timing out after 10000ms
+mongoose.set('bufferCommands', false);
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -19,36 +24,45 @@ if (!cached) {
 }
 
 export async function connectToDatabase(): Promise<typeof mongoose | null> {
-  if (cached?.conn) {
+  if (cached?.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
   if (!cached?.promise) {
     const opts = {
-      serverSelectionTimeoutMS: 10000,
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+      maxPoolSize: 10,
     };
 
-    cached!.promise = mongoose.connect(MONGODB_URI, opts).then((m) => {
-      console.log('Successfully connected to MongoDB Cloud Database (Atlas).');
-      return m;
-    }).catch((err) => {
-      console.warn('MongoDB connection warning:', err.message);
-      cached!.promise = null;
-      return null as any;
-    });
+    cached!.promise = mongoose
+      .connect(MONGODB_URI, opts)
+      .then((m) => {
+        console.log('Successfully connected to MongoDB Cloud Database (Atlas).');
+        return m;
+      })
+      .catch((err) => {
+        console.error('MongoDB Atlas connection error:', err.message);
+        cached!.promise = null;
+        cached!.conn = null;
+        throw err;
+      });
   }
 
   try {
     const conn = await cached!.promise;
-    if (!conn || mongoose.connection.readyState !== 1) {
-      cached!.conn = null;
-      return null;
+    if (mongoose.connection.readyState === 1) {
+      cached!.conn = conn;
+      return conn;
     }
-    cached!.conn = conn;
-    return conn;
-  } catch (e) {
+    cached!.conn = null;
+    cached!.promise = null;
+    return null;
+  } catch (e: any) {
     cached!.promise = null;
     cached!.conn = null;
+    console.error('connectToDatabase failure:', e?.message);
     return null;
   }
 }

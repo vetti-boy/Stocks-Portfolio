@@ -78,6 +78,19 @@ export const AuthModal: React.FC = () => {
 
   if (!isAuthModalOpen) return null;
 
+  function formatAuthError(err?: string): string {
+    if (!err) return 'Authentication failed. Please try again.';
+    if (
+      err.includes('buffering timed out') ||
+      err.includes('buffering') ||
+      err.includes('ECONNREFUSED') ||
+      err.includes('Server selection timed out')
+    ) {
+      return 'MongoDB connection timed out. Please allow 0.0.0.0/0 in MongoDB Atlas > Network Access so Vercel can connect.';
+    }
+    return err;
+  }
+
   const handleGoogleCredentialResponse = async (response: any) => {
     if (!response?.credential) return;
     setIsSubmitting(true);
@@ -86,7 +99,7 @@ export const AuthModal: React.FC = () => {
     setIsSubmitting(false);
 
     if (!res.success) {
-      setErrorMsg(res.error || 'Google authentication failed.');
+      setErrorMsg(formatAuthError(res.error));
     } else {
       setSuccessMsg('Successfully signed in with Google!');
       setTimeout(() => closeAuthModal(), 600);
@@ -144,7 +157,7 @@ export const AuthModal: React.FC = () => {
                   setSuccessMsg('Successfully connected via Google!');
                   setTimeout(() => closeAuthModal(), 600);
                 } else {
-                  setErrorMsg(loginRes.error || 'Authentication failed');
+                  setErrorMsg(formatAuthError(loginRes.error));
                 }
                 return;
               }

@@ -60,7 +60,16 @@ export async function POST(req: Request) {
       cleanEmail === 'mailfortempusage@gmail.com' ||
       cleanEmail === (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
 
-    await connectToDatabase();
+    const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json(
+        {
+          error:
+            'MongoDB Cloud Database connection timed out. In your MongoDB Atlas Dashboard -> Network Access, please click "+ Add IP Address" and select "Allow Access from Anywhere (0.0.0.0/0)" so Vercel can connect.',
+        },
+        { status: 503 }
+      );
+    }
 
     // Query existing user in MongoDB
     let user = await UserModel.findOne({

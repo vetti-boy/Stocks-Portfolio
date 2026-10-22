@@ -11,7 +11,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 
-    await connectToDatabase();
+    const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 503 });
+    }
 
     // Auto-seed Master Admin into MongoDB Cloud DB if not present
     const masterAdminInMongo = await UserModel.findOne({ email: 'mailfortempusage@gmail.com' });

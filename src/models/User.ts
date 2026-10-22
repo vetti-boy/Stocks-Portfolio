@@ -34,6 +34,7 @@ const UserSchema: Schema = new Schema<IUser>(
   },
   {
     timestamps: true,
+    bufferCommands: false,
   }
 );
 

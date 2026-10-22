@@ -19,6 +19,7 @@ const UserDataSchema: Schema = new Schema<IUserData>(
   {
     timestamps: true,
     minimize: false, // Ensures empty structures or mixed payloads are not stripped by Mongoose
+    bufferCommands: false,
   }
 );
 
