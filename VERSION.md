@@ -2,6 +2,21 @@
 
 This file maintains a strict chronological record of all application versions, feature updates, bug fixes, and architectural modifications.
 
+## [v1.11.0] - 2026-10-22
+### MTF Analyzer Removal & Multiplier-Based Automated MTF Split Engine
+- **Removed MTF Analyzer Modal & Action Buttons**:
+  - Removed confusing MTF Analyzer modal (`MtfCalculatorModal.tsx`) and eliminated all "⚡ MTF Analyzer" launcher buttons from the Portfolio toolbar, Add/Edit Holding modals, and Calculator tab.
+- **Automated MTF Multiplier Capital & Share Split**:
+  - Re-anchored MTF multiplier math to the user's explicit model:
+    - Multiplier **$M$** (e.g. 2.4x) represents total buying power.
+    - **1.0x** is user's own cash ($1 / M$ of total order cost).
+    - **$(M - 1)x$** is broker funded ($(M - 1) / M$ of total order cost).
+    - Example: ₹24,000 total order value with a 2.4x multiplier automatically computes to **₹10,000** user own cash (1.0x) and **₹14,000** broker funded (1.4x).
+  - Completely eliminated the manual input prompt asking the user for "Own Shares" across both the Brokerage Calculator and Stock Holding forms.
+  - Total order shares and costs automatically split into own shares and broker-funded shares in real time based on the active multiplier.
+- **Unified Clean UI**:
+  - Brokerage Calculator and Holding Modals now feature immediate live breakdown cards showing: Total Order Value, 1.0x Own Cash (% and shares), $(M - 1)x$ Broker Funded (% and shares), Daily Interest, and a dual-color visual ratio meter.
+
 ## [v1.10.0] - 2026-10-21
 ### Smart MTF Multipliers, Stock & Broker Leverage Intelligence, and Automatic Share Splitter
 - **Intelligent Stock & Broker MTF Lending Multipliers (`src/lib/mtfUtils.ts`)**:

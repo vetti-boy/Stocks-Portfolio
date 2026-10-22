@@ -29,7 +29,6 @@ import {
 import { StockHolding, TradeRecord } from '@/types/stock';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 import { MtfInputSection } from '@/components/MtfInputSection';
-import { MtfCalculatorModal } from '@/components/MtfCalculatorModal';
 import { getMtfMultiplier } from '@/lib/mtfUtils';
 
 interface PortfolioTabProps {
@@ -72,18 +71,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     mtfQuantity: '',
   });
 
-  // MTF Analyzer Modal State
-  const [isMtfAnalyzerOpen, setIsMtfAnalyzerOpen] = useState(false);
-  const [mtfAnalyzerInitial, setMtfAnalyzerInitial] = useState<{
-    symbol: string;
-    price: number;
-    broker: 'ZERODHA' | 'GROWW' | 'ANGELONE';
-  }>({
-    symbol: 'RATNAVEER',
-    price: 135.5,
-    broker: 'ZERODHA',
-  });
-
   // Edit Holding Modal State
   const [editingHolding, setEditingHolding] = useState<StockHolding | null>(null);
   const [editFormData, setEditFormData] = useState({
@@ -124,7 +111,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     const totalQty = parseFloat(editFormData.quantity);
     const buyP = parseFloat(editFormData.buyPrice);
     const mtfMult = editFormData.isMTF ? editFormData.mtfMultiplier || 2.4 : undefined;
-    const defaultOwnFraction = mtfMult ? 1 / (1 + mtfMult) : 0.2941;
+    const defaultOwnFraction = mtfMult && mtfMult >= 1 ? 1 / mtfMult : (1 / 2.4);
     const ownQ = editFormData.isMTF
       ? (editFormData.ownQuantity !== '' ? parseFloat(editFormData.ownQuantity) || 0 : Math.round(totalQty * defaultOwnFraction))
       : totalQty;
@@ -400,7 +387,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     const totalQty = parseFloat(formData.quantity);
     const buyP = parseFloat(formData.buyPrice);
     const mtfMult = formData.isMTF ? formData.mtfMultiplier || 2.4 : undefined;
-    const defaultOwnFraction = mtfMult ? 1 / (1 + mtfMult) : 0.2941;
+    const defaultOwnFraction = mtfMult && mtfMult >= 1 ? 1 / mtfMult : (1 / 2.4);
     const ownQ = formData.isMTF
       ? (formData.ownQuantity !== '' ? parseFloat(formData.ownQuantity) || 0 : Math.round(totalQty * defaultOwnFraction))
       : totalQty;
@@ -628,22 +615,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-            <button
-              onClick={() => {
-                setMtfAnalyzerInitial({
-                  symbol: 'RATNAVEER',
-                  price: 135.5,
-                  broker: 'ZERODHA',
-                });
-                setIsMtfAnalyzerOpen(true);
-              }}
-              title="Open interactive MTF Leverage, Cash Multiplier & Share Split Analyzer"
-              className="flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 px-3.5 py-2 text-xs font-bold text-amber-300 transition-all shadow-sm"
-            >
-              <Zap className="h-3.5 w-3.5 text-amber-400" />
-              <span>MTF Analyzer</span>
-            </button>
-
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="pill-btn-emerald flex items-center gap-2"
@@ -1490,14 +1461,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 onChangeMtfQuantity={(mtfQuantity) => setFormData((prev) => ({ ...prev, mtfQuantity }))}
                 mtfMultiplier={formData.mtfMultiplier}
                 onChangeMultiplier={(multiplier) => setFormData((prev) => ({ ...prev, mtfMultiplier: multiplier }))}
-                onOpenAnalyzer={() => {
-                  setMtfAnalyzerInitial({
-                    symbol: formData.symbol || 'RATNAVEER',
-                    price: parseFloat(formData.buyPrice) || 135.5,
-                    broker: formData.broker,
-                  });
-                  setIsMtfAnalyzerOpen(true);
-                }}
               />
 
               <div className="pt-2 flex justify-end gap-2">
@@ -1683,14 +1646,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 onChangeMtfQuantity={(mtfQuantity) => setEditFormData((prev) => ({ ...prev, mtfQuantity }))}
                 mtfMultiplier={editFormData.mtfMultiplier}
                 onChangeMultiplier={(multiplier) => setEditFormData((prev) => ({ ...prev, mtfMultiplier: multiplier }))}
-                onOpenAnalyzer={() => {
-                  setMtfAnalyzerInitial({
-                    symbol: editFormData.symbol || 'RATNAVEER',
-                    price: parseFloat(editFormData.buyPrice) || 135.5,
-                    broker: editFormData.broker,
-                  });
-                  setIsMtfAnalyzerOpen(true);
-                }}
               />
 
               <div className="pt-2 flex justify-end gap-2">
@@ -2027,30 +1982,6 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
           </div>
         );
       })()}
-
-      {/* Interactive MTF Leverage & Share Split Analyzer Modal */}
-      <MtfCalculatorModal
-        isOpen={isMtfAnalyzerOpen}
-        onClose={() => setIsMtfAnalyzerOpen(false)}
-        initialSymbol={mtfAnalyzerInitial.symbol}
-        initialPrice={mtfAnalyzerInitial.price}
-        initialBroker={mtfAnalyzerInitial.broker}
-        onApplyTrade={(trade) => {
-          setFormData((prev) => ({
-            ...prev,
-            symbol: trade.symbol,
-            companyName: trade.companyName,
-            buyPrice: trade.buyPrice.toString(),
-            quantity: trade.quantity.toString(),
-            ownQuantity: trade.ownQuantity.toString(),
-            mtfQuantity: trade.mtfQuantity.toString(),
-            broker: trade.broker,
-            isMTF: true,
-            mtfMultiplier: trade.mtfMultiplier,
-          }));
-          setIsAddModalOpen(true);
-        }}
-      />
     </div>
   );
 };

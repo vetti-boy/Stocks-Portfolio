@@ -69,29 +69,25 @@ export function calculateEquityDeliveryBrokerage(params: {
   const isAngelOne = taxSettings.brokerPreset === 'ANGELONE';
   const exchange = taxSettings.exchange || 'NSE';
 
-  // MTF Own vs Borrowed Capital Split
+  // MTF Own vs Borrowed Capital Split (1x Own, (M - 1)x Broker Funded)
   let ownQty = qty;
   let mtfQty = 0;
+  const validMultiplier = (mtfMultiplier !== undefined && mtfMultiplier >= 1) ? mtfMultiplier : 2.4;
+  const ownRatio = 1 / validMultiplier;
+
   if (isMTF) {
-    if (ownQuantity !== undefined && ownQuantity >= 0) {
+    if (ownQuantity !== undefined && ownQuantity >= 0 && ownQuantity !== null && !isNaN(ownQuantity) && ownQuantity <= qty && ownQuantity > 0) {
       ownQty = Math.min(qty, ownQuantity);
       mtfQty = Math.max(0, qty - ownQty);
-    } else if (mtfQuantity !== undefined && mtfQuantity >= 0) {
-      mtfQty = Math.min(qty, mtfQuantity);
-      ownQty = Math.max(0, qty - mtfQty);
-    } else if (mtfMultiplier !== undefined && mtfMultiplier > 0) {
-      const marginShare = 1 / (1 + mtfMultiplier);
-      ownQty = Math.round(qty * marginShare);
-      mtfQty = Math.max(0, qty - ownQty);
     } else {
-      ownQty = Math.round(qty * 0.2941); // Default 2.4x multiplier (29.41% own margin)
+      ownQty = qty > 0 ? Math.min(qty, Math.max(1, Math.round(qty * ownRatio))) : 0;
       mtfQty = Math.max(0, qty - ownQty);
     }
   }
 
   const buyTurnover = qty * buyP;
-  const ownInvestment = isMTF ? ownQty * buyP : buyTurnover;
-  const mtfBorrowedAmount = isMTF ? mtfQty * buyP : 0;
+  const ownInvestment = isMTF ? +( buyTurnover * ownRatio ).toFixed(2) : buyTurnover;
+  const mtfBorrowedAmount = isMTF ? +( buyTurnover - ownInvestment ).toFixed(2) : 0;
   const totalInvestment = buyTurnover;
 
   // MTF Interest Rates & Pledge Fees

@@ -279,11 +279,12 @@ export interface MultiplierPreset {
 }
 
 export const MTF_MULTIPLIER_PRESETS: MultiplierPreset[] = [
-  { multiplier: 2.0, label: '2.0x', sublabel: '3.0x Power • 33% Own', badge: 'Standard' },
-  { multiplier: 2.4, label: '2.4x', sublabel: '3.4x Power • 29% Own', badge: 'Ratnaveer' },
-  { multiplier: 2.5, label: '2.5x', sublabel: '3.5x Power • 29% Own', badge: 'Midcap' },
-  { multiplier: 3.0, label: '3.0x', sublabel: '4.0x Power • 25% Own', badge: 'Largecap' },
-  { multiplier: 4.0, label: '4.0x', sublabel: '5.0x Power • 20% Own', badge: 'Angel One' },
+  { multiplier: 2.0, label: '2.0x', sublabel: '1x Own • 1.0x Broker (50%)', badge: 'Standard' },
+  { multiplier: 2.4, label: '2.4x', sublabel: '1x Own • 1.4x Broker (41.7%)', badge: 'Ratnaveer' },
+  { multiplier: 2.5, label: '2.5x', sublabel: '1x Own • 1.5x Broker (40%)', badge: 'Midcap' },
+  { multiplier: 3.0, label: '3.0x', sublabel: '1x Own • 2.0x Broker (33.3%)', badge: 'Largecap' },
+  { multiplier: 4.0, label: '4.0x', sublabel: '1x Own • 3.0x Broker (25%)', badge: 'Angel One' },
+  { multiplier: 5.0, label: '5.0x', sublabel: '1x Own • 4.0x Broker (20%)', badge: 'Max 5x' },
 ];
 
 /**
@@ -296,6 +297,10 @@ export function cleanSymbol(symbol: string): string {
 
 /**
  * Looks up the MTF lending multiplier for a given stock and broker.
+ * Multiplier M (e.g. 2.4x):
+ * - Total Buying Power = M
+ * - Own Cash portion = 1.0x (1 / M = 41.7% for 2.4x)
+ * - Broker Funded portion = (M - 1)x (1.4x for 2.4x = 58.3%)
  */
 export function getMtfMultiplier(
   symbol: string,
@@ -303,6 +308,8 @@ export function getMtfMultiplier(
 ): {
   multiplier: number;
   totalLeverage: number;
+  ownFactor: number;
+  brokerFactor: number;
   marginPercent: number;
   isVerified: boolean;
   notes?: string;
@@ -311,7 +318,7 @@ export function getMtfMultiplier(
   const clean = cleanSymbol(symbol);
   const found = POPULAR_MTF_STOCKS[clean];
 
-  let multiplier = 2.4; // Default fallback
+  let multiplier = 2.4; // Default fallback (e.g. Ratnaveer)
   let isVerified = false;
   let notes: string | undefined;
 
@@ -328,12 +335,16 @@ export function getMtfMultiplier(
     else multiplier = 2.4;
   }
 
-  const totalLeverage = 1 + multiplier;
-  const marginPercent = +( (1 / totalLeverage) * 100 ).toFixed(2);
+  const totalLeverage = multiplier;
+  const ownFactor = 1.0;
+  const brokerFactor = +(Math.max(0, multiplier - 1)).toFixed(2);
+  const marginPercent = +( (1 / multiplier) * 100 ).toFixed(2);
 
   return {
     multiplier,
     totalLeverage,
+    ownFactor,
+    brokerFactor,
     marginPercent,
     isVerified,
     notes,
@@ -360,10 +371,11 @@ export interface MtfCashCalculationResult {
 
 /**
  * Calculate MTF split when user specifies their available Cash Amount (₹)
- * Example: ₹10,000 cash with 2.4x lending on Ratnaveer (Price: ₹100)
- * -> Broker gives ₹24,000
- * -> Total purchasing power: ₹34,000
- * -> Total shares: 340 (Own: 100, MTF: 240)
+ * Example: ₹10,000 cash with 2.4x total multiplier on Ratnaveer (Price: ₹100)
+ * -> 1x user cash: ₹10,000
+ * -> 1.4x broker funded: ₹14,000
+ * -> Total buying power (2.4x): ₹24,000
+ * -> Total shares: 240 (Own: 100 shares, MTF: 140 shares)
  */
 export function calculateMtfFromCash(params: {
   cashAmount: number;
@@ -375,20 +387,20 @@ export function calculateMtfFromCash(params: {
 
   const validCash = Math.max(0, cashAmount || 0);
   const validPrice = Math.max(0.01, sharePrice || 1);
-  const validMultiplier = Math.max(0.1, multiplier || 2.4);
+  const validMultiplier = Math.max(1.0, multiplier || 2.4);
 
-  const brokerLendedAmount = validCash * validMultiplier;
-  const totalBuyingPower = validCash + brokerLendedAmount;
-  const totalLeverage = 1 + validMultiplier;
-  const marginPercent = +( (1 / totalLeverage) * 100 ).toFixed(2);
+  // User formula: 1x own, (M - 1)x broker, total M x
+  const brokerLendedAmount = +( validCash * (validMultiplier - 1) ).toFixed(2);
+  const totalBuyingPower = +( validCash * validMultiplier ).toFixed(2);
+  const marginPercent = +( (1 / validMultiplier) * 100 ).toFixed(2);
 
   const totalQuantity = Math.floor(totalBuyingPower / validPrice);
-  const ownQuantity = Math.min(totalQuantity, Math.ceil(totalQuantity / totalLeverage));
+  const ownQuantity = totalQuantity > 0 ? Math.min(totalQuantity, Math.max(1, Math.round(totalQuantity * (1 / validMultiplier)))) : 0;
   const mtfQuantity = Math.max(0, totalQuantity - ownQuantity);
 
-  const actualTotalCost = totalQuantity * validPrice;
-  const actualOwnAmount = ownQuantity * validPrice;
-  const actualMtfAmount = mtfQuantity * validPrice;
+  const actualTotalCost = +( totalQuantity * validPrice ).toFixed(2);
+  const actualOwnAmount = +( actualTotalCost * (1 / validMultiplier) ).toFixed(2);
+  const actualMtfAmount = +( actualTotalCost - actualOwnAmount ).toFixed(2);
 
   const dailyRatePercent = (broker === 'GROWW' || broker === 'ANGELONE') ? 0.041 : 0.04;
   const dailyInterest = +( actualMtfAmount * (dailyRatePercent / 100) ).toFixed(2);
@@ -407,7 +419,7 @@ export function calculateMtfFromCash(params: {
     dailyInterest,
     dailyRatePercent,
     pledgeFee,
-    totalLeverage,
+    totalLeverage: validMultiplier,
     marginPercent,
   };
 }
@@ -427,11 +439,12 @@ export interface MtfQtyCalculationResult {
 }
 
 /**
- * Calculate MTF split when user specifies Total Shares they wish to purchase
- * Example: 100 shares of Ratnaveer at ₹135.50 (Multiplier 2.4x)
- * -> Total cost: ₹13,550
- * -> Own shares: 29 (Own cash needed: ₹3,929.50)
- * -> MTF shares: 71 (Broker funded: ₹9,620.50)
+ * Calculate MTF split when user specifies Total Shares & Buy Price:
+ * Example: 240 shares of Ratnaveer at ₹100 (Multiplier 2.4x)
+ * -> Total stock price: ₹24,000 (2.4x)
+ * -> Own cash (1.0x): ₹10,000 (100 shares • 41.67%)
+ * -> Broker funded (1.4x): ₹14,000 (140 shares • 58.33%)
+ * Total 1x + 1.4x = 2.4x
  */
 export function calculateMtfFromTotalQty(params: {
   totalQuantity: number;
@@ -443,22 +456,23 @@ export function calculateMtfFromTotalQty(params: {
 
   const validQty = Math.max(0, totalQuantity || 0);
   const validPrice = Math.max(0, sharePrice || 0);
-  const validMultiplier = Math.max(0.1, multiplier || 2.4);
+  const validMultiplier = Math.max(1.0, multiplier || 2.4);
 
-  const totalCost = validQty * validPrice;
-  const totalLeverage = 1 + validMultiplier;
-  const marginPercent = +( (1 / totalLeverage) * 100 ).toFixed(2);
+  const totalCost = +( validQty * validPrice ).toFixed(2);
+  const ownRatio = 1 / validMultiplier;
 
-  // Own shares = ceil(totalQty / totalLeverage) to guarantee minimum required margin is met
-  const ownQuantity = validQty > 0 ? Math.min(validQty, Math.max(1, Math.round(validQty / totalLeverage))) : 0;
+  // Own shares = round(validQty * (1 / multiplier))
+  const ownQuantity = validQty > 0 ? Math.min(validQty, Math.max(1, Math.round(validQty * ownRatio))) : 0;
   const mtfQuantity = Math.max(0, validQty - ownQuantity);
 
-  const ownAmount = +( ownQuantity * validPrice ).toFixed(2);
-  const brokerLendedAmount = +( mtfQuantity * validPrice ).toFixed(2);
+  // Exact cash amounts based on 1x : (multiplier - 1)x
+  const ownAmount = +( totalCost * ownRatio ).toFixed(2);
+  const brokerLendedAmount = +( totalCost - ownAmount ).toFixed(2);
 
   const dailyRatePercent = (broker === 'GROWW' || broker === 'ANGELONE') ? 0.041 : 0.04;
   const dailyInterest = +( brokerLendedAmount * (dailyRatePercent / 100) ).toFixed(2);
   const pledgeFee = (broker === 'GROWW' || broker === 'ANGELONE') ? 47.20 : 35.40;
+  const marginPercent = +( ownRatio * 100 ).toFixed(2);
 
   return {
     totalQuantity: validQty,
@@ -470,7 +484,7 @@ export function calculateMtfFromTotalQty(params: {
     dailyInterest,
     dailyRatePercent,
     pledgeFee,
-    totalLeverage,
+    totalLeverage: validMultiplier,
     marginPercent,
   };
 }

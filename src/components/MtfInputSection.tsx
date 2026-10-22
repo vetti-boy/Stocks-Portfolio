@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Zap, Coins, TrendingUp, Sparkles, Sliders, Info } from 'lucide-react';
+import { Zap, Coins, Sparkles, TrendingUp } from 'lucide-react';
 import {
   getMtfMultiplier,
   MTF_MULTIPLIER_PRESETS,
-  calculateMtfFromCash,
   calculateMtfFromTotalQty,
   cleanSymbol,
 } from '@/lib/mtfUtils';
@@ -24,7 +23,6 @@ export interface MtfInputSectionProps {
   onChangeMtfQuantity: (mtfQty: string) => void;
   mtfMultiplier?: number;
   onChangeMultiplier?: (multiplier: number) => void;
-  onOpenAnalyzer?: () => void;
 }
 
 export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
@@ -41,10 +39,7 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
   onChangeMtfQuantity,
   mtfMultiplier,
   onChangeMultiplier,
-  onOpenAnalyzer,
 }) => {
-  const [calcMode, setCalcMode] = useState<'qty' | 'cash'>('qty');
-  const [cashAmountInput, setCashAmountInput] = useState<string>('10000');
   const [selectedMultiplier, setSelectedMultiplier] = useState<number>(mtfMultiplier || 2.4);
   const [isCustomMultiplier, setIsCustomMultiplier] = useState(false);
   const [customMultiplierInput, setCustomMultiplierInput] = useState<string>('2.4');
@@ -67,16 +62,14 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
   }, [stockConfig.multiplier, stockConfig.isVerified, symbol]);
 
   const activeMultiplier = isCustomMultiplier
-    ? Math.max(0.1, parseFloat(customMultiplierInput) || 2.4)
+    ? Math.max(1.0, parseFloat(customMultiplierInput) || 2.4)
     : selectedMultiplier;
 
   const priceNum = Math.max(0.01, parseFloat(buyPrice) || 0);
   const totalQtyNum = Math.max(0, parseFloat(totalQuantity) || 0);
-  const ownQtyNum = Math.max(0, parseFloat(ownQuantity) || 0);
-  const mtfQtyNum = Math.max(0, parseFloat(mtfQuantity) || 0);
 
-  // Split calculation when in 'qty' mode
-  const qtyCalculated = useMemo(() => {
+  // Auto-calculate split based on multiplier (1x user cash, (M - 1)x broker funded)
+  const split = useMemo(() => {
     return calculateMtfFromTotalQty({
       totalQuantity: totalQtyNum,
       sharePrice: priceNum,
@@ -85,36 +78,13 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
     });
   }, [totalQtyNum, priceNum, activeMultiplier, broker]);
 
-  // Recalculate and sync ownQuantity and mtfQuantity when totalQuantity or multiplier changes in 'qty' mode
-  const handleApplySplitFromQty = (newTotalQtyStr: string, multiplierVal: number) => {
-    const qNum = Math.max(0, parseFloat(newTotalQtyStr) || 0);
-    if (qNum <= 0) return;
-    const split = calculateMtfFromTotalQty({
-      totalQuantity: qNum,
-      sharePrice: priceNum,
-      multiplier: multiplierVal,
-      broker,
-    });
-    onChangeOwnQuantity(split.ownQuantity.toString());
-    onChangeMtfQuantity(split.mtfQuantity.toString());
-  };
-
-  // Recalculate when user inputs Cash Amount in 'cash' mode
-  const handleCashAmountChange = (cashStr: string, multiplierVal: number) => {
-    setCashAmountInput(cashStr);
-    const cNum = Math.max(0, parseFloat(cashStr) || 0);
-    if (cNum > 0 && priceNum > 0) {
-      const split = calculateMtfFromCash({
-        cashAmount: cNum,
-        sharePrice: priceNum,
-        multiplier: multiplierVal,
-        broker,
-      });
-      onChangeTotalQuantity(split.totalQuantity.toString());
+  // Keep parent form in sync with calculated own shares and broker shares
+  useEffect(() => {
+    if (isMTF && totalQtyNum > 0) {
       onChangeOwnQuantity(split.ownQuantity.toString());
       onChangeMtfQuantity(split.mtfQuantity.toString());
     }
-  };
+  }, [isMTF, split.ownQuantity, split.mtfQuantity]);
 
   const handleMultiplierChange = (mult: number) => {
     setSelectedMultiplier(mult);
@@ -122,33 +92,32 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
     setCustomMultiplierInput(mult.toString());
     if (onChangeMultiplier) onChangeMultiplier(mult);
 
-    if (calcMode === 'cash') {
-      handleCashAmountChange(cashAmountInput, mult);
-    } else {
-      handleApplySplitFromQty(totalQuantity, mult);
-    }
+    const newSplit = calculateMtfFromTotalQty({
+      totalQuantity: totalQtyNum,
+      sharePrice: priceNum,
+      multiplier: mult,
+      broker,
+    });
+    onChangeOwnQuantity(newSplit.ownQuantity.toString());
+    onChangeMtfQuantity(newSplit.mtfQuantity.toString());
   };
 
   const handleCustomMultiplierChange = (customStr: string) => {
     setCustomMultiplierInput(customStr);
-    const m = Math.max(0.1, parseFloat(customStr) || 2.4);
+    const m = Math.max(1.0, parseFloat(customStr) || 2.4);
     if (onChangeMultiplier) onChangeMultiplier(m);
 
-    if (calcMode === 'cash') {
-      handleCashAmountChange(cashAmountInput, m);
-    } else {
-      handleApplySplitFromQty(totalQuantity, m);
-    }
+    const newSplit = calculateMtfFromTotalQty({
+      totalQuantity: totalQtyNum,
+      sharePrice: priceNum,
+      multiplier: m,
+      broker,
+    });
+    onChangeOwnQuantity(newSplit.ownQuantity.toString());
+    onChangeMtfQuantity(newSplit.mtfQuantity.toString());
   };
 
-  // Effective visual stats
-  const effectiveTotalCost = totalQtyNum * priceNum;
-  const effectiveOwnAmount = (ownQuantity !== '' ? ownQtyNum : qtyCalculated.ownQuantity) * priceNum;
-  const effectiveMtfAmount = (mtfQuantity !== '' ? mtfQtyNum : qtyCalculated.mtfQuantity) * priceNum;
-  const effectiveMarginPct = effectiveTotalCost > 0 ? (effectiveOwnAmount / effectiveTotalCost) * 100 : (1 / (1 + activeMultiplier)) * 100;
   const dailyRate = (broker === 'GROWW' || broker === 'ANGELONE') ? 0.041 : 0.04;
-  const dailyInterest = (effectiveMtfAmount * (dailyRate / 100)).toFixed(2);
-  const pledgeFee = (broker === 'GROWW' || broker === 'ANGELONE') ? 47.20 : 35.40;
 
   return (
     <div className="p-3.5 bg-gradient-to-b from-amber-500/10 to-amber-950/20 border border-amber-500/30 rounded-xl space-y-3.5">
@@ -163,38 +132,27 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
               Margin Trading Facility (MTF)
             </span>
             <span className="text-[10px] text-amber-200/70 block">
-              Lending multiplier & auto share splitter
+              Auto capital & share split based on multiplier
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {onOpenAnalyzer && (
-            <button
-              type="button"
-              onClick={onOpenAnalyzer}
-              className="text-[10px] font-mono font-bold text-amber-300 hover:text-white px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 transition flex items-center gap-1"
-            >
-              <Sliders className="h-3 w-3" /> Analyzer
-            </button>
-          )}
-
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={isMTF}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                onToggleMtf(checked);
-                if (checked) {
-                  handleApplySplitFromQty(totalQuantity, activeMultiplier);
-                }
-              }}
-              className="sr-only peer"
-            />
-            <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-          </label>
-        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isMTF}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onToggleMtf(checked);
+              if (checked && totalQtyNum > 0) {
+                onChangeOwnQuantity(split.ownQuantity.toString());
+                onChangeMtfQuantity(split.mtfQuantity.toString());
+              }
+            }}
+            className="sr-only peer"
+          />
+          <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+        </label>
       </div>
 
       {isMTF && (
@@ -204,23 +162,23 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
             <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-400" />
               <span>
-                <strong>Ratnaveer Precision:</strong> Zerodha lends <strong>2.4x</strong> of your cash (Total <strong>3.4x</strong> buying power • ~29.4% margin).
+                <strong>Ratnaveer Precision:</strong> <strong>2.4x Multiplier</strong> (1x own cash + 1.4x broker funded • ~41.7% own capital).
               </span>
             </div>
           )}
 
-          {/* Broker Lending Multiplier Selector Chips */}
+          {/* Broker Multiplier Selector Chips */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
               <span className="font-semibold text-slate-300 flex items-center gap-1">
-                <Coins className="h-3 w-3 text-amber-400" /> Broker Lending Multiplier:
+                <Coins className="h-3 w-3 text-amber-400" /> Broker Multiplier:
               </span>
               <span className="font-mono text-amber-400 font-bold">
-                Total Leverage: {(1 + activeMultiplier).toFixed(1)}x
+                {activeMultiplier}x Total (1.0x Own • {(activeMultiplier - 1).toFixed(1)}x Broker)
               </span>
             </div>
 
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
               {MTF_MULTIPLIER_PRESETS.map((p) => {
                 const isSelected = !isCustomMultiplier && selectedMultiplier === p.multiplier;
                 return (
@@ -236,7 +194,7 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
                   >
                     <div className="text-xs">{p.label}</div>
                     <div className={`text-[8px] truncate ${isSelected ? 'text-black/80 font-bold' : 'text-slate-400'}`}>
-                      {p.badge || `${(1 + p.multiplier).toFixed(1)}x`}
+                      {p.badge || `${p.multiplier}x`}
                     </div>
                   </button>
                 );
@@ -264,7 +222,7 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
                 <input
                   type="number"
                   step="0.1"
-                  min="0.1"
+                  min="1.0"
                   max="10"
                   value={customMultiplierInput}
                   onChange={(e) => handleCustomMultiplierChange(e.target.value)}
@@ -272,156 +230,70 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
                   className="w-20 glass-input text-amber-400 font-mono text-xs font-bold py-1 px-2"
                 />
                 <span className="text-[10px] text-slate-500">
-                  (Broker lends {activeMultiplier}x your cash)
+                  (1.0x Own Cash + {(activeMultiplier - 1).toFixed(1)}x Broker Funded)
                 </span>
               </div>
             )}
           </div>
 
-          {/* Dual Calculation Mode Switcher */}
-          <div className="space-y-2 bg-[#090E16] p-2.5 rounded-xl border border-white/5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">
-                Input Mode
+          {/* Automatic Multiplier Split Cards - No manual own shares prompt */}
+          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono bg-[#090E16] p-2.5 rounded-xl border border-white/5">
+            <div>
+              <span className="text-slate-400 block text-[10px]">Total Order Value:</span>
+              <span className="font-bold text-white text-xs">
+                ₹{split.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              <div className="flex rounded-md bg-[#05070B] border border-white/10 p-0.5 text-[10px] font-mono">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalcMode('qty');
-                    handleApplySplitFromQty(totalQuantity, activeMultiplier);
-                  }}
-                  className={`px-2 py-1 rounded transition flex items-center gap-1 ${
-                    calcMode === 'qty' ? 'bg-amber-500 text-black font-bold shadow' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <TrendingUp className="h-2.5 w-2.5" /> Total Shares
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCalcMode('cash');
-                    handleCashAmountChange(cashAmountInput, activeMultiplier);
-                  }}
-                  className={`px-2 py-1 rounded transition flex items-center gap-1 ${
-                    calcMode === 'cash' ? 'bg-amber-500 text-black font-bold shadow' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Coins className="h-2.5 w-2.5" /> By My Cash (₹)
-                </button>
-              </div>
+              <span className="text-[9px] text-slate-500 block">{totalQtyNum} shares ({activeMultiplier}x)</span>
             </div>
 
-            {calcMode === 'cash' ? (
-              <div>
-                <label className="block text-[11px] font-semibold text-amber-300 mb-1">
-                  Enter Your Available Cash (₹):
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">₹</span>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="e.g. 10000"
-                      value={cashAmountInput}
-                      onChange={(e) => handleCashAmountChange(e.target.value, activeMultiplier)}
-                      className="w-full glass-input pl-6 text-amber-400 font-mono font-bold text-xs"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-400 shrink-0 font-mono">
-                    Broker gives: <strong className="text-amber-300">₹{(Math.max(0, parseFloat(cashAmountInput) || 0) * activeMultiplier).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong>
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-[10px] text-slate-400 flex items-center justify-between">
-                <span>Total Order Shares: <strong className="text-white font-mono">{totalQtyNum} shares</strong></span>
-                <button
-                  type="button"
-                  onClick={() => handleApplySplitFromQty(totalQuantity, activeMultiplier)}
-                  className="text-amber-400 hover:underline font-mono"
-                >
-                  Re-split by {activeMultiplier}x factor
-                </button>
-              </div>
-            )}
+            <div>
+              <span className="text-slate-400 block text-[10px]">Daily Interest:</span>
+              <span className="font-bold text-amber-400 text-xs">
+                ₹{split.dailyInterest} / day
+              </span>
+              <span className="text-[9px] text-slate-500 block">Pledge fee: ₹{split.pledgeFee.toFixed(2)}</span>
+            </div>
+
+            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-emerald-400 block text-[10px] font-semibold">Your Own Cash (1.0x):</span>
+              <span className="font-bold text-[#22C55E] text-xs">
+                ₹{split.ownAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-[9px] text-emerald-300/80 block font-bold">{split.ownQuantity} shares ({split.marginPercent.toFixed(1)}%)</span>
+            </div>
+
+            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <span className="text-amber-400 block text-[10px] font-semibold">
+                Broker Funded ({(activeMultiplier - 1).toFixed(1)}x):
+              </span>
+              <span className="font-bold text-[#F59E0B] text-xs">
+                ₹{split.brokerLendedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-[9px] text-amber-300/80 block font-bold">{split.mtfQuantity} shares ({(100 - split.marginPercent).toFixed(1)}%)</span>
+            </div>
           </div>
 
           {/* Visual Capital Split Meter */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <div className="flex items-center justify-between text-[10px] font-mono">
               <span className="text-emerald-400 font-semibold">
-                Your Cash: ₹{effectiveOwnAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({effectiveMarginPct.toFixed(1)}%)
+                1.0x Own Cash: ₹{split.ownAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({split.marginPercent.toFixed(1)}%)
               </span>
               <span className="text-amber-400 font-semibold">
-                Broker Lended: ₹{effectiveMtfAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(100 - effectiveMarginPct).toFixed(1)}%)
+                {(activeMultiplier - 1).toFixed(1)}x Broker Funded: ₹{split.brokerLendedAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(100 - split.marginPercent).toFixed(1)}%)
               </span>
             </div>
 
             <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden flex border border-white/10">
               <div
-                style={{ width: `${Math.min(100, Math.max(0, effectiveMarginPct))}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, split.marginPercent))}%` }}
                 className="bg-emerald-500 h-full transition-all duration-200"
               />
               <div
-                style={{ width: `${Math.min(100, Math.max(0, 100 - effectiveMarginPct))}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, 100 - split.marginPercent))}%` }}
                 className="bg-amber-400 h-full transition-all duration-200"
               />
             </div>
-          </div>
-
-          {/* Own Shares vs MTF Borrowed Shares Inputs */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                Own Shares (Your Cash)
-              </label>
-              <input
-                type="number"
-                step="any"
-                placeholder="e.g. 29"
-                value={ownQuantity}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  onChangeOwnQuantity(val);
-                  const o = parseFloat(val) || 0;
-                  onChangeMtfQuantity(Math.max(0, totalQtyNum - o).toString());
-                }}
-                className="w-full glass-input text-emerald-400 font-bold font-mono text-xs"
-              />
-              <span className="text-[9px] text-slate-400 mt-0.5 block font-mono">
-                ₹{effectiveOwnAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                MTF Borrowed Shares
-              </label>
-              <input
-                type="number"
-                step="any"
-                placeholder="e.g. 71"
-                value={mtfQuantity}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  onChangeMtfQuantity(val);
-                  const m = parseFloat(val) || 0;
-                  onChangeOwnQuantity(Math.max(0, totalQtyNum - m).toString());
-                }}
-                className="w-full glass-input text-amber-400 font-mono font-bold text-xs"
-              />
-              <span className="text-[9px] text-slate-400 mt-0.5 block font-mono">
-                ₹{effectiveMtfAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </span>
-            </div>
-          </div>
-
-          {/* Daily Interest & Statutory Fees Notice */}
-          <div className="flex items-center justify-between text-[10px] text-amber-200/80 font-mono pt-1 border-t border-white/5">
-            <span>Daily Interest: <strong className="text-amber-400">₹{dailyInterest} / day</strong> ({dailyRate}%/d)</span>
-            <span>Pledge: ₹{pledgeFee.toFixed(2)}</span>
           </div>
         </div>
       )}
