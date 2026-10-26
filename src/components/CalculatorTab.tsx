@@ -127,9 +127,9 @@ export const CalculatorTab: React.FC = () => {
 
   // MTF Inputs & Multiplier Intelligence
   const [mtfDaysInput, setMtfDaysInput] = useState<string>('30');
-  const [mtfMultiplier, setMtfMultiplier] = useState<number>(2.4);
+  const [mtfMultiplier, setMtfMultiplier] = useState<number>(2.5);
   const [isCustomMultiplier, setIsCustomMultiplier] = useState(false);
-  const [customMultiplierInput, setCustomMultiplierInput] = useState<string>('2.4');
+  const [customMultiplierInput, setCustomMultiplierInput] = useState<string>('2.5');
 
   // Populate fields automatically when a portfolio holding is selected!
   useEffect(() => {
@@ -175,7 +175,7 @@ export const CalculatorTab: React.FC = () => {
   const activeBroker = (taxSettings.brokerPreset || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE';
 
   const activeMtfMultiplier = isCustomMultiplier
-    ? Math.max(1.0, parseFloat(customMultiplierInput) || 2.4)
+    ? Math.max(1.0, parseFloat(customMultiplierInput) || 2.5)
     : mtfMultiplier;
 
   // Automatically calculate MTF split from multiplier: 1x own cash, (M - 1)x broker funded
@@ -498,7 +498,7 @@ export const CalculatorTab: React.FC = () => {
                         className="w-20 bg-[#080B10] border border-amber-500/40 rounded px-2 py-0.5 text-xs font-mono text-amber-400 font-bold outline-none"
                       />
                       <span className="text-[10px] text-slate-400 font-mono">
-                        (1.0x Own Cash + {(Math.max(1, parseFloat(customMultiplierInput) || 2.4) - 1).toFixed(1)}x Broker Funded)
+                        (1.0x Own Cash + {(Math.max(1, parseFloat(customMultiplierInput) || 2.5) - 1).toFixed(1)}x Broker Funded)
                       </span>
                     </div>
                   )}

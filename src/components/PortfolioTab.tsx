@@ -66,7 +66,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     broker: 'ZERODHA' as 'ZERODHA' | 'GROWW' | 'ANGELONE',
     notes: '',
     isMTF: false,
-    mtfMultiplier: 2.4,
+    mtfMultiplier: 2.5,
     ownQuantity: '',
     mtfQuantity: '',
   });
@@ -82,7 +82,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     exchange: 'NSE' as StockHolding['exchange'],
     broker: 'ZERODHA' as 'ZERODHA' | 'GROWW' | 'ANGELONE',
     isMTF: false,
-    mtfMultiplier: 2.4,
+    mtfMultiplier: 2.5,
     ownQuantity: '',
     mtfQuantity: '',
   });
@@ -98,7 +98,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
       exchange: holding.exchange,
       broker: holding.broker || 'ZERODHA',
       isMTF: !!holding.isMTF,
-      mtfMultiplier: holding.mtfMultiplier || 2.4,
+      mtfMultiplier: holding.mtfMultiplier || 2.5,
       ownQuantity: holding.ownQuantity !== undefined ? holding.ownQuantity.toString() : '',
       mtfQuantity: holding.mtfQuantity !== undefined ? holding.mtfQuantity.toString() : '',
     });
@@ -110,8 +110,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
     const totalQty = parseFloat(editFormData.quantity);
     const buyP = parseFloat(editFormData.buyPrice);
-    const mtfMult = editFormData.isMTF ? editFormData.mtfMultiplier || 2.4 : undefined;
-    const defaultOwnFraction = mtfMult && mtfMult >= 1 ? 1 / mtfMult : (1 / 2.4);
+    const mtfMult = editFormData.isMTF ? editFormData.mtfMultiplier || 2.5 : undefined;
+    const defaultOwnFraction = mtfMult && mtfMult >= 1 ? 1 / mtfMult : (1 / 2.5);
     const ownQ = editFormData.isMTF
       ? (editFormData.ownQuantity !== '' ? parseFloat(editFormData.ownQuantity) || 0 : Math.round(totalQty * defaultOwnFraction))
       : totalQty;
@@ -386,8 +386,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
     const totalQty = parseFloat(formData.quantity);
     const buyP = parseFloat(formData.buyPrice);
-    const mtfMult = formData.isMTF ? formData.mtfMultiplier || 2.4 : undefined;
-    const defaultOwnFraction = mtfMult && mtfMult >= 1 ? 1 / mtfMult : (1 / 2.4);
+    const mtfMult = formData.isMTF ? formData.mtfMultiplier || 2.5 : undefined;
+    const defaultOwnFraction = mtfMult && mtfMult >= 1 ? 1 / mtfMult : (1 / 2.5);
     const ownQ = formData.isMTF
       ? (formData.ownQuantity !== '' ? parseFloat(formData.ownQuantity) || 0 : Math.round(totalQty * defaultOwnFraction))
       : totalQty;
@@ -424,7 +424,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
       broker: 'ZERODHA',
       notes: '',
       isMTF: false,
-      mtfMultiplier: 2.4,
+      mtfMultiplier: 2.5,
       ownQuantity: '',
       mtfQuantity: '',
     });

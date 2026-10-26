@@ -72,7 +72,7 @@ export function calculateEquityDeliveryBrokerage(params: {
   // MTF Own vs Borrowed Capital Split (1x Own, (M - 1)x Broker Funded)
   let ownQty = qty;
   let mtfQty = 0;
-  const validMultiplier = (mtfMultiplier !== undefined && mtfMultiplier >= 1) ? mtfMultiplier : 2.4;
+  const validMultiplier = (mtfMultiplier !== undefined && mtfMultiplier >= 1) ? mtfMultiplier : 2.5;
   const ownRatio = 1 / validMultiplier;
 
   if (isMTF) {

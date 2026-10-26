@@ -40,9 +40,9 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
   mtfMultiplier,
   onChangeMultiplier,
 }) => {
-  const [selectedMultiplier, setSelectedMultiplier] = useState<number>(mtfMultiplier || 2.4);
+  const [selectedMultiplier, setSelectedMultiplier] = useState<number>(mtfMultiplier || 2.5);
   const [isCustomMultiplier, setIsCustomMultiplier] = useState(false);
-  const [customMultiplierInput, setCustomMultiplierInput] = useState<string>('2.4');
+  const [customMultiplierInput, setCustomMultiplierInput] = useState<string>('2.5');
 
   // Detect verified stock config when symbol or broker changes
   const stockConfig = useMemo(() => {
@@ -62,7 +62,7 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
   }, [stockConfig.multiplier, stockConfig.isVerified, symbol]);
 
   const activeMultiplier = isCustomMultiplier
-    ? Math.max(1.0, parseFloat(customMultiplierInput) || 2.4)
+    ? Math.max(1.0, parseFloat(customMultiplierInput) || 2.5)
     : selectedMultiplier;
 
   const priceNum = Math.max(0.01, parseFloat(buyPrice) || 0);
@@ -104,7 +104,7 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
 
   const handleCustomMultiplierChange = (customStr: string) => {
     setCustomMultiplierInput(customStr);
-    const m = Math.max(1.0, parseFloat(customStr) || 2.4);
+    const m = Math.max(1.0, parseFloat(customStr) || 2.5);
     if (onChangeMultiplier) onChangeMultiplier(m);
 
     const newSplit = calculateMtfFromTotalQty({
@@ -162,7 +162,7 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
             <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-400" />
               <span>
-                <strong>Ratnaveer Precision:</strong> <strong>2.4x Multiplier</strong> (1x own cash + 1.4x broker funded • ~41.7% own capital).
+                <strong>Ratnaveer Precision:</strong> <strong>2.5x Multiplier</strong> (1x own cash + 1.5x broker funded • 40% own capital).
               </span>
             </div>
           )}
@@ -226,7 +226,7 @@ export const MtfInputSection: React.FC<MtfInputSectionProps> = ({
                   max="10"
                   value={customMultiplierInput}
                   onChange={(e) => handleCustomMultiplierChange(e.target.value)}
-                  placeholder="e.g. 2.4"
+                  placeholder="e.g. 2.5"
                   className="w-20 glass-input text-amber-400 font-mono text-xs font-bold py-1 px-2"
                 />
                 <span className="text-[10px] text-slate-500">

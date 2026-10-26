@@ -20,7 +20,7 @@ export interface StockMtfConfig {
  * Verified Indian Stocks MTF Multiplier Database
  * Zerodha, Groww, and Angel One publish Category / VaR margins.
  * For example:
- * - RATNAVEER (Ratnaveer Precision Engineering): Zerodha lending factor 2.4x (Margin ~29.4%, total power 3.4x)
+ * - RATNAVEER (Ratnaveer Precision Engineering): 2.5x Multiplier (1x own cash + 1.5x broker funded / 40% margin)
  * - RELIANCE, TCS, INFY: Zerodha lending factor 3.0x (Margin 25%, total power 4.0x), Angel One up to 4.0x (Margin 20%, 5.0x power)
  */
 export const POPULAR_MTF_STOCKS: Record<string, StockMtfConfig> = {
@@ -28,11 +28,11 @@ export const POPULAR_MTF_STOCKS: Record<string, StockMtfConfig> = {
     symbol: 'RATNAVEER',
     name: 'Ratnaveer Precision Engineering Ltd',
     category: 'SmallCap',
-    zerodhaMultiplier: 2.4, // User requested: Zerodha lends 2.4x of original amount
-    growwMultiplier: 2.4,
+    zerodhaMultiplier: 2.5, // Ratnaveer MTF: 2.5x multiplier (1x own cash + 1.5x broker funded)
+    growwMultiplier: 2.5,
     angelOneMultiplier: 2.5,
     isVerified: true,
-    notes: 'Verified Zerodha 2.4x lending (Total 3.4x buying power / 29.4% margin)',
+    notes: 'Verified 2.5x lending (1x Own cash + 1.5x Broker funded / 40% margin)',
   },
   RELIANCE: {
     symbol: 'RELIANCE',
@@ -280,8 +280,7 @@ export interface MultiplierPreset {
 
 export const MTF_MULTIPLIER_PRESETS: MultiplierPreset[] = [
   { multiplier: 2.0, label: '2.0x', sublabel: '1x Own • 1.0x Broker (50%)', badge: 'Standard' },
-  { multiplier: 2.4, label: '2.4x', sublabel: '1x Own • 1.4x Broker (41.7%)', badge: 'Ratnaveer' },
-  { multiplier: 2.5, label: '2.5x', sublabel: '1x Own • 1.5x Broker (40%)', badge: 'Midcap' },
+  { multiplier: 2.5, label: '2.5x', sublabel: '1x Own • 1.5x Broker (40%)', badge: 'Ratnaveer' },
   { multiplier: 3.0, label: '3.0x', sublabel: '1x Own • 2.0x Broker (33.3%)', badge: 'Largecap' },
   { multiplier: 4.0, label: '4.0x', sublabel: '1x Own • 3.0x Broker (25%)', badge: 'Angel One' },
   { multiplier: 5.0, label: '5.0x', sublabel: '1x Own • 4.0x Broker (20%)', badge: 'Max 5x' },
@@ -297,10 +296,10 @@ export function cleanSymbol(symbol: string): string {
 
 /**
  * Looks up the MTF lending multiplier for a given stock and broker.
- * Multiplier M (e.g. 2.4x):
+ * Multiplier M (e.g. 2.5x):
  * - Total Buying Power = M
- * - Own Cash portion = 1.0x (1 / M = 41.7% for 2.4x)
- * - Broker Funded portion = (M - 1)x (1.4x for 2.4x = 58.3%)
+ * - Own Cash portion = 1.0x (1 / M = 40.0% for 2.5x)
+ * - Broker Funded portion = (M - 1)x (1.5x for 2.5x = 60.0%)
  */
 export function getMtfMultiplier(
   symbol: string,
@@ -318,7 +317,7 @@ export function getMtfMultiplier(
   const clean = cleanSymbol(symbol);
   const found = POPULAR_MTF_STOCKS[clean];
 
-  let multiplier = 2.4; // Default fallback (e.g. Ratnaveer)
+  let multiplier = 2.5; // Default fallback (e.g. Ratnaveer)
   let isVerified = false;
   let notes: string | undefined;
 
@@ -332,7 +331,7 @@ export function getMtfMultiplier(
     // Sensible defaults based on broker
     if (broker === 'ANGELONE') multiplier = 3.0;
     else if (broker === 'GROWW') multiplier = 2.5;
-    else multiplier = 2.4;
+    else multiplier = 2.5;
   }
 
   const totalLeverage = multiplier;
@@ -371,11 +370,11 @@ export interface MtfCashCalculationResult {
 
 /**
  * Calculate MTF split when user specifies their available Cash Amount (₹)
- * Example: ₹10,000 cash with 2.4x total multiplier on Ratnaveer (Price: ₹100)
+ * Example: ₹10,000 cash with 2.5x total multiplier on Ratnaveer (Price: ₹100)
  * -> 1x user cash: ₹10,000
- * -> 1.4x broker funded: ₹14,000
- * -> Total buying power (2.4x): ₹24,000
- * -> Total shares: 240 (Own: 100 shares, MTF: 140 shares)
+ * -> 1.5x broker funded: ₹15,000
+ * -> Total buying power (2.5x): ₹25,000
+ * -> Total shares: 250 (Own: 100 shares, MTF: 150 shares)
  */
 export function calculateMtfFromCash(params: {
   cashAmount: number;
@@ -387,7 +386,7 @@ export function calculateMtfFromCash(params: {
 
   const validCash = Math.max(0, cashAmount || 0);
   const validPrice = Math.max(0.01, sharePrice || 1);
-  const validMultiplier = Math.max(1.0, multiplier || 2.4);
+  const validMultiplier = Math.max(1.0, multiplier || 2.5);
 
   // User formula: 1x own, (M - 1)x broker, total M x
   const brokerLendedAmount = +( validCash * (validMultiplier - 1) ).toFixed(2);
@@ -440,11 +439,11 @@ export interface MtfQtyCalculationResult {
 
 /**
  * Calculate MTF split when user specifies Total Shares & Buy Price:
- * Example: 240 shares of Ratnaveer at ₹100 (Multiplier 2.4x)
- * -> Total stock price: ₹24,000 (2.4x)
- * -> Own cash (1.0x): ₹10,000 (100 shares • 41.67%)
- * -> Broker funded (1.4x): ₹14,000 (140 shares • 58.33%)
- * Total 1x + 1.4x = 2.4x
+ * Example: 250 shares of Ratnaveer at ₹100 (Multiplier 2.5x)
+ * -> Total stock price: ₹25,000 (2.5x)
+ * -> Own cash (1.0x): ₹10,000 (100 shares • 40%)
+ * -> Broker funded (1.5x): ₹15,000 (150 shares • 60%)
+ * Total 1x + 1.5x = 2.5x
  */
 export function calculateMtfFromTotalQty(params: {
   totalQuantity: number;
@@ -456,7 +455,7 @@ export function calculateMtfFromTotalQty(params: {
 
   const validQty = Math.max(0, totalQuantity || 0);
   const validPrice = Math.max(0, sharePrice || 0);
-  const validMultiplier = Math.max(1.0, multiplier || 2.4);
+  const validMultiplier = Math.max(1.0, multiplier || 2.5);
 
   const totalCost = +( validQty * validPrice ).toFixed(2);
   const ownRatio = 1 / validMultiplier;
