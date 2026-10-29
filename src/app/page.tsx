@@ -83,10 +83,10 @@ function DashboardContent() {
   }, [isMounted, user, isAdmin, activeTab]);
 
   return (
-    <div className="relative min-h-screen flex bg-[var(--app-bg)] text-[var(--text-primary)] transition-colors duration-200 overflow-hidden font-sans">
+    <div className="relative min-h-screen flex bg-[var(--app-bg)] text-[var(--text-primary)] transition-colors duration-200 font-sans">
       {/* Left Sidebar (3 Fixed Navigation Tabs) */}
       <aside
-        className={`sticky top-0 z-50 h-screen bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] text-[var(--sidebar-text)] transition-all duration-200 flex flex-col justify-between hidden md:flex ${
+        className={`fixed inset-y-0 left-0 z-50 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] text-[var(--sidebar-text)] transition-all duration-200 flex flex-col justify-between overflow-y-auto overflow-x-hidden hidden md:flex ${
           isSidebarCollapsed ? 'w-16' : 'w-60'
         }`}
       >
@@ -200,7 +200,11 @@ function DashboardContent() {
       </aside>
 
       {/* Right Core Container */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[var(--app-bg)]">
+      <div
+        className={`flex-1 flex flex-col min-w-0 bg-[var(--app-bg)] transition-all duration-200 ${
+          isSidebarCollapsed ? 'md:pl-16' : 'md:pl-60'
+        }`}
+      >
         {/* Sticky Top Market Command Bar */}
         <div className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--surface)]">
           <Navbar
