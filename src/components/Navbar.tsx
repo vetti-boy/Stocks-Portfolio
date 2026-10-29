@@ -56,43 +56,41 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
   return (
     <header className="w-full bg-[var(--surface)] border-b border-[var(--border)] transition-colors duration-200">
       <div className="mx-auto flex max-w-[1920px] items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
-        {/* Market Status & Branding */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setIsDropdownOpen(prev => !prev)}
-            title="Open Profile & Settings"
-            className="flex items-center gap-3 text-left hover:opacity-90 transition group cursor-pointer"
+        {/* Market Status & Brand (Deduplicated on Desktop) */}
+        <div className="flex items-center gap-3">
+          {/* Mobile-only Brand (shown only when left sidebar is hidden) */}
+          <div className="flex md:hidden items-center gap-2">
+            <img
+              src="/logo-icon.png"
+              alt="StockPulse Logo"
+              width={26}
+              height={26}
+              style={{ height: '26px', width: '26px' }}
+              className="h-6.5 w-6.5 object-contain shrink-0"
+            />
+            <span className="text-xs font-black tracking-wider text-[var(--text-primary)] uppercase font-mono">
+              STOCK<span className="text-[var(--accent-gold)]">PULSE</span>
+            </span>
+          </div>
+
+          {/* Clean Real-Time Market Status Pill */}
+          <div
+            className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-mono shadow-sm"
+            title={marketStatus.detailText}
           >
-            <div className="relative">
-              <img
-                src="/logo-icon.png"
-                alt="StockPulse Logo"
-                width={32}
-                height={32}
-                style={{ height: '32px', width: '32px' }}
-                className="h-8 w-8 object-contain shrink-0"
+            <span
+              className={`flex items-center gap-1.5 font-bold tracking-wide ${marketStatus.textColor}`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${marketStatus.dotColor} ${marketStatus.isOpen ? 'animate-pulse' : ''}`}
               />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xs font-black tracking-wider text-[var(--text-primary)] uppercase font-mono">
-                  STOCK<span className="text-[var(--accent-gold)]">PULSE</span>
-                </h1>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] mt-0.5">
-                <span
-                  className={`flex items-center gap-1.5 font-semibold ${marketStatus.textColor}`}
-                  title={marketStatus.detailText}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${marketStatus.dotColor} ${marketStatus.isOpen ? 'animate-pulse' : ''}`}
-                  />
-                  {marketStatus.statusText}
-                </span>
-                <span className="hidden md:inline font-mono text-[9px] text-[var(--text-muted)]">• NSE / BSE (₹ INR)</span>
-              </div>
-            </div>
-          </button>
+              {marketStatus.statusText}
+            </span>
+            <span className="text-[10px] text-[var(--text-muted)] font-normal hidden sm:inline">•</span>
+            <span className="text-[10px] text-[var(--text-secondary)] font-normal hidden sm:inline">
+              NSE / BSE <span className="text-[var(--text-muted)]">(₹ INR)</span>
+            </span>
+          </div>
         </div>
 
         {/* Center: Command Palette Trigger */}
