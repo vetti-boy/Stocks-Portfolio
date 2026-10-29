@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const MONGODB_URI = 'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/stocks-portfolio?retryWrites=true&w=majority';
+const MONGODB_URI = 'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/test?retryWrites=true&w=majority';
 
 async function resetDB() {
   try {

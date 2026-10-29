@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const MONGODB_URI =
   process.env.MONGODB_URI ||
-  'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/stocks-portfolio?retryWrites=true&w=majority';
+  'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/test?retryWrites=true&w=majority';
 
 // In serverless environments (Vercel), disable operation buffering so queries fail fast rather than timing out after 10000ms
 mongoose.set('bufferCommands', false);

@@ -86,7 +86,7 @@ export const AuthModal: React.FC = () => {
       err.includes('ECONNREFUSED') ||
       err.includes('Server selection timed out')
     ) {
-      return 'MongoDB connection timed out. Please allow 0.0.0.0/0 in MongoDB Atlas > Network Access so Vercel can connect.';
+      return 'Connection timed out. Please check your network connection and try again.';
     }
     return err;
   }
@@ -229,9 +229,9 @@ export const AuthModal: React.FC = () => {
           <p className="text-xs text-[#8D99A8] max-w-xs mx-auto">
             {user
               ? isGuestUser
-                ? 'Session data is stored in temporary tab cache only and will be discarded once the app is closed.'
-                : 'Your stock portfolio & trade history are securely synced to MongoDB Cloud.'
-              : 'Access your cloud-synced portfolio holdings, live watchlist, and SEBI tax calculations.'}
+                ? 'Session data is active for this browser tab.'
+                : 'Signed in with your verified Google account.'
+              : 'Sign in to access your portfolio holdings, live watchlist, and SEBI tax calculations.'}
           </p>
         </div>
 
@@ -261,7 +261,7 @@ export const AuthModal: React.FC = () => {
                     className="h-11 w-11 rounded-full border border-[#38BDF8]/40 object-cover"
                   />
                 ) : (
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] font-bold text-black text-sm">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#0E1522] border border-[#38BDF8]/40 text-[#38BDF8] font-bold text-black text-sm">
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -285,21 +285,6 @@ export const AuthModal: React.FC = () => {
                     <span>{user.email}</span>
                   </div>
                 </div>
-              </div>
-
-              <div className="pt-2 border-t border-[#202A35] flex items-center justify-between text-[11px] text-[#8D99A8]">
-                <span>Storage Status:</span>
-                {isGuestUser ? (
-                  <span className="text-amber-400 font-mono font-medium flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                    Tab Memory Only (Discarded on Exit)
-                  </span>
-                ) : (
-                  <span className="text-[#38BDF8] font-mono font-medium flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#38BDF8] animate-pulse" />
-                    MongoDB Cloud Connected
-                  </span>
-                )}
               </div>
             </div>
 

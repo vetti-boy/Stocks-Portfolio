@@ -65,6 +65,55 @@ const POPULAR_INDIAN_STOCKS = [
   { symbol: 'MPHASIS', companyName: 'Mphasis Ltd.', exchange: 'NSE', category: 'Tech', basePrice: 2950.00 },
 ];
 
+
+interface CachedPrice {
+  price: number;
+  timestamp: number;
+}
+const livePriceCache = new Map<string, CachedPrice>();
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+async function getLivePriceForTicker(ticker: string, fallback: number): Promise<{ price: number; isLive: boolean }> {
+  const formattedTicker = ticker.endsWith('.NS') || ticker.endsWith('.BO') ? ticker : `${ticker}.NS`;
+
+  if (livePriceCache.has(formattedTicker)) {
+    const entry = livePriceCache.get(formattedTicker)!;
+    if (Date.now() - entry.timestamp < CACHE_TTL_MS) {
+      return { price: entry.price, isLive: true };
+    }
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1800);
+    const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(formattedTicker)}?interval=1d&range=1d`;
+    const res = await fetch(chartUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        Accept: 'application/json',
+      },
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      const regularMarketPrice = meta?.regularMarketPrice;
+      if (typeof regularMarketPrice === 'number' && regularMarketPrice > 0) {
+        livePriceCache.set(formattedTicker, { price: regularMarketPrice, timestamp: Date.now() });
+        return { price: regularMarketPrice, isLive: true };
+      }
+    }
+  } catch {
+    // Network / abort fallback
+  }
+
+  return { price: fallback, isLive: false };
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -154,7 +203,20 @@ export async function GET(req: Request) {
       });
     }
 
-    const results = Array.from(combinedMap.values()).slice(0, 10);
+    const rawResults = Array.from(combinedMap.values()).slice(0, 10);
+
+    // Fetch real-time live current prices for all matched stocks concurrently
+    const results = await Promise.all(
+      rawResults.map(async (item) => {
+        const ticker = item.ticker || `${item.symbol}.NS`;
+        const { price, isLive } = await getLivePriceForTicker(ticker, item.price);
+        return {
+          ...item,
+          price: price > 0 ? price : item.price,
+          isLive,
+        };
+      })
+    );
 
     return NextResponse.json({
       success: true,

@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 import {
-  MTF_MULTIPLIER_PRESETS,
   getMtfMultiplier,
   calculateMtfFromTotalQty,
   cleanSymbol,
@@ -127,8 +126,6 @@ export const CalculatorTab: React.FC = () => {
 
   // MTF Inputs & Multiplier Intelligence
   const [mtfDaysInput, setMtfDaysInput] = useState<string>('30');
-  const [mtfMultiplier, setMtfMultiplier] = useState<number>(2.5);
-  const [isCustomMultiplier, setIsCustomMultiplier] = useState(false);
   const [customMultiplierInput, setCustomMultiplierInput] = useState<string>('2.5');
 
   // Populate fields automatically when a portfolio holding is selected!
@@ -142,14 +139,10 @@ export const CalculatorTab: React.FC = () => {
       setTradeType(selectedHolding.isMTF ? 'MTF' : 'DELIVERY');
 
       if (selectedHolding.mtfMultiplier) {
-        setMtfMultiplier(selectedHolding.mtfMultiplier);
         setCustomMultiplierInput(selectedHolding.mtfMultiplier.toString());
-        setIsCustomMultiplier(false);
       } else {
         const conf = getMtfMultiplier(selectedHolding.symbol, selectedHolding.broker || 'ZERODHA');
-        setMtfMultiplier(conf.multiplier);
         setCustomMultiplierInput(conf.multiplier.toString());
-        setIsCustomMultiplier(false);
       }
 
       const buyTime = selectedHolding.buyDate ? new Date(selectedHolding.buyDate).getTime() : Date.now();
@@ -174,9 +167,7 @@ export const CalculatorTab: React.FC = () => {
   // Selected Broker: Zerodha, Groww, or Angel One
   const activeBroker = (taxSettings.brokerPreset || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE';
 
-  const activeMtfMultiplier = isCustomMultiplier
-    ? Math.max(1.0, parseFloat(customMultiplierInput) || 2.5)
-    : mtfMultiplier;
+  const activeMtfMultiplier = Math.max(1.0, parseFloat(customMultiplierInput) || 2.5);
 
   // Automatically calculate MTF split from multiplier: 1x own cash, (M - 1)x broker funded
   const mtfSplit = useMemo(() => {
@@ -229,21 +220,26 @@ export const CalculatorTab: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Top Title Banner */}
-      <div className="bg-[#0D1218] rounded-xl p-6 border border-[#202A35] shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg sm:text-xl font-extrabold text-[#F4F7FA] font-mono flex items-center gap-2.5">
-            <Calculator className="h-5 w-5 text-[#38BDF8]" />
-            <span>Zerodha, Groww & Angel One Brokerage Calculator</span>
-          </h2>
-          <p className="text-xs text-[#8D99A8] mt-1">
-            Unified interactive calculator — calculate for your actual portfolio stocks or custom manual trades.
-          </p>
+      <div className="glass-shell">
+        <div className="glass-core p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#38BDF8] font-mono mb-1">
+              TAX & STATUTORY BROKERAGE ENGINE
+            </div>
+            <h2 className="text-base sm:text-lg font-black text-white font-mono flex items-center gap-2.5">
+              <Calculator className="h-5 w-5 text-[#38BDF8]" />
+              <span>Zerodha, Groww & Angel One Brokerage & Tax Calculator</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              SEBI compliant tax engine — calculate real-time net take-home P&L for portfolio holdings or custom trades.
+            </p>
+          </div>
         </div>
-
       </div>
 
       {/* Calculation Data Preset Source Bar (Portfolio Stock vs Custom Trade) */}
-      <div className="bg-[#0D1218] rounded-xl p-5 border border-[#202A35] shadow-lg space-y-4">
+      <div className="glass-shell">
+        <div className="glass-core p-4 sm:p-5 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono flex items-center gap-2">
@@ -285,7 +281,7 @@ export const CalculatorTab: React.FC = () => {
 
         {/* Stock Selector Dropdown */}
         {selectedHoldingId ? (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-3 border-t border-[#202A35]">
+          <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-[#202A35]">
             <label className="text-xs font-semibold text-slate-300 font-mono shrink-0">
               Active Holding:
             </label>
@@ -296,7 +292,7 @@ export const CalculatorTab: React.FC = () => {
                 setSelectedHoldingId(newId);
                 setSelectedCalculatorHoldingId(newId);
               }}
-              className="flex-1 bg-[#080B10] text-[#22C55E] border border-[#22C55E]/50 rounded-lg p-2.5 font-mono text-xs font-bold outline-none focus:border-[#22C55E] cursor-pointer"
+              className="w-full sm:w-auto min-w-[280px] max-w-md bg-[#080B10] text-[#22C55E] border border-[#22C55E]/50 rounded-lg py-1.5 px-3 font-mono text-xs font-bold outline-none focus:border-[#22C55E] cursor-pointer"
             >
               {holdings.map((h) => (
                 <option key={h.id} value={h.id} className="bg-[#0D1218] text-white font-mono">
@@ -305,20 +301,15 @@ export const CalculatorTab: React.FC = () => {
               ))}
             </select>
 
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono px-2.5 py-1.5 rounded bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30 shrink-0">
-                ✓ Auto-Filled from Portfolio
-              </span>
-              <button
-                onClick={() => {
-                  setSelectedHoldingId(null);
-                  setSelectedCalculatorHoldingId(null);
-                }}
-                className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 transition shrink-0"
-              >
-                Clear
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setSelectedHoldingId(null);
+                setSelectedCalculatorHoldingId(null);
+              }}
+              className="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition shrink-0 font-mono"
+            >
+              Clear
+            </button>
           </div>
         ) : (
           <div className="text-[11px] text-[#8D99A8] pt-2 border-t border-[#202A35] flex items-center justify-between font-mono">
@@ -330,13 +321,15 @@ export const CalculatorTab: React.FC = () => {
             )}
           </div>
         )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Input Settings (6 Cols) */}
         <div className="lg:col-span-6 space-y-6">
           {/* Trade Parameters Card */}
-          <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-lg">
+          <div className="glass-shell">
+            <div className="glass-core p-5 space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#202A35] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono">
                 1. TRADE PARAMETERS & MTF SPLIT
@@ -433,59 +426,16 @@ export const CalculatorTab: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Multiplier Presets */}
+                {/* Custom Broker Multiplier Input */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="text-slate-300">Broker Lending Multiplier:</span>
+                    <label className="text-slate-300">Broker Lending Multiplier:</label>
                     <span className="text-amber-400 font-bold">
                       {activeMtfMultiplier}x Total (1.0x Own Cash • {(activeMtfMultiplier - 1).toFixed(1)}x Broker Funded)
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5 font-mono">
-                    {MTF_MULTIPLIER_PRESETS.map((p) => {
-                      const isSelected = !isCustomMultiplier && mtfMultiplier === p.multiplier;
-                      return (
-                        <button
-                          key={p.multiplier}
-                          type="button"
-                          onClick={() => {
-                            setMtfMultiplier(p.multiplier);
-                            setIsCustomMultiplier(false);
-                            setCustomMultiplierInput(p.multiplier.toString());
-                          }}
-                          className={`p-1.5 rounded-lg text-center transition border ${
-                            isSelected
-                              ? 'bg-amber-500 text-black border-amber-400 font-bold shadow'
-                              : 'bg-[#080B10] text-slate-300 border-[#202A35] hover:border-amber-500/40'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{p.label}</div>
-                          <div className={`text-[8px] truncate ${isSelected ? 'text-black/80 font-bold' : 'text-slate-400'}`}>
-                            {p.badge || `${p.multiplier}x`}
-                          </div>
-                        </button>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomMultiplier(true)}
-                      className={`p-1.5 rounded-lg text-center transition border font-mono ${
-                        isCustomMultiplier
-                          ? 'bg-amber-500 text-black border-amber-400 font-bold'
-                          : 'bg-[#080B10] text-slate-300 border-[#202A35] hover:border-amber-500/40'
-                      }`}
-                    >
-                      <div className="text-xs font-bold">Custom</div>
-                      <div className={`text-[8px] ${isCustomMultiplier ? 'text-black/80 font-bold' : 'text-slate-400'}`}>
-                        Custom
-                      </div>
-                    </button>
-                  </div>
-
-                  {isCustomMultiplier && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[11px] text-slate-400 font-mono">Custom Multiplier:</span>
+                  <div className="flex items-center gap-2 font-mono">
+                    <div className="relative w-28">
                       <input
                         type="number"
                         step="0.1"
@@ -495,13 +445,15 @@ export const CalculatorTab: React.FC = () => {
                         onChange={(e) => {
                           setCustomMultiplierInput(e.target.value);
                         }}
-                        className="w-20 bg-[#080B10] border border-amber-500/40 rounded px-2 py-0.5 text-xs font-mono text-amber-400 font-bold outline-none"
+                        placeholder="e.g. 2.5"
+                        className="w-full bg-[#080B10] border border-amber-500/40 rounded-lg py-1.5 pl-3 pr-6 text-xs text-amber-400 font-bold outline-none focus:border-amber-400"
                       />
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        (1.0x Own Cash + {(Math.max(1, parseFloat(customMultiplierInput) || 2.5) - 1).toFixed(1)}x Broker Funded)
-                      </span>
+                      <span className="absolute right-2.5 top-1.5 text-xs text-amber-400/80 font-bold pointer-events-none">x</span>
                     </div>
-                  )}
+                    <span className="text-[10px] text-slate-400">
+                      (1.0x Own Cash + {(activeMtfMultiplier - 1).toFixed(1)}x Broker Funded)
+                    </span>
+                  </div>
                 </div>
 
                 {/* MTF Holding Days Input */}
@@ -578,10 +530,12 @@ export const CalculatorTab: React.FC = () => {
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* Unified Bidirectional Pricing & Net Profit Inputs Card */}
-          <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#38BDF8]/40 shadow-xl">
+          <div className="glass-shell">
+            <div className="glass-core p-5 space-y-4 border border-[#38BDF8]/30">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#38BDF8] font-mono flex items-center gap-2">
                 <ArrowLeftRight className="h-4 w-4 text-[#38BDF8] animate-pulse" />
@@ -664,10 +618,12 @@ export const CalculatorTab: React.FC = () => {
                 <strong>Single Flow:</strong> Type in either box — editing Sell Price updates Net Profit, and editing Net Profit updates required Sell Price automatically!
               </span>
             </div>
+            </div>
           </div>
 
           {/* Broker Selector: Zerodha, Groww & Angel One */}
-          <div className="bg-[#0D1218] rounded-xl p-6 space-y-4 border border-[#202A35] shadow-lg">
+          <div className="glass-shell">
+            <div className="glass-core p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B5CF6] flex items-center gap-2 font-mono">
                 <IndianRupee className="h-4 w-4 text-[#22C55E]" /> 3. SELECT BROKER PLATFORM
@@ -770,6 +726,7 @@ export const CalculatorTab: React.FC = () => {
                 </div>
               </button>
             </div>
+            </div>
           </div>
         </div>
 
@@ -777,7 +734,8 @@ export const CalculatorTab: React.FC = () => {
         <div className="lg:col-span-6 space-y-6">
           {/* Active Highlight Banner */}
           {activeInput === 'targetNetPnL' && result.requiredSellPricePerShare ? (
-            <div className="bg-[#0D1218] rounded-xl p-6 border-2 border-[#22C55E] shadow-2xl relative overflow-hidden">
+            <div className="glass-shell glass-shell-profit">
+              <div className="glass-core p-5 sm:p-6 relative overflow-hidden border border-emerald-500/40">
               <div className="flex items-center justify-between text-[#22C55E] text-xs font-bold uppercase tracking-wider font-mono">
                 <span>TARGET SELLING PRICE REQUIRED</span>
                 <Target className="h-5 w-5 text-[#22C55E]" />
@@ -793,9 +751,11 @@ export const CalculatorTab: React.FC = () => {
                 Sell at or above this price to take home net profit of ₹
                 {(parseFloat(targetNetPnLInput) || 0).toLocaleString('en-IN')} after all taxes & charges!
               </p>
+              </div>
             </div>
           ) : (
-            <div className="bg-[#0D1218] rounded-xl p-6 border-2 border-[#38BDF8] shadow-2xl relative overflow-hidden">
+            <div className="glass-shell">
+              <div className="glass-core p-5 sm:p-6 relative overflow-hidden border border-[#38BDF8]/35">
               <div className="flex items-center justify-between text-[#38BDF8] text-xs font-bold uppercase tracking-wider font-mono">
                 <span>PROJECTED NET TAKE-HOME P&L</span>
                 <Calculator className="h-5 w-5 text-[#38BDF8]" />
@@ -815,11 +775,13 @@ export const CalculatorTab: React.FC = () => {
               <p className="mt-2 text-xs text-[#8D99A8] tracking-wide">
                 Net profit when selling at ₹{(parseFloat(sellPriceInput) || 0).toLocaleString('en-IN')} / share after deducting ₹{result.totalFees.toFixed(2)} total side charges.
               </p>
+              </div>
             </div>
           )}
 
           {/* ITEM-BY-ITEM SEPARATE BUY & SELL CHARGES CONTRACT NOTE CARD */}
-          <div className="bg-[#0D1218] rounded-xl p-6 space-y-5 border border-[#202A35] shadow-xl">
+          <div className="glass-shell">
+            <div className="glass-core p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-[#202A35] pb-3 font-mono">
               <div className="flex items-center gap-2">
                 <Receipt className="h-4 w-4 text-[#38BDF8]" />
@@ -995,6 +957,7 @@ export const CalculatorTab: React.FC = () => {
                   })}
                 </span>
               </div>
+            </div>
             </div>
           </div>
         </div>

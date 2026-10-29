@@ -42,16 +42,31 @@ export interface TradeRecord {
   id: string;
   symbol: string;
   companyName: string;
-  type: 'BUY' | 'SELL';
+  type?: 'BUY' | 'SELL';
   quantity: number;
+  buyDate?: string;
   buyPrice?: number;
   price: number;
   totalValue: number;
   date: string;
+  sellDate?: string;
   broker?: 'ZERODHA' | 'GROWW' | 'ANGELONE';
+  grossPnL?: number;
+  totalDeductions?: number;
   realizedPnL?: number;
   realizedPnLPercent?: number;
   exchange: string;
+  deductionsBreakdown?: {
+    brokerage: number;
+    stt: number;
+    exchangeTxn: number;
+    sebi: number;
+    gst: number;
+    stampDuty: number;
+    dpCharges: number;
+    mtfInterest?: number;
+    mtfPledgeFee?: number;
+  };
   // MTF Realized Trade Details
   isMTF?: boolean;
   mtfMultiplier?: number;

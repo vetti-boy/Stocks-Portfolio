@@ -135,7 +135,7 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
                   : newPinStep === 'new'
                   ? 'Enter New 4-Digit PIN'
                   : 'Confirm New PIN'
-                : 'StockPulse PRO Security Lock'}
+                : 'StockPulse Security Lock'}
             </h2>
             <p className="text-xs text-[#8D99A8]">
               {isChangingPinMode

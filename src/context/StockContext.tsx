@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { StockHolding, WatchlistItem, TaxSettings, PricePoint, TradeRecord, User } from '@/types/stock';
 import { useAuth } from './AuthContext';
 import { getIndianMarketStatus, MarketStatusInfo } from '@/utils/marketStatus';
+import { calculateEquityDeliveryBrokerage } from '@/lib/brokerageCalculator';
 
 interface StockContextType {
   holdings: StockHolding[];
@@ -15,7 +16,13 @@ interface StockContextType {
   addHolding: (holding: Omit<StockHolding, 'id' | 'currentPrice' | 'previousClose' | 'dayChangePercent'>) => void;
   deleteHolding: (id: string) => void;
   updateHolding: (id: string, updated: Partial<StockHolding>) => void;
-  sellHolding: (id: string, sellPrice: number, sellQty: number, sellDate: string) => void;
+  sellHolding: (
+    id: string,
+    sellPrice: number,
+    sellQty: number,
+    sellDate: string,
+    customBuyDate?: string
+  ) => void;
   deleteTradeRecord: (id: string) => void;
   addToWatchlist: (item: Omit<WatchlistItem, 'history'>) => void;
   removeFromWatchlist: (symbol: string) => void;
@@ -407,6 +414,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       currentPrice,
       previousClose,
       dayChangePercent,
+      buyDate: (data.buyDate && data.buyDate.trim()) || new Date().toISOString().slice(0, 10),
     };
 
     const nextHoldings = [newHolding, ...curHoldings];
@@ -456,31 +464,90 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     persistPortfolio(nextHoldings, watchlistRef.current, tradeHistoryRef.current, taxSettingsRef.current);
   };
 
-  const sellHolding = (id: string, sellPrice: number, sellQty: number, sellDate: string) => {
+  const sellHolding = (
+    id: string,
+    sellPrice: number,
+    sellQty: number,
+    sellDate: string,
+    customBuyDate?: string
+  ) => {
     const targetHolding = holdingsRef.current.find((h) => h.id === id);
     if (!targetHolding) return;
 
     const qtyToSell = Math.min(sellQty, targetHolding.quantity);
+    const validBuyDate =
+      (customBuyDate && customBuyDate.trim()) ||
+      (targetHolding.buyDate && targetHolding.buyDate.trim()) ||
+      (sellDate && sellDate.trim()) ||
+      new Date().toISOString().slice(0, 10);
+    const validSellDate = (sellDate && sellDate.trim()) || new Date().toISOString().slice(0, 10);
+
+    const buyTime = new Date(validBuyDate).getTime();
+    const sellTime = new Date(validSellDate).getTime();
+    const daysHeld = Math.max(0, Math.floor((sellTime - buyTime) / (1000 * 60 * 60 * 24)));
+    const holdingMonths = daysHeld / 30;
+
+    const hTaxSettings = {
+      ...taxSettingsRef.current,
+      brokerPreset: (targetHolding.broker || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE',
+      exchange: (targetHolding.exchange || 'NSE') as 'NSE' | 'BSE',
+    };
+
+    const calc = calculateEquityDeliveryBrokerage({
+      quantity: qtyToSell,
+      buyPrice: targetHolding.buyPrice,
+      sellPrice: sellPrice,
+      holdingMonths,
+      taxSettings: hTaxSettings,
+      isMTF: targetHolding.isMTF,
+      mtfMultiplier: targetHolding.mtfMultiplier,
+      ownQuantity: targetHolding.ownQuantity ? Math.min(qtyToSell, targetHolding.ownQuantity) : undefined,
+      mtfQuantity: targetHolding.mtfQuantity ? Math.min(qtyToSell, targetHolding.mtfQuantity) : undefined,
+      mtfDays: daysHeld,
+    });
+
     const buyCost = targetHolding.buyPrice * qtyToSell;
     const saleValue = sellPrice * qtyToSell;
-    const realizedPnL = saleValue - buyCost;
-    const realizedPnLPercent = buyCost > 0 ? (realizedPnL / buyCost) * 100 : 0;
+    const grossPnL = saleValue - buyCost;
+    const totalDeductions = calc.totalFees;
+    const netRealizedPnL = calc.netPnL; // Net profit after all deductions & statutory charges
+    const netRoiPercent = calc.netRoiPercent;
 
     const sellRecord: TradeRecord = {
       id: 'tr_sell_' + Date.now(),
       symbol: targetHolding.symbol,
       companyName: targetHolding.companyName,
-      type: 'SELL',
       quantity: qtyToSell,
+      buyDate: validBuyDate,
       buyPrice: targetHolding.buyPrice,
       price: sellPrice,
+      sellDate: validSellDate,
+      date: validSellDate,
       totalValue: saleValue,
-      date: sellDate || new Date().toISOString().slice(0, 10),
       broker: targetHolding.broker,
-      realizedPnL: +realizedPnL.toFixed(2),
-      realizedPnLPercent: +realizedPnLPercent.toFixed(2),
+      grossPnL: +grossPnL.toFixed(2),
+      totalDeductions: +totalDeductions.toFixed(2),
+      realizedPnL: +netRealizedPnL.toFixed(2),
+      realizedPnLPercent: +netRoiPercent.toFixed(2),
       exchange: targetHolding.exchange,
       isMTF: targetHolding.isMTF,
+      mtfMultiplier: targetHolding.mtfMultiplier,
+      ownQuantity: targetHolding.ownQuantity,
+      mtfQuantity: targetHolding.mtfQuantity,
+      mtfDaysHeld: daysHeld,
+      mtfInterestDeducted: +(calc.mtfInterestCost || 0).toFixed(2),
+      mtfPledgeCharges: +(calc.mtfPledgeUnpledgeFee || 0).toFixed(2),
+      deductionsBreakdown: {
+        brokerage: +(calc.totalBrokerage || 0).toFixed(2),
+        stt: +(calc.totalStt || 0).toFixed(2),
+        exchangeTxn: +(calc.totalExchangeTxn || 0).toFixed(2),
+        sebi: +(calc.totalSebi || 0).toFixed(2),
+        gst: +(calc.totalGst || 0).toFixed(2),
+        stampDuty: +(calc.stampDuty || 0).toFixed(2),
+        dpCharges: +(calc.dpCharges || 0).toFixed(2),
+        mtfInterest: +(calc.mtfInterestCost || 0).toFixed(2),
+        mtfPledgeFee: +(calc.mtfPledgeUnpledgeFee || 0).toFixed(2),
+      },
     };
 
     const nextHistory = [sellRecord, ...tradeHistoryRef.current];

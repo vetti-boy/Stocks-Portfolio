@@ -1,16 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useStock } from '@/context/StockContext';
+import { ThemeSwitcher } from './ThemeSwitcher';
 import {
-  LogIn,
-  Activity,
   Lock,
-  ShieldCheck,
   Search,
-  Zap,
-  Building2,
+  User as UserIcon,
+  LogOut,
+  ChevronDown,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -19,70 +20,68 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalette }) => {
-  const { user, openAuthModal } = useAuth();
-  const { taxSettings, updateTaxSettings, marketStatus } = useStock();
+  const { user, openAuthModal, logout } = useAuth();
+  const { marketStatus } = useStock();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const activeBroker = taxSettings.brokerPreset || 'ZERODHA';
-
-  const setBrokerPreset = (preset: 'ZERODHA' | 'GROWW' | 'ANGELONE') => {
-    if (preset === 'ZERODHA') {
-      updateTaxSettings({
-        brokerPreset: 'ZERODHA',
-        flatBrokerageBuy: 0,
-        flatBrokerageSell: 0,
-        brokeragePercent: 0,
-        sttPercent: 0.1,
-        stampDutyPercent: 0.015,
-        gstPercent: 18,
-        flatDpCharges: 15.34,
-      });
-    } else if (preset === 'GROWW') {
-      updateTaxSettings({
-        brokerPreset: 'GROWW',
-        flatBrokerageBuy: 20,
-        flatBrokerageSell: 20,
-        brokeragePercent: 0.05,
-        sttPercent: 0.1,
-        stampDutyPercent: 0.015,
-        gstPercent: 18,
-        flatDpCharges: 23.60,
-      });
-    } else {
-      updateTaxSettings({
-        brokerPreset: 'ANGELONE',
-        flatBrokerageBuy: 0,
-        flatBrokerageSell: 20,
-        brokeragePercent: 0,
-        sttPercent: 0.1,
-        stampDutyPercent: 0.015,
-        gstPercent: 18,
-        flatDpCharges: 20.00,
-      });
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
     }
-  };
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  // Close dropdown on Esc
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const isGuestUser = user?.isGuest;
 
   return (
-    <header className="w-full">
-      <div className="mx-auto flex max-w-[1920px] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+    <header className="w-full bg-[var(--surface)] border-b border-[var(--border)] transition-colors duration-200">
+      <div className="mx-auto flex max-w-[1920px] items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
         {/* Market Status & Branding */}
         <div className="flex items-center gap-4">
           <button
-            onClick={openAuthModal}
-            title="Open Profile & Account Session Panel"
+            onClick={() => setIsDropdownOpen(prev => !prev)}
+            title="Open Profile & Settings"
             className="flex items-center gap-3 text-left hover:opacity-90 transition group cursor-pointer"
           >
             <div className="relative">
-              <div className="h-9 w-9 rounded-xl bg-[#0D1218] border border-[#202A35] flex items-center justify-center">
-                <Activity className="h-4 w-4 text-[#38BDF8]" />
-              </div>
+              <img
+                src="/logo-icon.png"
+                alt="StockPulse Logo"
+                width={32}
+                height={32}
+                style={{ height: '32px', width: '32px' }}
+                className="h-8 w-8 object-contain shrink-0"
+              />
             </div>
             <div>
-              <h1 className="text-sm font-extrabold tracking-tight text-white">
-                STOCKPULSE
-              </h1>
-              <div className="flex items-center gap-2 text-[10px] text-[#8D99A8]">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xs font-black tracking-wider text-[var(--text-primary)] uppercase font-mono">
+                  STOCK<span className="text-[var(--accent-gold)]">PULSE</span>
+                </h1>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] mt-0.5">
                 <span
-                  className={`flex items-center gap-1 font-semibold ${marketStatus.textColor}`}
+                  className={`flex items-center gap-1.5 font-semibold ${marketStatus.textColor}`}
                   title={marketStatus.detailText}
                 >
                   <span
@@ -90,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
                   />
                   {marketStatus.statusText}
                 </span>
-                <span className="hidden md:inline">• NSE/BSE Real-Time (₹ INR)</span>
+                <span className="hidden md:inline font-mono text-[9px] text-[var(--text-muted)]">• NSE / BSE (₹ INR)</span>
               </div>
             </div>
           </button>
@@ -100,83 +99,132 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
         {onOpenCommandPalette && (
           <button
             onClick={onOpenCommandPalette}
-            className="hidden md:flex items-center gap-3 rounded-full border border-[#202A35] bg-[#0D1218] hover:bg-[#151D26] hover:border-[#334155] px-4 py-1.5 text-xs text-[#8D99A8] transition-all duration-200 group"
+            className="hidden md:flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)] px-3.5 py-1.5 text-xs text-[var(--text-secondary)] transition-all duration-180 group cursor-pointer shadow-sm"
           >
-            <Search className="h-3.5 w-3.5 text-[#38BDF8] group-hover:scale-110 transition-transform" />
-            <span>Search stocks or press</span>
-            <kbd className="rounded bg-[#111820] px-2 py-0.5 text-[10px] font-mono font-bold text-white border border-[#202A35]">
+            <Search className="h-3.5 w-3.5 text-[var(--brand-primary)] group-hover:scale-105 transition-transform" />
+            <span className="text-[var(--text-secondary)] text-xs">Search stocks, actions...</span>
+            <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5 text-[9px] font-mono font-bold text-[var(--text-primary)] border border-[var(--border)]">
               Ctrl + K
             </kbd>
           </button>
         )}
 
-        {/* Action Controls & Auth */}
-        <div className="flex items-center gap-3">
+        {/* Action Controls & Auth Profile Dropdown */}
+        <div className="flex items-center gap-2.5">
           {/* Lock Screen Security Button */}
           {onLockScreen && (
             <button
               onClick={onLockScreen}
               title="Lock screen with 4-digit PIN"
-              className="flex items-center gap-2 rounded-full border border-[#202A35] bg-[#0D1218] hover:bg-[#151D26] hover:border-[#38BDF8]/40 px-3 py-1.5 text-xs font-semibold text-[#8D99A8] hover:text-white transition-all duration-200"
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-180 cursor-pointer shadow-sm"
             >
-              <Lock className="h-3.5 w-3.5 text-[#38BDF8]" />
-              <span className="hidden lg:inline">Lock Screen</span>
+              <Lock className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
+              <span className="hidden lg:inline text-[11px]">Lock</span>
             </button>
           )}
 
-          {/* User Profile / Auth Button */}
-          {user ? (
+          {/* User Profile Dropdown Anchor */}
+          <div className="relative" ref={dropdownRef}>
             <button
-              onClick={openAuthModal}
-              title={`Logged in as ${user.name} (${user.email})`}
-              className="flex items-center gap-2.5 rounded-full border border-[#202A35] bg-[#0D1218] hover:bg-[#151D26] hover:border-[#38BDF8]/40 px-3 py-1.5 text-xs font-semibold text-white transition-all duration-200 cursor-pointer"
+              onClick={() => setIsDropdownOpen(prev => !prev)}
+              aria-expanded={isDropdownOpen}
+              aria-haspopup="true"
+              title="User Profile & Settings"
+              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition-all duration-180 cursor-pointer shadow-sm"
             >
-              {user.avatar ? (
+              {user?.avatar ? (
                 <img
                   src={user.avatar}
                   alt={user.name}
-                  className="h-5 w-5 rounded-full object-cover border border-[#38BDF8]/40"
+                  className="h-5 w-5 rounded-full object-cover border border-[var(--brand-primary)]"
                 />
               ) : (
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] font-bold text-[9px] text-black">
-                  {user.name.charAt(0).toUpperCase()}
+                <div className="flex h-5 w-5 items-center justify-center rounded bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--brand-primary)] font-bold text-[9px]">
+                  {user ? user.name.charAt(0).toUpperCase() : <UserIcon className="h-3 w-3" />}
                 </div>
               )}
-              <span className="max-w-[110px] truncate hidden sm:inline">{user.name}</span>
-              {user.role === 'ADMIN' && (
-                <ShieldCheck className="h-3.5 w-3.5 text-[#8B5CF6] shrink-0" />
+              <span className="max-w-[110px] truncate text-xs hidden sm:inline text-[var(--text-primary)]">
+                {user ? user.name : 'Guest User'}
+              </span>
+              {user?.role === 'ADMIN' && (
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[var(--brand-primary)]/15 text-[var(--brand-primary)] border border-[var(--brand-primary)]/30">
+                  ADMIN
+                </span>
               )}
+              <ChevronDown className={`h-3 w-3 text-[var(--text-secondary)] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
-          ) : (
-            <button
-              onClick={openAuthModal}
-              className="flex items-center gap-2 rounded-full bg-white hover:bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-900 transition-all duration-200 shadow-md cursor-pointer"
-            >
-              <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Sign in with Google</span>
-            </button>
-          )}
+
+            {/* Profile & Settings Dropdown Menu */}
+            {isDropdownOpen && (
+              <div
+                className="absolute right-0 mt-2 w-72 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xl p-3.5 space-y-3 z-50 animate-in fade-in zoom-in-95 duration-150"
+                role="menu"
+                aria-orientation="vertical"
+              >
+                {/* User Info Header */}
+                <div className="flex items-center gap-3 pb-3 border-b border-[var(--border)]">
+                  {user?.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      className="h-10 w-10 rounded-full object-cover border border-[var(--border)] shrink-0"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--surface-muted)] border border-[var(--border)] text-[var(--brand-primary)] font-bold text-sm shrink-0">
+                      {user ? user.name.charAt(0).toUpperCase() : 'G'}
+                    </div>
+                  )}
+                  <div className="overflow-hidden flex-1">
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-[var(--text-primary)] truncate">
+                      <span>{user ? user.name : 'Guest Session'}</span>
+                      {user?.role === 'ADMIN' && (
+                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.2 rounded bg-[var(--brand-primary)]/15 text-[var(--brand-primary)] border border-[var(--brand-primary)]/30">
+                          ADMIN
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-[var(--text-secondary)] truncate mt-0.5">
+                      {user?.email || 'Temporary local cache'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Appearance Section: The Light / Dark Switcher */}
+                <div className="pt-1">
+                  <ThemeSwitcher />
+                </div>
+
+                {/* Account Actions */}
+                <div className="pt-2 border-t border-[var(--border)] space-y-1.5">
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      openAuthModal();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition cursor-pointer"
+                  >
+                    <UserIcon className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
+                    <span>{user && !isGuestUser ? 'Google Account' : 'Connect Google Account'}</span>
+                  </button>
+
+                  {user && (
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--negative)] hover:bg-[var(--negative-bg)] transition cursor-pointer"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                      <span>{isGuestUser ? 'Exit Guest Session' : 'Sign Out'}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
   );
 };
-
-

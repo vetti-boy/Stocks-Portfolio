@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useStock } from '@/context/StockContext';
 import {
   Plus,
@@ -34,6 +35,13 @@ import { getMtfMultiplier } from '@/lib/mtfUtils';
 interface PortfolioTabProps {
   onOpenInCalculator?: (holdingId: string) => void;
 }
+
+const isSymbolMatch = (s1?: string, s2?: string): boolean => {
+  if (!s1 || !s2) return false;
+  const clean1 = s1.replace(/\.NS$|\.BO$|\.BSE$/i, '').trim().toUpperCase();
+  const clean2 = s2.replace(/\.NS$|\.BO$|\.BSE$/i, '').trim().toUpperCase();
+  return clean1 === clean2;
+};
 
 export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }) => {
   const {
@@ -147,6 +155,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     sellPrice: '',
     sellQuantity: '',
     sellDate: new Date().toISOString().slice(0, 10),
+    buyDate: '',
   });
 
   const handleOpenSellModal = (holding: StockHolding) => {
@@ -155,6 +164,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
       sellPrice: holding.currentPrice.toString(),
       sellQuantity: holding.quantity.toString(),
       sellDate: new Date().toISOString().slice(0, 10),
+      buyDate: holding.buyDate || new Date().toISOString().slice(0, 10),
     });
   };
 
@@ -168,7 +178,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
       sellingHolding.id,
       parseFloat(sellFormData.sellPrice),
       parseFloat(sellFormData.sellQuantity),
-      sellFormData.sellDate
+      sellFormData.sellDate,
+      sellFormData.buyDate || sellingHolding.buyDate
     );
 
     setSellingHolding(null);
@@ -180,6 +191,119 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
   // Itemized Tax & Fee Receipt Modal State
   const [selectedTradeForTaxDetails, setSelectedTradeForTaxDetails] = useState<TradeRecord | null>(null);
+
+  // Deduction Breakdown Tooltip Popover State (Portal-rendered to avoid table overflow clipping)
+  const [deductionPopover, setDeductionPopover] = useState<{
+    holding: any;
+    rect: DOMRect;
+    pinned?: boolean;
+  } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!deductionPopover) return;
+
+    const handleScrollOrResize = () => {
+      if (!deductionPopover.pinned) {
+        setDeductionPopover(null);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDeductionPopover(null);
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-deduction-popover]') && !target.closest('[data-deduction-trigger]')) {
+        setDeductionPopover(null);
+      }
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [deductionPopover]);
+
+  const handleTriggerMouseEnter = (holding: any, e: React.MouseEvent<HTMLElement>) => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDeductionPopover((prev) => (prev?.pinned ? prev : { holding, rect, pinned: false }));
+  };
+
+  const handleTriggerMouseLeave = () => {
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = setTimeout(() => {
+      setDeductionPopover((prev) => (prev?.pinned ? prev : null));
+    }, 120);
+  };
+
+  const handlePopoverMouseEnter = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  };
+
+  const handlePopoverMouseLeave = () => {
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = setTimeout(() => {
+      setDeductionPopover((prev) => (prev?.pinned ? prev : null));
+    }, 120);
+  };
+
+  const getPopoverPosition = (rect: DOMRect) => {
+    const popoverWidth = 264;
+    const estimatedHeight = 240;
+    const spaceAbove = rect.top;
+
+    // Show above only if there is sufficient space (at least 240px); otherwise show below to prevent clipping
+    const showAbove = spaceAbove >= estimatedHeight;
+
+    let left = rect.right - popoverWidth;
+    if (left < 12) left = 12;
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - popoverWidth - 12);
+    }
+
+    return {
+      showAbove,
+      style: showAbove
+        ? {
+            position: 'fixed' as const,
+            left: `${left}px`,
+            bottom: `${Math.max(12, window.innerHeight - rect.top + 8)}px`,
+            zIndex: 99999,
+          }
+        : {
+            position: 'fixed' as const,
+            left: `${left}px`,
+            top: `${Math.max(12, rect.bottom + 8)}px`,
+            zIndex: 99999,
+          },
+    };
+  };
 
   // Live Stock Search Autocomplete State
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -225,15 +349,17 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     return () => clearTimeout(timer);
   }, [formData.symbol]);
 
-  const handleSelectStockSuggestion = (stock: any) => {
+  const handleSelectStockSuggestion = async (stock: any) => {
     isSuggestionSelectedRef.current = true;
     const cleanSym = stock.symbol.replace(/\.NS$|\.BO$|\.BSE$/, '');
     const mtfInfo = getMtfMultiplier(cleanSym, formData.broker);
+    const initialPrice = stock.price && stock.price > 0 ? stock.price.toString() : '';
+
     setFormData((prev) => ({
       ...prev,
       symbol: stock.symbol.endsWith('.NS') ? stock.symbol : `${stock.symbol}.NS`,
       companyName: stock.companyName,
-      buyPrice: stock.price ? stock.price.toString() : prev.buyPrice,
+      buyPrice: initialPrice || prev.buyPrice,
       exchange: (stock.exchange === 'BSE' ? 'BSE' : 'NSE') as StockHolding['exchange'],
       category: (['Energy', 'Tech', 'Financials', 'Consumer', 'Automotive', 'Industrial'].includes(stock.category)
         ? stock.category
@@ -242,6 +368,26 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
     }));
     setSearchResults([]);
     setShowSuggestions(false);
+
+    // If initial price wasn't available, fetch live current price
+    if (!initialPrice) {
+      try {
+        const res = await fetch(`/api/stocks/quote?symbols=${encodeURIComponent(cleanSym)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const quote = data?.quotes?.[0];
+          if (quote && quote.currentPrice > 0) {
+            setFormData((prev) => ({
+              ...prev,
+              buyPrice: quote.currentPrice.toString(),
+              companyName: prev.companyName || quote.companyName,
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch live quote on selection:', err);
+      }
+    }
   };
 
   // Import JSON Modal State
@@ -251,37 +397,146 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
   const [sellSuccessNotice, setSellSuccessNotice] = useState<string | null>(null);
 
+  // Calibrated Trade History Calculations (Net of All Taxes, Deductions & Brokerage)
+  const tradesWithCalculations = useMemo(() => {
+    return tradeHistory.map((t) => {
+      // 1. Resolve Buy Price & Buy Date (handling both new and legacy trade records)
+      let buyP = t.buyPrice !== undefined && t.buyPrice !== null && Number(t.buyPrice) > 0
+        ? Number(t.buyPrice)
+        : 0;
+      const sellP = Number(t.price) || 0;
+      const qty = Math.max(0.0001, Number(t.quantity) || 1);
+      const totalSaleValue = t.totalValue || (sellP * qty);
+
+      // Reconstruct missing buy price on legacy trade records:
+      // On legacy records, t.realizedPnL was saved as gross profit: (sellP - buyP) * qty = grossProfit
+      // Therefore: buyP = sellP - (realizedPnL / qty)
+      if (buyP <= 0 && t.realizedPnL !== undefined && t.totalDeductions === undefined) {
+        const inferredBuyP = sellP - (Number(t.realizedPnL) / qty);
+        if (inferredBuyP > 0) {
+          buyP = inferredBuyP;
+        }
+      } else if (buyP <= 0 && t.grossPnL !== undefined) {
+        const inferredBuyP = sellP - (Number(t.grossPnL) / qty);
+        if (inferredBuyP > 0) {
+          buyP = inferredBuyP;
+        }
+      }
+
+      // Check active or prior holdings with matching symbol if still missing
+      let resolvedBuyDate = (t.buyDate && t.buyDate.trim()) || '';
+      const matchingHolding = holdings.find((h) => isSymbolMatch(h.symbol, t.symbol));
+      if (matchingHolding) {
+        if (buyP <= 0) buyP = matchingHolding.buyPrice;
+        if (!resolvedBuyDate && matchingHolding.buyDate && matchingHolding.buyDate.trim()) {
+          resolvedBuyDate = matchingHolding.buyDate.trim();
+        }
+      }
+      if (buyP <= 0) buyP = sellP;
+
+      // Robust fallback for legacy records to guarantee a valid date is always rendered
+      if (!resolvedBuyDate) {
+        if (t.date && t.date.trim()) {
+          resolvedBuyDate = t.date.trim();
+        } else if (t.sellDate && t.sellDate.trim()) {
+          resolvedBuyDate = t.sellDate.trim();
+        } else if (t.id && t.id.includes('_')) {
+          const timestamp = parseInt(t.id.split('_').pop() || '');
+          if (!isNaN(timestamp) && timestamp > 1600000000000) {
+            resolvedBuyDate = new Date(timestamp).toISOString().slice(0, 10);
+          }
+        }
+        if (!resolvedBuyDate) {
+          resolvedBuyDate = new Date().toISOString().slice(0, 10);
+        }
+      }
+
+      const buyTime = new Date(resolvedBuyDate).getTime();
+      const sellTime = t.sellDate ? new Date(t.sellDate).getTime() : (t.date ? new Date(t.date).getTime() : Date.now());
+      const daysHeld = Math.max(0, Math.floor((sellTime - buyTime) / (1000 * 60 * 60 * 24)));
+      const holdingMonths = daysHeld / 30;
+
+      const tTaxSettings = {
+        ...taxSettings,
+        brokerPreset: (t.broker || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE',
+        exchange: (t.exchange || 'NSE') as 'NSE' | 'BSE',
+      };
+
+      const calc = calculateEquityDeliveryBrokerage({
+        quantity: qty,
+        buyPrice: buyP,
+        sellPrice: sellP,
+        holdingMonths,
+        taxSettings: tTaxSettings,
+        isMTF: t.isMTF,
+        mtfMultiplier: t.mtfMultiplier,
+        ownQuantity: t.ownQuantity,
+        mtfQuantity: t.mtfQuantity,
+        mtfDays: t.mtfDaysHeld ?? daysHeld,
+      });
+
+      const grossInvested = buyP * qty;
+      const grossPnL = calc.grossProfit;
+      const totalDeductions = calc.totalFees;
+      const netPnL = calc.netPnL; // Strictly calibrated to match Tax Calculator Engine
+      const netRoiPercent = calc.netRoiPercent;
+
+      return {
+        ...t,
+        calc,
+        daysHeld,
+        buyP,
+        sellP,
+        buyDate: resolvedBuyDate,
+        grossInvested,
+        totalSaleValue,
+        grossPnL,
+        totalDeductions,
+        netPnL,
+        netRoiPercent,
+      };
+    });
+  }, [tradeHistory, taxSettings, holdings]);
+
+  const totalBookedNetPnL = tradesWithCalculations.reduce((sum, item) => sum + item.netPnL, 0);
+  const totalBookedDeductions = tradesWithCalculations.reduce((sum, item) => sum + item.totalDeductions, 0);
+  const totalBookedGrossPnL = tradesWithCalculations.reduce((sum, item) => sum + item.grossPnL, 0);
+
   // Download Trade History as CSV (Excel compatible)
   const handleDownloadTradeHistoryCSV = () => {
-    if (tradeHistory.length === 0) return;
+    if (tradesWithCalculations.length === 0) return;
     const headers = [
-      'Date',
       'Symbol',
       'Company Name',
-      'Trade Type',
-      'Exchange',
       'Broker',
+      'Exchange',
       'Quantity',
+      'Buy Date',
       'Buy Price (INR)',
+      'Sell Date',
       'Sell Price (INR)',
-      'Total Value (INR)',
-      'Realized PnL (INR)',
-      'Realized PnL (%)',
+      'Total Sale Value (INR)',
+      'Gross PnL (INR)',
+      'Deductions / Charges (INR)',
+      'Net Realized PnL (INR)',
+      'Net Realized PnL (%)',
     ];
 
-    const rows = tradeHistory.map((t) => [
-      `"${t.date || ''}"`,
+    const rows = tradesWithCalculations.map((t) => [
       `"${t.symbol || ''}"`,
       `"${(t.companyName || '').replace(/"/g, '""')}"`,
-      `"${t.type || 'SELL'}"`,
-      `"${t.exchange || 'NSE'}"`,
       `"${t.broker || 'ZERODHA'}"`,
+      `"${t.exchange || 'NSE'}"`,
       t.quantity,
-      t.buyPrice !== undefined ? Number(t.buyPrice).toFixed(2) : '',
-      Number(t.price).toFixed(2),
-      Number(t.totalValue).toFixed(2),
-      t.realizedPnL !== undefined ? Number(t.realizedPnL).toFixed(2) : '',
-      t.realizedPnLPercent !== undefined ? Number(t.realizedPnLPercent).toFixed(2) : '',
+      `"${t.buyDate || ''}"`,
+      Number(t.buyP).toFixed(2),
+      `"${t.date || t.sellDate || ''}"`,
+      Number(t.sellP).toFixed(2),
+      Number(t.totalSaleValue).toFixed(2),
+      Number(t.grossPnL).toFixed(2),
+      Number(t.totalDeductions).toFixed(2),
+      Number(t.netPnL).toFixed(2),
+      Number(t.netRoiPercent).toFixed(2),
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
@@ -454,8 +709,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         <div className="glass-shell">
           <div className="glass-core p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Total Invested Capital
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                TOTAL INVESTED CAPITAL
               </span>
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500/10 border border-indigo-500/20">
                 <Briefcase className="h-4 w-4 text-indigo-400" />
@@ -472,8 +727,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         <div className="glass-shell">
           <div className="glass-core p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Current Market Value
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                CURRENT MARKET VALUE
               </span>
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/10 border border-cyan-500/20">
                 <IndianRupee className="h-4 w-4 text-cyan-400" />
@@ -490,8 +745,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         <div className={`glass-shell ${totalNetPnL >= 0 ? 'glass-shell-profit' : 'glass-shell-loss'}`}>
           <div className="glass-core p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Unrealized Net P&L
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                UNREALIZED NET P&L
               </span>
               <div className={`flex h-8 w-8 items-center justify-center rounded-full ${totalNetPnL >= 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-rose-500/10 border border-rose-500/20'}`}>
                 {totalNetPnL >= 0 ? (
@@ -532,8 +787,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         <div className="glass-shell">
           <div className="glass-core p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                Top Performing Asset
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                TOP PERFORMING ASSET
               </span>
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
                 <PieChart className="h-4 w-4 text-amber-400" />
@@ -570,8 +825,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
       {currentVal > 0 && (
         <div className="glass-shell">
           <div className="glass-core p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs font-bold text-white flex items-center gap-2 shrink-0">
-              <Building2 className="h-4 w-4 text-[#38BDF8]" /> Multi-Broker Allocation
+            <div className="text-xs font-bold text-white flex items-center gap-2 shrink-0 font-mono">
+              <Building2 className="h-4 w-4 text-[#38BDF8]" /> <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">MULTI-BROKER ALLOCATION</span>
             </div>
             <div className="flex-1 w-full max-w-xl flex items-center gap-3">
               <div className="h-2.5 flex-1 bg-[#111820] rounded-full overflow-hidden flex border border-[#202A35]">
@@ -626,9 +881,9 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
             <button
               onClick={exportPortfolioJSON}
               title="Export portfolio as JSON file"
-              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-3.5 py-2 text-xs font-semibold text-slate-300 transition-all"
+              className="btn-export-secondary"
             >
-              <Download className="h-3.5 w-3.5" />
+              <Download className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)]" />
               <span className="hidden md:inline">Export JSON</span>
             </button>
           </div>
@@ -656,8 +911,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         <div className="glass-core overflow-hidden">
           {/* Desktop & Tablet Table View */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300">
-              <thead className="bg-[#05070d] text-[11px] uppercase tracking-wider text-slate-400 font-semibold border-b border-white/10">
+            <table className="w-full text-left text-sm text-[var(--text-secondary)]">
+              <thead className="bg-[var(--table-header-bg)] text-[10px] uppercase font-mono tracking-wider text-[var(--text-secondary)] font-bold border-b border-[var(--border)]">
                 <tr>
                   <th className="px-6 py-4">Asset</th>
                   <th className="px-4 py-4">Exchange</th>
@@ -670,11 +925,11 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                   <th className="px-4 py-4 text-center">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 font-sans">
+              <tbody className="divide-y divide-[var(--border)] font-sans">
                 {holdingsWithCalculations.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center text-slate-400">
-                      No holdings in portfolio. Click <strong className="text-white">Add Stock Purchase</strong> to record your first trade!
+                    <td colSpan={9} className="py-16 text-center text-[var(--text-secondary)]">
+                      No holdings in portfolio. Click <strong className="text-[var(--text-primary)]">Add Stock Purchase</strong> to record your first trade!
                     </td>
                   </tr>
                 ) : (
@@ -795,57 +1050,27 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                               {netRoiPercent.toFixed(2)}%
                             </span>
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-end gap-1 font-sans">
-                            <span>Deductions: ₹{totalDeductions.toFixed(2)}</span>
-                            <div className="relative inline-block group/tooltip">
-                              <HelpCircle className="h-3 w-3 text-slate-400 hover:text-slate-200 cursor-help" />
-                              <div className="pointer-events-none absolute right-0 bottom-full mb-2 hidden group-hover/tooltip:block w-60 p-3 bg-[#080c14] border border-slate-700/80 rounded-xl shadow-2xl z-50 text-[11px] text-slate-200 font-sans text-left">
-                                <div className="font-bold text-white mb-2 pb-1.5 border-b border-slate-800 flex justify-between items-center">
-                                  <span>Estimated Deductions</span>
-                                  <span className="text-amber-400 font-mono">₹{totalDeductions.toFixed(2)}</span>
-                                </div>
-                                <div className="space-y-1 font-mono text-[10px]">
-                                  <div className="flex justify-between py-0.5 border-b border-white/5">
-                                    <span className="text-slate-400 font-sans">Gross P&L:</span>
-                                    <span className={grossPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                                      {grossPnL >= 0 ? '+' : '-'}₹{Math.abs(grossPnL).toFixed(2)}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400 font-sans">Brokerage:</span>
-                                    <span>₹{calc.totalBrokerage.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400 font-sans">STT (0.1% Buy+Sell):</span>
-                                    <span>₹{calc.totalStt.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400 font-sans">Exch + SEBI + GST:</span>
-                                    <span>₹{(calc.totalExchangeTxn + calc.totalSebi + calc.totalGst).toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400 font-sans">Stamp Duty (Buy):</span>
-                                    <span>₹{calc.stampDuty.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400 font-sans">DP Charges (Sell):</span>
-                                    <span>₹{calc.dpCharges.toFixed(2)}</span>
-                                  </div>
-                                  {holding.isMTF && (
-                                    <>
-                                      <div className="flex justify-between text-amber-300 pt-1 border-t border-amber-500/20">
-                                        <span className="font-sans">MTF Interest ({holding.daysHeld}d):</span>
-                                        <span>₹{(calc.mtfInterestCost || 0).toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex justify-between text-amber-300">
-                                        <span className="font-sans">Pledge/Unpledge Fee:</span>
-                                        <span>₹{(calc.mtfPledgeUnpledgeFee || 0).toFixed(2)}</span>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
+                          <div className="text-[10px] text-slate-400 mt-1 flex items-center justify-end font-sans">
+                            <button
+                              type="button"
+                              data-deduction-trigger="true"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setDeductionPopover((prev) =>
+                                  prev?.holding.id === holding.id && prev.pinned
+                                    ? null
+                                    : { holding, rect, pinned: true }
+                                );
+                              }}
+                              onMouseEnter={(e) => handleTriggerMouseEnter(holding, e)}
+                              onMouseLeave={handleTriggerMouseLeave}
+                              className="inline-flex items-center gap-1 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer group/btn"
+                              title="Click to pin or hover to preview deduction breakdown"
+                            >
+                              <span>Deductions: ₹{totalDeductions.toFixed(2)}</span>
+                              <HelpCircle className="h-3 w-3 text-slate-400 group-hover/btn:text-cyan-400 transition-colors" />
+                            </button>
                           </div>
                         </td>
 
@@ -957,9 +1182,26 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                         <span className={`font-bold ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {isProfit ? '+' : '-'}₹{Math.abs(netPnL).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                         </span>
-                        <span className="text-[9px] text-slate-400 block mt-0.5 font-sans">
-                          (Deductions: ₹{totalDeductions.toFixed(0)})
-                        </span>
+                        <button
+                          type="button"
+                          data-deduction-trigger="true"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setDeductionPopover((prev) =>
+                              prev?.holding.id === holding.id && prev.pinned
+                                ? null
+                                : { holding, rect, pinned: true }
+                            );
+                          }}
+                          onMouseEnter={(e) => handleTriggerMouseEnter(holding, e)}
+                          onMouseLeave={handleTriggerMouseLeave}
+                          className="text-[9px] text-slate-400 hover:text-cyan-300 mt-0.5 font-sans inline-flex items-center justify-end gap-1 ml-auto cursor-pointer"
+                          title="Click to view deduction breakdown"
+                        >
+                          <span>(Deductions: ₹{totalDeductions.toFixed(0)})</span>
+                          <HelpCircle className="h-2.5 w-2.5 text-slate-400" />
+                        </button>
                       </div>
                       {holding.isMTF && (() => {
                         const ownQ = holding.ownQuantity ?? holding.quantity;
@@ -1014,51 +1256,55 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
 
       {/* Trade History Ledger Section */}
-      <div className="glass-panel p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+      <div className="glass-shell">
+        <div className="glass-core p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <History className="h-5 w-5 text-cyan-400" /> Trade History & Realized P&L Ledger ({tradeHistory.length})
+            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2 font-mono">
+              <History className="h-5 w-5 text-[var(--brand-primary)]" /> Trade History & Realized P&L Ledger ({tradeHistory.length})
             </h3>
-            <p className="text-xs text-slate-400">Complete record of executed stock sales and booked realized profits</p>
+            <p className="text-xs text-[var(--text-secondary)]">Complete record of executed stock sales and booked realized profits</p>
           </div>
 
           {/* Realized P&L Stat Pill & Download Actions */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-2 rounded-xl bg-slate-950 border border-white/10 px-3.5 py-1.5 text-xs font-mono">
-              <span className="text-slate-400">Total Booked P&L:</span>
+            <div className="flex items-center gap-2 rounded-xl bg-[var(--surface-muted)] border border-[var(--border)] px-3.5 py-1.5 text-xs font-mono">
+              <span className="text-[var(--text-secondary)]">Total Net Realized P&L:</span>
               <span
                 className={`font-extrabold text-sm flex items-center gap-1 ${
-                  tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0) >= 0
-                    ? 'text-emerald-400'
-                    : 'text-rose-400'
+                  totalBookedNetPnL >= 0
+                    ? 'text-[var(--positive)]'
+                    : 'text-[var(--negative)]'
                 }`}
               >
-                {tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0) >= 0 ? '+' : '-'}₹
-                {Math.abs(tradeHistory.reduce((s, t) => s + (t.realizedPnL || 0), 0)).toLocaleString('en-IN', {
+                {totalBookedNetPnL >= 0 ? '+' : '-'}₹
+                {Math.abs(totalBookedNetPnL).toLocaleString('en-IN', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
+              </span>
+              <span className="text-[10px] text-[var(--text-secondary)] font-sans">
+                (Charges: -₹{totalBookedDeductions.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
               </span>
             </div>
 
             <button
               onClick={handleDownloadTradeHistoryCSV}
-              disabled={tradeHistory.length === 0}
-              title={tradeHistory.length === 0 ? "No trades to download yet" : "Download Trade History as CSV / Excel spreadsheet"}
-              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 disabled:opacity-40 disabled:pointer-events-none px-3.5 py-2 text-xs font-semibold text-cyan-300 transition-all shadow-sm cursor-pointer"
+              disabled={tradesWithCalculations.length === 0}
+              title={tradesWithCalculations.length === 0 ? "No trades to download yet" : "Download Trade History as CSV / Excel spreadsheet"}
+              className="btn-export-csv"
             >
-              <Download className="h-3.5 w-3.5" />
+              <Download className="h-3.5 w-3.5 shrink-0" />
               <span>Download CSV</span>
             </button>
 
             <button
               onClick={handleDownloadTradeHistoryJSON}
-              disabled={tradeHistory.length === 0}
-              title={tradeHistory.length === 0 ? "No trades to download yet" : "Download Trade History as JSON"}
-              className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:pointer-events-none px-3 py-2 text-xs font-semibold text-slate-300 transition-all cursor-pointer"
+              disabled={tradesWithCalculations.length === 0}
+              title={tradesWithCalculations.length === 0 ? "No trades to download yet" : "Download Trade History as JSON"}
+              className="btn-export-secondary"
             >
-              <FileText className="h-3.5 w-3.5" />
+              <FileText className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)]" />
               <span className="hidden sm:inline">JSON</span>
             </button>
           </div>
@@ -1066,36 +1312,42 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
         {/* Trade Ledger Table (Desktop & Tablet) */}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-950/80 text-xs uppercase text-slate-400 font-semibold border-b border-white/10">
+          <table className="w-full text-left text-sm text-[var(--text-secondary)]">
+            <thead className="bg-[var(--table-header-bg)] text-[10px] uppercase font-mono tracking-wider text-[var(--text-secondary)] font-bold border-b border-[var(--border)]">
               <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Asset Ticker</th>
+                <th className="px-4 py-3">Asset</th>
                 <th className="px-4 py-3">Broker</th>
-                <th className="px-4 py-3">Trade Type</th>
-                <th className="px-4 py-3 text-right">Quantity</th>
-                <th className="px-4 py-3 text-right">Sell Price (₹)</th>
-                <th className="px-4 py-3 text-right">Total Trade Value</th>
-                <th className="px-4 py-3 text-right">Realized P&L (₹)</th>
+                <th className="px-4 py-3 text-right">Qty</th>
+                <th className="px-4 py-3 text-right">Bought (Date & Price)</th>
+                <th className="px-4 py-3 text-right">Sold (Date & Price)</th>
+                <th className="px-4 py-3 text-right">Total Sale Value</th>
+                <th className="px-4 py-3 text-right">Deductions</th>
+                <th className="px-4 py-3 text-right">Realized Net P&L</th>
                 <th className="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 font-mono text-xs">
-              {tradeHistory.length === 0 ? (
+            <tbody className="divide-y divide-[var(--border)] font-mono text-xs">
+              {tradesWithCalculations.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400 font-sans">
+                  <td colSpan={9} className="py-8 text-center text-[var(--text-secondary)] font-sans">
                     No recorded trades yet. Log a stock sale to track realized profits!
                   </td>
                 </tr>
               ) : (
-                tradeHistory.map((trade) => {
-                  const isGain = (trade.realizedPnL || 0) >= 0;
+                tradesWithCalculations.map((trade) => {
+                  const isGain = trade.netPnL >= 0;
                   return (
-                    <tr key={trade.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="px-4 py-3.5 text-slate-400">{trade.date}</td>
-                      <td className="px-4 py-3.5 font-bold text-white">
-                        {trade.symbol}
-                        <span className="block text-[10px] text-slate-400 font-sans font-normal truncate max-w-[140px]">
+                    <tr key={trade.id} className="hover:bg-[var(--table-row-hover)] transition-colors">
+                      <td className="px-4 py-3.5 font-bold text-[var(--text-primary)]">
+                        <div className="flex items-center gap-1.5">
+                          <span>{trade.symbol}</span>
+                          {trade.isMTF && (
+                            <span className="rounded bg-amber-500/15 px-1.5 py-0.2 text-[9px] font-bold text-amber-400 border border-amber-500/30">
+                              MTF {trade.mtfMultiplier || 4}x
+                            </span>
+                          )}
+                        </div>
+                        <span className="block text-[10px] text-[var(--text-secondary)] font-sans font-normal truncate max-w-[150px]">
                           {trade.companyName}
                         </span>
                       </td>
@@ -1114,46 +1366,69 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5">
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                            trade.type === 'SELL'
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                          }`}
-                        >
-                          {trade.type}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 text-right text-white">{trade.quantity}</td>
-                      <td className="px-4 py-3.5 text-right text-slate-200">
-                        ₹{trade.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-4 py-3.5 text-right font-bold text-white">
-                        ₹{trade.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td className="px-4 py-3.5 text-right font-bold text-[var(--text-primary)]">
+                        {trade.quantity}
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        {trade.realizedPnL !== undefined ? (
-                          <div>
-                            <span className={`font-bold ${isGain ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {isGain ? '+' : '-'}₹
-                              {Math.abs(trade.realizedPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </span>
-                            {trade.realizedPnLPercent !== undefined && (
-                              <span className={`block text-[10px] ${isGain ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                ({isGain ? '+' : ''}{trade.realizedPnLPercent.toFixed(2)}%)
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-500">-</span>
-                        )}
+                        <div className="font-bold text-[var(--text-primary)]">
+                          ₹{trade.buyP.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-secondary)] font-sans">
+                          {trade.buyDate || trade.sellDate || trade.date || new Date().toISOString().slice(0, 10)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="font-bold text-[var(--text-primary)]">
+                          ₹{trade.sellP.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-secondary)] font-sans">
+                          {trade.sellDate || trade.date || new Date().toISOString().slice(0, 10)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-bold text-[var(--text-primary)]">
+                        ₹{trade.totalSaleValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-sans">
+                        <button
+                          type="button"
+                          data-deduction-trigger="true"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setDeductionPopover((prev) =>
+                              prev?.holding.id === trade.id && prev.pinned
+                                ? null
+                                : { holding: trade, rect, pinned: true }
+                            );
+                          }}
+                          onMouseEnter={(e) => handleTriggerMouseEnter(trade, e)}
+                          onMouseLeave={handleTriggerMouseLeave}
+                          className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-cyan-300 transition-colors cursor-pointer group/btn"
+                          title="Click to pin or hover to preview deduction breakdown"
+                        >
+                          <span className="font-mono text-amber-400 font-bold">-₹{trade.totalDeductions.toFixed(2)}</span>
+                          <HelpCircle className="h-3 w-3 text-[var(--text-secondary)] group-hover/btn:text-cyan-400 transition-colors" />
+                        </button>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div>
+                          <span className={`font-bold ${isGain ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+                            {isGain ? '+' : '-'}₹
+                            {Math.abs(trade.netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className={`block text-[10px] ${isGain ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+                            ({trade.netRoiPercent >= 0 ? '+' : ''}{trade.netRoiPercent.toFixed(2)}%)
+                          </span>
+                          <span className="block text-[9px] text-[var(--text-secondary)] font-sans">
+                            Gross: {trade.grossPnL >= 0 ? '+' : '-'}₹{Math.abs(trade.grossPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <button
                           onClick={() => deleteTradeRecord(trade.id)}
                           title="Remove trade log entry"
-                          className="rounded p-1 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 transition"
+                          className="rounded p-1 text-[var(--text-secondary)] hover:bg-rose-500/20 hover:text-rose-400 transition"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -1167,22 +1442,24 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         </div>
 
         {/* Trade Ledger Mobile Cards (< 640px) */}
-        <div className="block sm:hidden divide-y divide-white/5 font-sans">
-          {tradeHistory.length === 0 ? (
-            <div className="py-8 text-center text-slate-400 text-xs">
+        <div className="block sm:hidden divide-y divide-[var(--border)] font-sans">
+          {tradesWithCalculations.length === 0 ? (
+            <div className="py-8 text-center text-[var(--text-secondary)] text-xs">
               No recorded trades yet. Log a stock sale to track realized profits!
             </div>
           ) : (
-            tradeHistory.map((trade) => {
-              const isGain = (trade.realizedPnL || 0) >= 0;
+            tradesWithCalculations.map((trade) => {
+              const isGain = trade.netPnL >= 0;
               return (
-                <div key={trade.id} className="p-3.5 space-y-2 font-mono text-xs">
+                <div key={trade.id} className="p-3.5 space-y-2.5 font-mono text-xs">
                   <div className="flex items-center justify-between font-sans">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white font-mono text-sm">{trade.symbol}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${trade.type === 'SELL' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-indigo-500/20 text-indigo-300'}`}>
-                        {trade.type}
-                      </span>
+                      <span className="font-bold text-[var(--text-primary)] font-mono text-sm">{trade.symbol}</span>
+                      {trade.isMTF && (
+                        <span className="rounded bg-amber-500/15 px-1.5 py-0.2 text-[9px] font-bold text-amber-400 border border-amber-500/30">
+                          MTF {trade.mtfMultiplier || 4}x
+                        </span>
+                      )}
                       {(trade.broker || 'ZERODHA') === 'ANGELONE' ? (
                         <span className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-400 border border-orange-500/30">
                           Angel One
@@ -1197,45 +1474,81 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-slate-400">{trade.date}</span>
+                    <button
+                      onClick={() => deleteTradeRecord(trade.id)}
+                      className="p-1 text-[var(--text-secondary)] hover:text-rose-400 transition"
+                      title="Remove trade"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 bg-[#05070d]/60 p-2 rounded-lg text-xs border border-white/5">
+                  <div className="grid grid-cols-2 gap-2 bg-[var(--surface-muted)] p-2.5 rounded-lg text-xs border border-[var(--border)]">
                     <div>
-                      <span className="text-[9px] text-slate-400 block uppercase font-sans">Sell Qty & Price</span>
-                      <span className="text-slate-200">{trade.quantity} @ ₹{trade.price.toLocaleString('en-IN')}</span>
+                      <span className="text-[9px] text-[var(--text-secondary)] block uppercase font-sans">Bought (Date & Price)</span>
+                      <span className="text-[var(--text-primary)] font-bold">₹{trade.buyP.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-[10px] text-[var(--text-secondary)] block font-sans">{trade.buyDate || trade.sellDate || trade.date || new Date().toISOString().slice(0, 10)}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[9px] text-slate-400 block uppercase font-sans">Total Value</span>
-                      <span className="text-white font-bold">₹{trade.totalValue.toLocaleString('en-IN')}</span>
+                      <span className="text-[9px] text-[var(--text-secondary)] block uppercase font-sans">Sold (Date & Price)</span>
+                      <span className="text-[var(--text-primary)] font-bold">₹{trade.sellP.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-[10px] text-[var(--text-secondary)] block font-sans">{trade.sellDate || trade.date || new Date().toISOString().slice(0, 10)}</span>
+                    </div>
+                    <div className="pt-1 border-t border-[var(--border)]">
+                      <span className="text-[9px] text-[var(--text-secondary)] block uppercase font-sans">Quantity</span>
+                      <span className="text-[var(--text-primary)]">{trade.quantity} shares</span>
+                    </div>
+                    <div className="text-right pt-1 border-t border-[var(--border)]">
+                      <span className="text-[9px] text-[var(--text-secondary)] block uppercase font-sans">Sale Value</span>
+                      <span className="text-[var(--text-primary)] font-bold">₹{trade.totalSaleValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-1">
-                      <span className="text-slate-400 text-[10px] font-sans">Realized P&L:</span>
-                      <span className={`font-bold ${isGain ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isGain ? '+' : '-'}₹{Math.abs(trade.realizedPnL || 0).toLocaleString('en-IN')}
+                    <button
+                      type="button"
+                      data-deduction-trigger="true"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setDeductionPopover((prev) =>
+                          prev?.holding.id === trade.id && prev.pinned
+                            ? null
+                            : { holding: trade, rect, pinned: true }
+                        );
+                      }}
+                      onMouseEnter={(e) => handleTriggerMouseEnter(trade, e)}
+                      onMouseLeave={handleTriggerMouseLeave}
+                      className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-cyan-300 font-sans text-xs cursor-pointer"
+                    >
+                      <span className="font-mono text-amber-400 font-bold">-₹{trade.totalDeductions.toFixed(2)}</span>
+                      <HelpCircle className="h-3 w-3 text-[var(--text-secondary)]" />
+                    </button>
+
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 justify-end">
+                        <span className="text-[var(--text-secondary)] text-[10px] font-sans">Net P&L:</span>
+                        <span className={`font-bold ${isGain ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+                          {isGain ? '+' : '-'}₹{Math.abs(trade.netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <span className="text-[9px] text-[var(--text-secondary)] block font-sans">
+                        Gross: {trade.grossPnL >= 0 ? '+' : '-'}₹{Math.abs(trade.grossPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <button
-                      onClick={() => deleteTradeRecord(trade.id)}
-                      className="p-1 text-slate-400 hover:text-rose-400 transition"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
                   </div>
                 </div>
               );
             })
           )}
         </div>
+        </div>
       </div>
 
       {/* Modal 1: Add Purchase Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="glass-panel w-full max-w-md p-6 space-y-4 relative border border-white/20">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="bg-[#0B1018] rounded-xl w-full max-w-md p-6 space-y-4 relative border border-white/[0.1] shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Plus className="h-5 w-5 text-indigo-400" /> Record Stock Purchase (₹ INR)
@@ -1314,9 +1627,9 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                         {item.price > 0 && (
                           <div className="text-right">
                             <span className="text-xs font-bold font-mono text-emerald-400">
-                              ₹{item.price.toLocaleString('en-IN')}
+                              ₹{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            <span className="block text-[9px] text-slate-400">Est. Price</span>
+                            <span className="block text-[9px] text-emerald-400/90 font-medium tracking-wide">Curr. Price</span>
                           </div>
                         )}
                       </button>
@@ -1473,7 +1786,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 px-5 py-2 text-xs font-bold text-white shadow-lg hover:from-indigo-500 hover:to-cyan-500"
+                  className="pill-btn-primary flex items-center gap-1.5 cursor-pointer"
                 >
                   Save Stock to Portfolio
                 </button>
@@ -1485,8 +1798,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
       {/* Modal 1B: Edit Stock Holding Modal */}
       {editingHolding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="glass-panel w-full max-w-md p-6 space-y-4 relative border border-indigo-500/40 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+          <div className="bg-[#0B1018] rounded-xl w-full max-w-md p-6 space-y-4 relative border border-indigo-500/40 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Pencil className="h-5 w-5 text-indigo-400" /> Edit Stock Holding Details
@@ -1658,7 +1971,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 px-5 py-2 text-xs font-bold text-white shadow-lg hover:from-indigo-500 hover:to-cyan-500"
+                  className="pill-btn-primary flex items-center gap-1.5 cursor-pointer"
                 >
                   Update Stock Holding
                 </button>
@@ -1676,18 +1989,38 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         const buyCost = sellingHolding.buyPrice * sellQtyNum;
         const grossProfit = grossValue - buyCost;
 
-        const activeHoldingBroker = sellingHolding.broker || 'ZERODHA';
-        const estBrokerage = activeHoldingBroker === 'GROWW' ? Math.min(20, grossValue * 0.0005) : activeHoldingBroker === 'ANGELONE' ? 20 : 0;
-        const estStt = (grossValue * 0.1) / 100;
-        const estStampDuty = (buyCost * 0.015) / 100;
-        const estGst = (estBrokerage * 18) / 100;
-        const estDpCharges = sellQtyNum > 0 ? (taxSettings.flatDpCharges || 15.93) : 0;
-        const totalEstFees = estBrokerage + estStt + estStampDuty + estGst + estDpCharges;
-        const netEstPnL = grossProfit - totalEstFees;
+        const buyTime = sellingHolding.buyDate ? new Date(sellingHolding.buyDate).getTime() : Date.now();
+        const sellTime = sellFormData.sellDate ? new Date(sellFormData.sellDate).getTime() : Date.now();
+        const daysHeld = Math.max(0, Math.floor((sellTime - buyTime) / (1000 * 60 * 60 * 24)));
+        const holdingMonths = daysHeld / 30;
+
+        const activeHoldingBroker = (sellingHolding.broker || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE';
+        const hTaxSettings = {
+          ...taxSettings,
+          brokerPreset: activeHoldingBroker,
+          exchange: (sellingHolding.exchange || 'NSE') as 'NSE' | 'BSE',
+        };
+
+        const calc = calculateEquityDeliveryBrokerage({
+          quantity: sellQtyNum,
+          buyPrice: sellingHolding.buyPrice,
+          sellPrice: sellPriceNum,
+          holdingMonths,
+          taxSettings: hTaxSettings,
+          isMTF: sellingHolding.isMTF,
+          mtfMultiplier: sellingHolding.mtfMultiplier,
+          ownQuantity: sellingHolding.ownQuantity ? Math.min(sellQtyNum, sellingHolding.ownQuantity) : undefined,
+          mtfQuantity: sellingHolding.mtfQuantity ? Math.min(sellQtyNum, sellingHolding.mtfQuantity) : undefined,
+          mtfDays: daysHeld,
+        });
+
+        const totalEstFees = calc.totalFees;
+        const netEstPnL = calc.netPnL; // Net profit after subtracting all statutory deductions
+        const netRoiPercent = calc.netRoiPercent;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="glass-panel w-full max-w-md p-6 space-y-4 relative border border-emerald-500/40 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+            <div className="bg-[#0B1018] rounded-xl w-full max-w-md p-6 space-y-4 relative border border-emerald-500/40 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1710,8 +2043,10 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                     <span className="font-bold text-white font-mono">{sellingHolding.symbol}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-300">
-                    <span>Initial Buy Price:</span>
-                    <span className="font-mono text-slate-200">₹{sellingHolding.buyPrice.toLocaleString('en-IN')}</span>
+                    <span>Initial Buy Price & Date:</span>
+                    <span className="font-mono text-slate-200">
+                      ₹{sellingHolding.buyPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ({sellingHolding.buyDate || new Date().toISOString().slice(0, 10)})
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-slate-300">
                     <span>Available Quantity:</span>
@@ -1763,42 +2098,62 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 {sellPriceNum > 0 && sellQtyNum > 0 && (
                   <div className="p-3 bg-slate-950 rounded-xl border border-white/10 space-y-1.5 text-xs font-mono text-slate-300">
                     <div className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider font-sans border-b border-white/10 pb-1 flex justify-between items-center">
-                      <span>Est. Taxes & Broker Charges ({activeHoldingBroker})</span>
-                      <span className="text-[10px] text-slate-400 font-mono">SEBI Tariff</span>
+                      <span>Live Tax & Fee Breakdown ({activeHoldingBroker})</span>
+                      <span className="text-[10px] text-slate-400 font-mono">SEBI Verified</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Gross Sale Value:</span>
+                      <span className="text-slate-400 font-sans">Total Sale Value:</span>
                       <span className="font-bold text-white">₹{grossValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Brokerage ({activeHoldingBroker}):</span>
-                      <span>₹{estBrokerage.toFixed(2)}</span>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-sans">Invested Buy Cost:</span>
+                      <span className="font-bold text-slate-200">₹{buyCost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-white/5 pt-1">
+                      <span className="text-slate-400 font-sans">Gross P&L (Pre-tax):</span>
+                      <span className={grossProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                        {grossProfit >= 0 ? '+' : '-'}₹{Math.abs(grossProfit).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
                     </div>
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">STT (0.1% Delivery):</span>
-                      <span>₹{estStt.toFixed(2)}</span>
+                      <span className="text-slate-400 font-sans">Brokerage ({activeHoldingBroker}):</span>
+                      <span>₹{calc.totalBrokerage.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Stamp Duty (0.015%):</span>
-                      <span>₹{estStampDuty.toFixed(2)}</span>
+                      <span className="text-slate-400 font-sans">STT (0.1% Buy+Sell):</span>
+                      <span>₹{calc.totalStt.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">GST (18% on Brokerage):</span>
-                      <span>₹{estGst.toFixed(2)}</span>
+                      <span className="text-slate-400 font-sans">Exch + SEBI + GST:</span>
+                      <span>₹{(calc.totalExchangeTxn + calc.totalSebi + calc.totalGst).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">CDSL DP Charges (Sell):</span>
-                      <span>₹{estDpCharges.toFixed(2)}</span>
+                      <span className="text-slate-400 font-sans">Stamp Duty + DP Charges:</span>
+                      <span>₹{(calc.stampDuty + calc.dpCharges).toFixed(2)}</span>
                     </div>
+                    {sellingHolding.isMTF && (
+                      <div className="flex justify-between text-[11px] text-amber-300">
+                        <span className="font-sans">MTF Interest ({daysHeld}d) & Pledge:</span>
+                        <span>₹{((calc.mtfInterestCost || 0) + (calc.mtfPledgeUnpledgeFee || 0)).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-bold border-t border-white/10 pt-1 text-amber-400 text-[11px]">
-                      <span>Total Estimated Deductions:</span>
+                      <span className="font-sans">Total Statutory Deductions:</span>
                       <span>-₹{totalEstFees.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-bold border-t border-white/10 pt-1.5 text-xs">
-                      <span className="text-white font-sans font-bold">Net P&L (After Charges):</span>
-                      <span className={netEstPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                        {netEstPnL >= 0 ? '+' : ''}₹{netEstPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
+                    <div className="flex justify-between items-center font-bold border-t border-white/10 pt-1.5 text-xs bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/25">
+                      <div>
+                        <span className="text-white font-sans font-bold block">Net Realized P&L:</span>
+                        <span className="text-[10px] text-slate-400 font-sans font-normal">Deductions subtracted from gross</span>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-sm ${netEstPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {netEstPnL >= 0 ? '+' : '-'}₹{Math.abs(netEstPnL).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className={`block text-[10px] ${netEstPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          ({netRoiPercent >= 0 ? '+' : ''}{netRoiPercent.toFixed(2)}%)
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1827,7 +2182,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                   </button>
                   <button
                     type="submit"
-                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-xs font-bold text-white shadow-lg hover:from-emerald-500 hover:to-teal-500 transition-all cursor-pointer"
+                    className="pill-btn-emerald flex items-center gap-1.5 cursor-pointer"
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Confirm Sale & Transfer to Trade History</span>
@@ -1868,8 +2223,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         const netTakeHome = grossProfit - taxAmount;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-            <div className="glass-panel w-full max-w-lg p-6 space-y-4 relative border border-cyan-500/40 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+            <div className="bg-[#0B1018] rounded-xl w-full max-w-lg p-6 space-y-4 relative border border-cyan-500/40 shadow-2xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
                   <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
@@ -1958,7 +2313,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </div>
 
                 {/* Final Net Take-Home */}
-                <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 rounded-xl border border-emerald-500/40 flex justify-between items-center text-sm">
+                <div className="p-4 bg-[#090E16] rounded-xl border border-emerald-500/35 flex justify-between items-center text-sm shadow-inner">
                   <div>
                     <span className="font-bold text-white font-sans block">Net Take-Home Cash P&L</span>
                     <span className="text-[10px] text-slate-400 font-sans">After all taxes, STT & DP charges</span>
@@ -1982,6 +2337,98 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
           </div>
         );
       })()}
+
+      {/* Dynamic Unclipped Deductions Breakdown Popover Portal */}
+      {mounted && deductionPopover && createPortal(
+        (() => {
+          const { showAbove, style } = getPopoverPosition(deductionPopover.rect);
+          const h = deductionPopover.holding;
+          const calc = h.calc;
+          const grossPnL = h.grossPnL;
+          const netPnL = h.netPnL;
+          const totalDeductions = h.totalDeductions;
+
+          return (
+            <div
+              data-deduction-popover="true"
+              style={style}
+              className="w-64 p-3.5 bg-[#0a0f16] border border-cyan-500/50 rounded-xl shadow-[0_12px_45px_rgba(0,0,0,0.85)] text-[11px] text-slate-200 font-sans text-left animate-in fade-in duration-150 backdrop-blur-md"
+              onMouseEnter={handlePopoverMouseEnter}
+              onMouseLeave={handlePopoverMouseLeave}
+            >
+              <div className="font-bold text-white mb-2 pb-1.5 border-b border-white/10 flex justify-between items-center">
+                <span className="flex items-center gap-1.5">
+                  <span>Estimated Deductions</span>
+                  <span className="text-[9px] text-slate-400 font-mono font-normal px-1.5 py-0.5 rounded bg-white/5 border border-white/10 uppercase">
+                    {h.broker || 'ZERODHA'}
+                  </span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-mono font-bold">₹{totalDeductions.toFixed(2)}</span>
+                  {deductionPopover.pinned && (
+                    <button
+                      type="button"
+                      onClick={() => setDeductionPopover(null)}
+                      className="text-slate-400 hover:text-white transition p-0.5"
+                      title="Close"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 font-mono text-[10px]">
+                <div className="flex justify-between py-0.5 border-b border-white/5">
+                  <span className="text-slate-400 font-sans">Gross P&L:</span>
+                  <span className={grossPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                    {grossPnL >= 0 ? '+' : '-'}₹{Math.abs(grossPnL).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-sans">Brokerage:</span>
+                  <span>₹{calc.totalBrokerage.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-sans">STT (0.1% Buy+Sell):</span>
+                  <span>₹{calc.totalStt.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-sans">Exch + SEBI + GST:</span>
+                  <span>₹{(calc.totalExchangeTxn + calc.totalSebi + calc.totalGst).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-sans">Stamp Duty (Buy):</span>
+                  <span>₹{calc.stampDuty.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400 font-sans">DP Charges (Sell):</span>
+                  <span>₹{calc.dpCharges.toFixed(2)}</span>
+                </div>
+                {h.isMTF && (
+                  <>
+                    <div className="flex justify-between text-amber-300 pt-1 border-t border-amber-500/20">
+                      <span className="font-sans">MTF Interest ({h.daysHeld}d):</span>
+                      <span>₹{(calc.mtfInterestCost || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-300">
+                      <span className="font-sans">Pledge/Unpledge Fee:</span>
+                      <span>₹{(calc.mtfPledgeUnpledgeFee || 0).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between pt-1 border-t border-white/10 font-bold text-[11px]">
+                  <span className="text-white font-sans">Net P&L:</span>
+                  <span className={netPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                    {netPnL >= 0 ? '+' : '-'}₹{Math.abs(netPnL).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 };

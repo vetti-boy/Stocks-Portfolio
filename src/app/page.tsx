@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { StockProvider, useStock } from '@/context/StockContext';
+import { ThemeProvider } from '@/context/ThemeContext';
+import { StockProvider } from '@/context/StockContext';
 import { Navbar } from '@/components/Navbar';
 import { PortfolioTab } from '@/components/PortfolioTab';
 import { CalculatorTab } from '@/components/CalculatorTab';
@@ -14,7 +15,6 @@ import { Briefcase, Calculator, ShieldCheck, ChevronLeft } from 'lucide-react';
 
 function DashboardContent() {
   const { user } = useAuth();
-  const { syncStatus } = useStock();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<'portfolio' | 'calculator' | 'admin'>('portfolio');
   const [storedPin, setStoredPin] = useState('1234');
@@ -75,114 +75,121 @@ function DashboardContent() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
-  // Automatically redirect non-admin users away from the admin tab to portfolio
+  // Automatically redirect non-admin users away from the admin tab to portfolio (only when user session has resolved)
   useEffect(() => {
-    if (activeTab === 'admin' && !isAdmin) {
+    if (isMounted && user && activeTab === 'admin' && !isAdmin) {
       changeTab('portfolio');
     }
-  }, [user, isAdmin, activeTab]);
+  }, [isMounted, user, isAdmin, activeTab]);
 
   return (
-    <div className="relative min-h-screen flex bg-[#080B10] text-[#F4F7FA] selection:bg-[#38BDF8] selection:text-black overflow-hidden font-sans">
-      {/* Subtle OBSIDIAN Ambient Orbs */}
-      <div className="pointer-events-none absolute top-[-150px] left-1/4 h-[600px] w-[600px] rounded-full bg-[#38BDF8]/5 blur-[160px] animate-ambient" />
-      <div className="pointer-events-none absolute bottom-[-150px] right-[-100px] h-[600px] w-[600px] rounded-full bg-[#8B5CF6]/5 blur-[160px] animate-ambient" />
-
-      {/* OBSIDIAN PULSE Left Sidebar */}
+    <div className="relative min-h-screen flex bg-[var(--app-bg)] text-[var(--text-primary)] transition-colors duration-200 overflow-hidden font-sans">
+      {/* Left Sidebar (3 Fixed Navigation Tabs) */}
       <aside
-        className={`sticky top-0 z-50 h-screen bg-[#0A0F15] border-r border-[#202A35] transition-all duration-300 flex flex-col justify-between hidden md:flex ${
-          isSidebarCollapsed ? 'w-16' : 'w-64'
+        className={`sticky top-0 z-50 h-screen bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] text-[var(--sidebar-text)] transition-all duration-200 flex flex-col justify-between hidden md:flex ${
+          isSidebarCollapsed ? 'w-16' : 'w-60'
         }`}
       >
         <div className="space-y-6 p-3">
           {/* Brand Header */}
-          <div className="flex items-center justify-between min-h-[40px]">
+          <div className="flex items-center justify-between min-h-[40px] px-1">
             {!isSidebarCollapsed ? (
               <>
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center font-extrabold text-black text-xs shadow-md shrink-0">
-                    SP
-                  </div>
-                  <h1 className="text-sm font-extrabold tracking-tight text-white">
-                    STOCKPULSE
-                  </h1>
+                <div className="flex items-center">
+                  <img
+                    src="/logo.png"
+                    alt="StockPulse — Portfolio Intelligence"
+                    width={180}
+                    height={36}
+                    style={{ height: '36px', width: 'auto', maxWidth: '180px' }}
+                    className="h-9 w-auto max-w-[180px] object-contain shrink-0"
+                  />
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
-                  className="text-[#8D99A8] hover:text-white p-1.5 rounded-lg hover:bg-[#151D26] transition shrink-0"
+                  className="text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] p-1 rounded-md hover:bg-[var(--sidebar-hover-bg)] transition shrink-0 cursor-pointer"
                   title="Collapse sidebar"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
               </>
             ) : (
-              <div className="w-full flex flex-col items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[#38BDF8] to-[#8B5CF6] flex items-center justify-center font-extrabold text-black text-xs shadow-md shrink-0">
-                  SP
-                </div>
+              <div className="w-full flex items-center justify-center">
                 <button
                   onClick={() => setIsSidebarCollapsed(false)}
-                  className="text-[#8D99A8] hover:text-white p-1 rounded-lg bg-[#111820] border border-[#202A35] hover:bg-[#151D26] transition shadow-sm mt-1"
-                  title="Expand sidebar"
+                  className="h-8 w-8 rounded-lg flex items-center justify-center shadow-sm shrink-0 transition-all cursor-pointer group relative hover:bg-[var(--sidebar-hover-bg)]"
+                  title="Click to expand sidebar"
+                  aria-label="Click to expand sidebar"
                 >
-                  <ChevronLeft className="h-3.5 w-3.5 rotate-180 text-[#38BDF8]" />
+                  <img
+                    src="/logo-icon.png"
+                    alt="StockPulse"
+                    width={32}
+                    height={32}
+                    style={{ height: '32px', width: '32px' }}
+                    className="h-8 w-8 object-contain shrink-0 group-hover:opacity-25 transition-opacity"
+                  />
+                  <ChevronLeft className="h-4 w-4 rotate-180 text-[var(--sidebar-text)] absolute hidden group-hover:block transition-transform" />
                 </button>
               </div>
             )}
           </div>
 
-          {/* Navigation Menu */}
+          {/* Navigation Menu (Strictly 3 Pages) */}
           <nav className="space-y-4">
             <div>
               {!isSidebarCollapsed && (
-                <div className="px-3 text-[10px] font-bold uppercase tracking-widest text-[#596574] mb-2">
-                  FINANCIAL WORKSPACE
+                <div className="px-2 text-[9px] font-bold uppercase tracking-widest text-[var(--sidebar-text-muted)] mb-2 font-mono">
+                  NAVIGATION
                 </div>
               )}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
+                {/* Tab 1: Portfolio & Holdings */}
                 <button
                   onClick={() => changeTab('portfolio')}
                   title="Portfolio & Holdings"
                   className={`w-full flex items-center ${
-                    isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
-                  } rounded-xl text-xs font-semibold transition ${
+                    isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+                  } rounded-lg text-xs font-semibold transition cursor-pointer ${
                     activeTab === 'portfolio'
-                      ? 'bg-[#111820] text-[#38BDF8] border border-[#38BDF8]/40 shadow-sm'
-                      : 'text-[#8D99A8] hover:text-white hover:bg-[#151D26]'
+                      ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-text)] border border-[var(--sidebar-border)] shadow-sm font-bold'
+                      : 'text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]'
                   }`}
                 >
-                  <Briefcase className="h-4 w-4 shrink-0" />
+                  <Briefcase className={`h-4 w-4 shrink-0 ${activeTab === 'portfolio' ? 'text-[var(--sidebar-text)]' : 'text-[var(--sidebar-text-muted)]'}`} />
                   {!isSidebarCollapsed && <span>Portfolio & Holdings</span>}
                 </button>
 
+                {/* Tab 2: Tax P&L Engine */}
                 <button
                   onClick={() => changeTab('calculator')}
                   title="Tax P&L Engine"
                   className={`w-full flex items-center ${
-                    isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
-                  } rounded-xl text-xs font-semibold transition ${
+                    isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+                  } rounded-lg text-xs font-semibold transition cursor-pointer ${
                     activeTab === 'calculator'
-                      ? 'bg-[#111820] text-[#38BDF8] border border-[#38BDF8]/40 shadow-sm'
-                      : 'text-[#8D99A8] hover:text-white hover:bg-[#151D26]'
+                      ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-text)] border border-[var(--sidebar-border)] shadow-sm font-bold'
+                      : 'text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]'
                   }`}
                 >
-                  <Calculator className="h-4 w-4 shrink-0 text-[#22C55E]" />
+                  <Calculator className={`h-4 w-4 shrink-0 ${activeTab === 'calculator' ? 'text-[var(--sidebar-text)]' : 'text-[var(--sidebar-text-muted)]'}`} />
                   {!isSidebarCollapsed && <span>Tax P&L Engine</span>}
                 </button>
 
+                {/* Tab 3: Enterprise Console */}
                 {isAdmin && (
                   <button
                     onClick={() => changeTab('admin')}
                     title="Enterprise Console"
                     className={`w-full flex items-center ${
-                      isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
-                    } rounded-xl text-xs font-semibold transition ${
+                      isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+                    } rounded-lg text-xs font-semibold transition cursor-pointer ${
                       activeTab === 'admin'
-                        ? 'bg-[#111820] text-[#8B5CF6] border border-[#8B5CF6]/40 shadow-sm'
-                        : 'text-[#8D99A8] hover:text-white hover:bg-[#151D26]'
+                        ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-text)] border border-[var(--sidebar-border)] shadow-sm font-bold'
+                        : 'text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]'
                     }`}
                   >
-                    <ShieldCheck className="h-4 w-4 shrink-0 text-[#8B5CF6]" />
+                    <ShieldCheck className={`h-4 w-4 shrink-0 ${activeTab === 'admin' ? 'text-[var(--sidebar-text)]' : 'text-[var(--sidebar-text-muted)]'}`} />
                     {!isSidebarCollapsed && <span>Enterprise Console</span>}
                   </button>
                 )}
@@ -190,33 +197,31 @@ function DashboardContent() {
             </div>
           </nav>
         </div>
-
-
       </aside>
 
       {/* Right Core Container */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 bg-[var(--app-bg)]">
         {/* Sticky Top Market Command Bar */}
-        <div className="sticky top-0 z-40 w-full bg-[#0A0F15]/95 backdrop-blur-md border-b border-[#202A35]">
+        <div className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--surface)]">
           <Navbar
             onLockScreen={() => setIsLocked(true)}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           />
 
           {/* Mobile Tab Switcher */}
-          <div className="md:hidden border-t border-[#202A35] bg-[#0A0F15] px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar">
+          <div className="md:hidden border-t border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 flex gap-1.5 overflow-x-auto no-scrollbar">
             <button
               onClick={() => changeTab('portfolio')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 ${
-                activeTab === 'portfolio' ? 'bg-[#111820] text-[#38BDF8] border border-[#38BDF8]/40' : 'text-[#8D99A8]'
+              className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
+                activeTab === 'portfolio' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
               }`}
             >
               Portfolio
             </button>
             <button
               onClick={() => changeTab('calculator')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 ${
-                activeTab === 'calculator' ? 'bg-[#111820] text-[#22C55E] border border-[#22C55E]/40' : 'text-[#8D99A8]'
+              className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
+                activeTab === 'calculator' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
               }`}
             >
               Tax Engine
@@ -224,8 +229,8 @@ function DashboardContent() {
             {isAdmin && (
               <button
                 onClick={() => changeTab('admin')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 ${
-                  activeTab === 'admin' ? 'bg-[#111820] text-[#8B5CF6] border border-[#8B5CF6]/40' : 'text-[#8D99A8]'
+                className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
+                  activeTab === 'admin' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
                 }`}
               >
                 Admin
@@ -234,8 +239,8 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* Main Workspace Area */}
-        <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-4 sm:px-6 lg:px-8 space-y-6 pb-24 md:pb-6">
+        {/* Main Workspace Area (The 3 Tab Components) */}
+        <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-5 sm:px-6 lg:px-8 space-y-6 pb-24 md:pb-8">
           {activeTab === 'portfolio' && (
             <PortfolioTab onOpenInCalculator={() => changeTab('calculator')} />
           )}
@@ -243,29 +248,16 @@ function DashboardContent() {
           {activeTab === 'admin' && <AdminPanel />}
         </main>
 
-        {/* Footer Bar */}
-        <footer className="border-t border-[#202A35] bg-[#0A0F15] py-4 text-xs text-[#596574] mb-14 md:mb-0">
-          <div className="mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="tracking-wide text-center sm:text-left">
-              StockPulse &copy; 2026. Financial Command Center • Secure Data Server.
-            </p>
-            <div className="flex items-center gap-2 text-[#8D99A8]">
-              <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
-              <span className="text-white font-medium">SEBI Compliant Tax Engine Active</span>
-            </div>
-          </div>
-        </footer>
-
         {/* Fixed Mobile Bottom Navigation Bar (iOS & Android Smartphone Native Experience) */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0A0F15]/95 backdrop-blur-lg border-t border-[#202A35] px-4 py-2 flex items-center justify-around shadow-2xl">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--surface)]/95 backdrop-blur-lg border-t border-[var(--border)] px-4 py-2 flex items-center justify-around shadow-2xl">
           <button
             onClick={() => changeTab('portfolio')}
             className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
-              activeTab === 'portfolio' ? 'text-[#38BDF8]' : 'text-[#8D99A8] hover:text-white'
+              activeTab === 'portfolio' ? 'text-[var(--brand-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <div className={`p-1.5 rounded-xl transition ${activeTab === 'portfolio' ? 'bg-[#38BDF8]/15 border border-[#38BDF8]/30' : ''}`}>
-              <Briefcase className="h-5 w-5" />
+            <div className={`p-1.5 rounded-lg transition ${activeTab === 'portfolio' ? 'bg-[var(--brand-primary)]/15 border border-[var(--brand-primary)]/30' : ''}`}>
+              <Briefcase className="h-4 w-4" />
             </div>
             <span>Portfolio</span>
           </button>
@@ -273,11 +265,11 @@ function DashboardContent() {
           <button
             onClick={() => changeTab('calculator')}
             className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
-              activeTab === 'calculator' ? 'text-[#22C55E]' : 'text-[#8D99A8] hover:text-white'
+              activeTab === 'calculator' ? 'text-[var(--positive)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            <div className={`p-1.5 rounded-xl transition ${activeTab === 'calculator' ? 'bg-[#22C55E]/15 border border-[#22C55E]/30' : ''}`}>
-              <Calculator className="h-5 w-5" />
+            <div className={`p-1.5 rounded-lg transition ${activeTab === 'calculator' ? 'bg-[var(--positive)]/15 border border-[var(--positive)]/30' : ''}`}>
+              <Calculator className="h-4 w-4" />
             </div>
             <span>Tax Engine</span>
           </button>
@@ -286,11 +278,11 @@ function DashboardContent() {
             <button
               onClick={() => changeTab('admin')}
               className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
-                activeTab === 'admin' ? 'text-[#8B5CF6]' : 'text-[#8D99A8] hover:text-white'
+                activeTab === 'admin' ? 'text-[var(--brand-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <div className={`p-1.5 rounded-xl transition ${activeTab === 'admin' ? 'bg-[#8B5CF6]/15 border border-[#8B5CF6]/30' : ''}`}>
-                <ShieldCheck className="h-5 w-5" />
+              <div className={`p-1.5 rounded-lg transition ${activeTab === 'admin' ? 'bg-[var(--brand-primary)]/15 border border-[var(--brand-primary)]/30' : ''}`}>
+                <ShieldCheck className="h-4 w-4" />
               </div>
               <span>Admin</span>
             </button>
@@ -324,11 +316,11 @@ function DashboardContent() {
 export default function Home() {
   return (
     <AuthProvider>
-      <StockProvider>
-        <DashboardContent />
-      </StockProvider>
+      <ThemeProvider>
+        <StockProvider>
+          <DashboardContent />
+        </StockProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
-
-

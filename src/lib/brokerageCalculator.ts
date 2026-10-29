@@ -96,18 +96,19 @@ export function calculateEquityDeliveryBrokerage(params: {
   const mtfInterestCost = isMTF
     ? mtfBorrowedAmount * (mtfDailyInterestRatePercent / 100) * mtfHoldingDays
     : 0;
-  const mtfPledgeUnpledgeFee = isMTF ? ((isGroww || isAngelOne) ? 47.20 : 35.40) : 0;
+  // Note: On Groww, MTF unpledge fee is billed as exit DP charges (₹33 Groww + ₹7 CDSL)
+  const mtfPledgeUnpledgeFee = isMTF ? (isGroww ? 0 : isAngelOne ? 47.20 : 35.40) : 0;
 
   // ----------------------------------------------------
   // 1. BROKERAGE CHARGES
   // Zerodha Normal: ₹0 | Zerodha MTF: Min(₹20, 0.3%)
-  // Groww Normal: Min(₹20, Max(5, 0.1%)) | Groww MTF: Min(₹20, Max(5, 0.1%))
+  // Groww Normal: Min(₹20, Max(5, 0.05%)) | Groww MTF: Min(₹20, Max(5, 0.05%))
   // Angel One Normal: ₹0 Buy, ₹20 Sell | Angel One MTF: Min(₹20, 0.1%)
   // ----------------------------------------------------
   let buyBrokerage = 0;
   if (isMTF) {
     if (isGroww) {
-      buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.001)) : 0;
+      buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.0005)) : 0;
     } else if (isAngelOne) {
       buyBrokerage = buyTurnover > 0 ? Math.min(20, (buyTurnover * 0.1) / 100) : 0;
     } else {
@@ -115,7 +116,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     }
   } else {
     if (isGroww) {
-      buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.001)) : 0;
+      buyBrokerage = buyTurnover > 0 ? Math.min(20, Math.max(5, buyTurnover * 0.0005)) : 0;
     } else if (isAngelOne) {
       buyBrokerage = 0;
     } else {
@@ -167,7 +168,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     let sellBrokerage = 0;
     if (isMTF) {
       if (isGroww) {
-        sellBrokerage = sellTurnover > 0 ? Math.min(20, Math.max(5, sellTurnover * 0.001)) : 0;
+        sellBrokerage = sellTurnover > 0 ? Math.min(20, Math.max(5, sellTurnover * 0.0005)) : 0;
       } else if (isAngelOne) {
         sellBrokerage = sellTurnover > 0 ? Math.min(20, (sellTurnover * 0.1) / 100) : 0;
       } else {
@@ -175,7 +176,7 @@ export function calculateEquityDeliveryBrokerage(params: {
       }
     } else {
       if (isGroww && sellTurnover > 0) {
-        sellBrokerage = Math.min(20, Math.max(5, sellTurnover * 0.001));
+        sellBrokerage = Math.min(20, Math.max(5, sellTurnover * 0.0005));
       } else if (isAngelOne && sellTurnover > 0) {
         sellBrokerage = 20;
       } else {
@@ -196,9 +197,9 @@ export function calculateEquityDeliveryBrokerage(params: {
 
     // ----------------------------------------------------
     // 7. DP CHARGES (SELL SIDE ONLY)
-    // Zerodha: ₹15.34 (13+GST) | Groww: ₹23.60 (20+GST) | Angel One: ₹20 base (+ GST in GST breakdown)
+    // Zerodha: ₹15.34 (13+GST) | Groww Delivery: ₹23.60 (20+GST) | Groww MTF: ₹47.20 (₹33 Groww + ₹7 CDSL + GST) | Angel One: ₹20 base
     // ----------------------------------------------------
-    const baseDpCharge = isAngelOne ? 20.00 : isGroww ? 20.00 : 13.00;
+    const baseDpCharge = isAngelOne ? 20.00 : isGroww ? (isMTF ? 40.00 : 20.00) : 13.00;
     const dpGst = baseDpCharge * 0.18;
     const sellDpCharges = isAngelOne ? (sellTurnover > 0 ? 20.00 : 0) : sellTurnover > (isGroww ? 100 : 0) ? (baseDpCharge + dpGst) : 0;
 
@@ -288,7 +289,7 @@ export function calculateEquityDeliveryBrokerage(params: {
   } else {
     // REVERSE MODE: Find required sell price per share
     const targetPnL = targetNetPnL || 0;
-    const baseDpCharge = isAngelOne ? 20.00 : isGroww ? 20.00 : 13.00;
+    const baseDpCharge = isAngelOne ? 20.00 : isGroww ? (isMTF ? 40.00 : 20.00) : 13.00;
     const dpGst = baseDpCharge * 0.18;
     const dpChargeTotal = isAngelOne ? 20.00 : (baseDpCharge + dpGst);
 
@@ -298,7 +299,7 @@ export function calculateEquityDeliveryBrokerage(params: {
       let estSellBrokerage = 0;
       if (isMTF) {
         if (isGroww) {
-          estSellBrokerage = estSellTurnover > 0 ? Math.min(20, Math.max(5, estSellTurnover * 0.001)) : 0;
+          estSellBrokerage = estSellTurnover > 0 ? Math.min(20, Math.max(5, estSellTurnover * 0.0005)) : 0;
         } else if (isAngelOne) {
           estSellBrokerage = estSellTurnover > 0 ? Math.min(20, (estSellTurnover * 0.1) / 100) : 0;
         } else {
@@ -306,7 +307,7 @@ export function calculateEquityDeliveryBrokerage(params: {
         }
       } else {
         if (isGroww && estSellTurnover > 0) {
-          estSellBrokerage = Math.min(20, Math.max(5, estSellTurnover * 0.001));
+          estSellBrokerage = Math.min(20, Math.max(5, estSellTurnover * 0.0005));
         } else if (isAngelOne && estSellTurnover > 0) {
           estSellBrokerage = 20;
         } else {
