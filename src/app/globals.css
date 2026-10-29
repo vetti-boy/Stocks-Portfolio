@@ -4,61 +4,67 @@
   :root,
   [data-theme="light"],
   .light {
-    /* LIGHT THEME — Ivory × Forest (Approved Design System) */
-    --app-bg: #F4F0E6;
-    --sidebar-bg: #183E32;
-    --sidebar-text: #E8F0EC;
-    --sidebar-text-muted: #9BB8AC;
-    --sidebar-border: rgba(255, 255, 255, 0.12);
-    --sidebar-active-bg: rgba(255, 255, 255, 0.16);
-    --sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+    /* LIGHT THEME — Slate × Mauve (Approved Design System) */
+    --app-bg: #F2E9E4;
+    --sidebar-bg: #22223B;
+    --sidebar-text: #F2E9E4;
+    --sidebar-text-muted: #9A8C98;
+    --sidebar-border: rgba(201, 173, 167, 0.25);
+    --sidebar-active-bg: rgba(74, 78, 105, 0.4);
+    --sidebar-hover-bg: rgba(74, 78, 105, 0.2);
 
     --surface: #FFFFFF;
     --surface-elevated: #FFFFFF;
-    --surface-muted: #ECE8DE;
-    --surface-hover: #F7F4EC;
-    --border: #E1DDD2;
-    --border-subtle: #EBE7DD;
+    --surface-muted: #F2E9E4;
+    --surface-hover: #E8DCD7;
 
-    --text-primary: #202720;
-    --text-secondary: #73766D;
-    --text-muted: #95988F;
+    --border: #E1D5D0;
+    --border-subtle: #EDE4DF;
+    --border-strong: #C9ADA7;
 
-    --brand-primary: #183E32;
-    --brand-hover: #245442;
-    --accent-primary: #183E32;
-    --accent-secondary: #D6B477;
-    --accent-gold: #D6B477;
+    --brand-primary: #4A4E69;
+    --brand-hover: #3D415B;
+    --brand-soft: #E7DEE2;
+    --accent-primary: #9A8C98;
+    --accent-secondary: #C9ADA7;
+    --accent-gold: #9A8C98;
 
-    --positive: #147D54;
-    --positive-bg: rgba(20, 125, 84, 0.08);
-    --positive-border: rgba(20, 125, 84, 0.22);
+    --text-primary: #22223B;
+    --text-secondary: #5F5C68;
+    --text-muted: #726C75;
 
-    --negative: #C74646;
-    --negative-bg: rgba(199, 70, 70, 0.08);
-    --negative-border: rgba(199, 70, 70, 0.22);
+    --positive: #167A52;
+    --positive-bg: rgba(22, 122, 82, 0.08);
+    --positive-border: rgba(22, 122, 82, 0.22);
 
-    --warning: #C96843;
-    --warning-bg: rgba(201, 104, 67, 0.08);
-    --warning-border: rgba(201, 104, 67, 0.22);
+    --negative: #C43F50;
+    --negative-bg: rgba(196, 63, 80, 0.08);
+    --negative-border: rgba(196, 63, 80, 0.22);
+
+    --warning: #925A12;
+    --warning-bg: rgba(146, 90, 18, 0.08);
+    --warning-border: rgba(146, 90, 18, 0.22);
+    --info: #4A4E69;
+
+    --focus-ring: #4A4E69;
 
     --card-bg: #FFFFFF;
-    --card-border: #E1DDD2;
-    --card-shadow: 0 4px 16px -2px rgba(24, 62, 50, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
-    --card-shadow-hover: 0 8px 24px -4px rgba(24, 62, 50, 0.1), 0 2px 6px rgba(0, 0, 0, 0.04);
+    --card-border: #E1D5D0;
+    --card-shadow: 0 4px 16px -2px rgba(34, 34, 59, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+    --card-shadow-hover: 0 8px 24px -4px rgba(34, 34, 59, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
 
     --input-bg: #FFFFFF;
-    --input-border: #D8D3C6;
-    --input-focus-border: #183E32;
-    --input-focus-ring: rgba(24, 62, 50, 0.15);
+    --input-border: #D8CCC7;
+    --input-focus-border: #4A4E69;
+    --input-focus-ring: rgba(74, 78, 105, 0.2);
 
-    --table-header-bg: #ECE8DE;
-    --table-row-hover: #F7F4EC;
-    --table-border: #E1DDD2;
+    --table-header-bg: #F2E9E4;
+    --table-row-hover: #E8DCD7;
+    --table-border: #E1D5D0;
 
-    --scrollbar-track: #ECE8DE;
-    --scrollbar-thumb: #D1CCBF;
-    --scrollbar-thumb-hover: #B5B0A2;
+    --scrollbar-track: #F2E9E4;
+    --scrollbar-thumb: #C9ADA7;
+    --scrollbar-thumb-hover: #9A8C98;
   }
 
   [data-theme="dark"],
@@ -390,10 +396,10 @@ input:-webkit-autofill:active {
 /* ========================================================
    THEME MAPPING UTILITIES
    Ensures existing UI structures gracefully adapt to both
-   Light (Ivory × Forest) and Dark (Midnight Plum × Silver)
+   Light (Slate × Mauve) and Dark (Pitch Black × Pure Gold)
    ======================================================== */
 
-/* LIGHT THEME (Ivory × Forest) */
+/* LIGHT THEME (Slate × Mauve) */
 [data-theme="light"] {
   /* Surfaces & Backgrounds */
   .bg-\[\#06080D\],
@@ -405,7 +411,15 @@ input:-webkit-autofill:active {
   .bg-\[\#0D1218\],
   .bg-\[\#111820\],
   .bg-\[\#0A0F15\],
-  .bg-\[\#0a0f16\] {
+  .bg-\[\#0a0f16\],
+  .bg-slate-900,
+  .bg-slate-900\/60,
+  .bg-slate-900\/80,
+  .bg-slate-900\/90,
+  .bg-slate-900\/95,
+  .bg-slate-850,
+  .bg-gray-900,
+  .bg-zinc-900 {
     background-color: var(--surface) !important;
   }
   .bg-\[\#101723\],
@@ -413,7 +427,11 @@ input:-webkit-autofill:active {
   .bg-\[\#152030\],
   .bg-\[\#151D26\],
   .bg-\[\#090E16\],
-  .bg-\[\#080B10\] {
+  .bg-\[\#080B10\],
+  .bg-slate-800,
+  .bg-slate-800\/60,
+  .bg-gray-800,
+  .bg-zinc-800 {
     background-color: var(--surface-muted) !important;
   }
   .hover\:bg-\[\#101723\]:hover,
@@ -421,7 +439,9 @@ input:-webkit-autofill:active {
   .hover\:bg-\[\#151D26\]:hover,
   .hover\:bg-white\/\[0\.04\]:hover,
   .hover\:bg-white\/\[0\.06\]:hover,
-  .hover\:bg-white\/\[0\.08\]:hover {
+  .hover\:bg-white\/\[0\.08\]:hover,
+  .hover\:bg-slate-800:hover,
+  .hover\:bg-slate-700:hover {
     background-color: var(--surface-hover) !important;
   }
 

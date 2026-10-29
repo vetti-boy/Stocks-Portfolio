@@ -21,7 +21,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
         <div className="flex items-center justify-between text-[11px] font-mono font-medium text-[var(--text-secondary)]">
           <span>Appearance</span>
           <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">
-            {theme === 'light' ? 'Ivory × Forest' : 'Royal Black'}
+            {theme === 'light' ? 'Slate × Mauve' : 'Dark Theme'}
           </span>
         </div>
       )}
@@ -37,7 +37,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
           type="button"
           role="radio"
           aria-checked={theme === 'light'}
-          aria-label="Switch to Light Theme (Ivory × Forest)"
+          aria-label="Switch to Light Theme (Slate × Mauve)"
           onClick={() => setTheme('light')}
           className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-semibold transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
             theme === 'light'
@@ -45,7 +45,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'
           }`}
         >
-          <Sun className="h-3.5 w-3.5 shrink-0 text-[#D6B477]" />
+          <Sun className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)]" />
           <span>Light</span>
         </button>
 
@@ -54,7 +54,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
           type="button"
           role="radio"
           aria-checked={theme === 'dark'}
-          aria-label="Switch to Dark Theme (Royal Black)"
+          aria-label="Switch to Dark Theme"
           onClick={() => setTheme('dark')}
           className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-semibold transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
             theme === 'dark'
