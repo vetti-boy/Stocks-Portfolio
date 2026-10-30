@@ -21,7 +21,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
         <div className="flex items-center justify-between text-[11px] font-mono font-medium text-[var(--text-secondary)]">
           <span>Appearance</span>
           <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">
-            {theme === 'light' ? 'Slate × Mauve' : 'Slate × Mauve Night'}
+            {theme === 'light' ? 'Slate × Mauve' : 'Black × Mauve'}
           </span>
         </div>
       )}
@@ -54,7 +54,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
           type="button"
           role="radio"
           aria-checked={theme === 'dark'}
-          aria-label="Switch to Dark Theme (Slate × Mauve Night)"
+          aria-label="Switch to Dark Theme (Black × Mauve)"
           onClick={() => setTheme('dark')}
           className={`flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-semibold transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] ${
             theme === 'dark'

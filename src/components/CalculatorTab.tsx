@@ -118,10 +118,10 @@ export const CalculatorTab: React.FC = () => {
   const [tradeType, setTradeType] = useState<'DELIVERY' | 'MTF'>('DELIVERY');
 
   // Input states in INR
-  const [quantity, setQuantity] = useState<string>('100');
-  const [buyPrice, setBuyPrice] = useState<string>('100.00');
-  const [sellPriceInput, setSellPriceInput] = useState<string>('110.00');
-  const [targetNetPnLInput, setTargetNetPnLInput] = useState<string>('950.00');
+  const [quantity, setQuantity] = useState<string>('0');
+  const [buyPrice, setBuyPrice] = useState<string>('0.00');
+  const [sellPriceInput, setSellPriceInput] = useState<string>('0.00');
+  const [targetNetPnLInput, setTargetNetPnLInput] = useState<string>('0.00');
   const [exchange, setExchange] = useState<'NSE' | 'BSE'>('NSE');
 
   // MTF Inputs & Multiplier Intelligence
@@ -183,7 +183,7 @@ export const CalculatorTab: React.FC = () => {
 
   // Itemized Calculations (Forward or Reverse mode depending on activeInput)
   const result = useMemo(() => {
-    const qty = Math.max(0.0001, parseFloat(quantity) || 0);
+    const qty = Math.max(0, parseFloat(quantity) || 0);
     const buyP = Math.max(0, parseFloat(buyPrice) || 0);
     const sellP = Math.max(0, parseFloat(sellPriceInput) || 0);
     const targetPnL = parseFloat(targetNetPnLInput) || 0;
@@ -396,6 +396,7 @@ export const CalculatorTab: React.FC = () => {
                 <input
                   type="number"
                   value={quantity}
+                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => setQuantity(e.target.value)}
                   className="w-full bg-[#080B10] text-[#F4F7FA] border border-[#202A35] rounded-lg p-2.5 font-mono text-sm focus:border-[#38BDF8] outline-none"
                 />
@@ -408,6 +409,7 @@ export const CalculatorTab: React.FC = () => {
                 <input
                   type="number"
                   value={buyPrice}
+                  onFocus={(e) => e.currentTarget.select()}
                   onChange={(e) => setBuyPrice(e.target.value)}
                   className="w-full bg-[#080B10] text-[#F4F7FA] border border-[#202A35] rounded-lg p-2.5 font-mono text-sm focus:border-[#38BDF8] outline-none"
                 />
@@ -566,7 +568,10 @@ export const CalculatorTab: React.FC = () => {
                 <input
                   type="number"
                   value={sellPriceInput}
-                  onFocus={() => setActiveInput('sellPrice')}
+                  onFocus={(e) => {
+                    setActiveInput('sellPrice');
+                    e.currentTarget.select();
+                  }}
                   onChange={(e) => {
                     setActiveInput('sellPrice');
                     setSellPriceInput(e.target.value);
@@ -598,7 +603,10 @@ export const CalculatorTab: React.FC = () => {
                 <input
                   type="number"
                   value={targetNetPnLInput}
-                  onFocus={() => setActiveInput('targetNetPnL')}
+                  onFocus={(e) => {
+                    setActiveInput('targetNetPnL');
+                    e.currentTarget.select();
+                  }}
                   onChange={(e) => {
                     setActiveInput('targetNetPnL');
                     setTargetNetPnLInput(e.target.value);

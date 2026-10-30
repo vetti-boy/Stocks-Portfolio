@@ -11,7 +11,10 @@ This file maintains a strict chronological record of all application versions, f
   - KPIs: net realized P&L and ROI, win rate and profit factor, average per trade, charges paid, best and worst trade; per-stock profit ranking.
   - Ledger with expandable charges breakdown, CSV / JSON export of the filtered trades, delete with confirmation.
   - Date maths and aggregation live in a pure module and were verified with 41 checks (week/month/FY boundaries, leap years, gap filling, legacy records).
-- **Brand & theme**: animated SVG app icon (replaces the black/gold PNGs), `BrandLogo` component, dark theme rebuilt as the night version of the Slate x Mauve light palette, light-theme contrast fixes for pale amber / indigo text.
+- **Edit sold trades**: pencil button on every ledger row opens an editor for buy/sell date, buy/sell price and quantity with a live recalculation (holding period, charges, net P&L) and validation; trades that never stored a buy date are flagged "est." and prompt for the real one.
+- **MTF funding split**: the ledger shows the invested amount under the sale value; on MTF trades, hover / tap shows your own money vs the broker-funded MTF amount, share counts, interest paid and return on your own capital.
+- **Tax calculator** now starts at 0 shares / 0.00 prices (selects on focus; zero quantity no longer yields phantom DP charges).
+- **Brand & theme**: animated SVG app icon (replaces the black/gold PNGs), `BrandLogo` component, dark theme is a true-black base with slate-purple secondary surfaces and mauve accents, light-theme contrast fixes for pale amber / indigo text, and hardcoded dark panels (Mark-Sold fee breakdown, MTF cash/broker split, white-alpha borders) now follow the active theme.
 - **Portfolio mascot "Pulse"**: jumps when the portfolio is in profit, cries when in loss, idles otherwise.
 - **Market sign**: header market status is now a hanging OPEN / CLOSED shop board (no exchange text).
 - **Command palette redesign**: theme-native colours, borderless search field, stable active-row marker, empty state, scroll-into-view on arrow keys; phones get a search button to open it.

@@ -24,6 +24,7 @@ interface StockContextType {
     customBuyDate?: string
   ) => void;
   deleteTradeRecord: (id: string) => void;
+  updateTradeRecord: (id: string, updated: Partial<TradeRecord>) => void;
   addToWatchlist: (item: Omit<WatchlistItem, 'history'>) => void;
   removeFromWatchlist: (symbol: string) => void;
   updateTaxSettings: (settings: Partial<TaxSettings>) => void;
@@ -653,6 +654,22 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     persistPortfolio(holdingsRef.current, watchlistRef.current, nextHistory, taxSettingsRef.current);
   };
 
+  const updateTradeRecord = (id: string, updated: Partial<TradeRecord>) => {
+    if (updated.quantity !== undefined && !(isFiniteNum(updated.quantity) && updated.quantity > 0)) return;
+    if (updated.price !== undefined && !(isFiniteNum(updated.price) && updated.price >= 0)) return;
+    if (updated.buyPrice !== undefined && !(isFiniteNum(updated.buyPrice) && updated.buyPrice >= 0)) return;
+    const nextHistory = tradeHistoryRef.current.map((t) => {
+      if (t.id !== id) return t;
+      const merged = { ...t, ...updated };
+      // Keep the sale value in step with the edited price / quantity
+      merged.totalValue = +(merged.price * merged.quantity).toFixed(2);
+      return merged;
+    });
+    tradeHistoryRef.current = nextHistory;
+    setTradeHistory(nextHistory);
+    persistPortfolio(holdingsRef.current, watchlistRef.current, nextHistory, taxSettingsRef.current);
+  };
+
   const addToWatchlist = (item: Omit<WatchlistItem, 'history'>) => {
     if (watchlistRef.current.some((w) => w.symbol === item.symbol)) return;
     const newItem: WatchlistItem = {
@@ -752,6 +769,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateHolding,
         sellHolding,
         deleteTradeRecord,
+        updateTradeRecord,
         addToWatchlist,
         removeFromWatchlist,
         updateTaxSettings,

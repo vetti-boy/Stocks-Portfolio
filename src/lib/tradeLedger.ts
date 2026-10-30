@@ -9,6 +9,8 @@ export interface LedgerTrade extends TradeRecord {
   buyP: number;
   sellP: number;
   buyDate: string;
+  /** False when the record never stored a buy date (the ledger then has to guess one). */
+  buyDateRecorded: boolean;
   /** Date the trade was sold (YYYY-MM-DD). This is the date realized P&L is attributed to. */
   soldOn: string;
   grossInvested: number;
@@ -159,6 +161,7 @@ export function buildTradeLedger(
       buyP,
       sellP,
       buyDate: resolvedBuyDate,
+      buyDateRecorded: !!toYMD(t.buyDate),
       soldOn,
       grossInvested: buyP * qty,
       totalSaleValue,

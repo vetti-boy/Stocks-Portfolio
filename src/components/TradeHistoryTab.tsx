@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -27,8 +28,11 @@ import {
   CalendarRange,
   X,
   Scale,
+  Pencil,
+  Info,
 } from 'lucide-react';
 import { useStock } from '@/context/StockContext';
+import { EditTradeModal } from '@/components/EditTradeModal';
 import {
   LedgerTrade,
   PeriodGroup,
@@ -79,14 +83,127 @@ const axisMoney = (n: number) => {
 
 const brokerName = (b?: string) => (b === 'ANGELONE' ? 'Angel One' : b === 'GROWW' ? 'Groww' : 'Zerodha');
 
+
+/** Invested amount under the sale value. For MTF trades, hover / tap shows how it was funded. */
+const InvestedLine: React.FC<{ t: LedgerTrade; className?: string }> = ({ t, className = '' }) => {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!pinned) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !btnRef.current?.contains(e.target as Node)) {
+        setPinned(false);
+        setRect(null);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [pinned]);
+
+  const invested = t.grossInvested;
+  if (!t.isMTF) {
+    return <div className={`font-sans text-[10px] text-[var(--text-secondary)] ${className}`}>Invested ₹{money(invested)}</div>;
+  }
+
+  const own = t.calc.ownInvestment ?? 0;
+  const funded = t.calc.mtfBorrowedAmount ?? 0;
+  const interest = (t.calc.mtfInterestCost ?? 0) + (t.calc.mtfPledgeUnpledgeFee ?? 0);
+  const ownReturn = t.calc.mtfNetReturnOnOwnCapitalPercent ?? 0;
+  const total = own + funded || 1;
+  const ownPct = (own / total) * 100;
+  const show = () => btnRef.current && setRect(btnRef.current.getBoundingClientRect());
+  const W = 250;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
+  const style: React.CSSProperties | undefined = rect
+    ? {
+        width: W,
+        left: Math.min(Math.max(8, rect.right - W), vw - W - 8),
+        ...(rect.bottom + 230 > vh ? { bottom: vh - rect.top + 8 } : { top: rect.bottom + 8 }),
+      }
+    : undefined;
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onMouseEnter={show}
+        onMouseLeave={() => !pinned && setRect(null)}
+        onFocus={show}
+        onBlur={() => !pinned && setRect(null)}
+        onClick={() => {
+          show();
+          setPinned((p) => !p);
+        }}
+        aria-label="Show how this MTF trade was funded"
+        className={`inline-flex cursor-help items-center gap-1 font-sans text-[10px] text-[var(--text-secondary)] underline decoration-dotted underline-offset-2 hover:text-[var(--text-primary)] ${className}`}
+      >
+        Invested ₹{money(invested)}
+        <Info className="h-2.5 w-2.5 text-[var(--warning)]" />
+      </button>
+      {rect && style && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={style}
+            className="fixed z-[60] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-3 text-left font-sans text-xs shadow-2xl"
+          >
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+              How this was funded · MTF {t.mtfMultiplier || 2.5}x
+            </div>
+            <div className="mb-2.5 flex h-2 overflow-hidden rounded-full">
+              <div style={{ width: `${ownPct}%`, background: 'var(--positive)' }} />
+              <div style={{ width: `${100 - ownPct}%`, background: 'var(--warning)' }} />
+            </div>
+            <div className="space-y-1.5 font-mono">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-sans text-[var(--positive)]">● Your money ({ownPct.toFixed(0)}%)</span>
+                <span className="font-bold text-[var(--text-primary)]">₹{money(own)}</span>
+              </div>
+              {t.calc.ownQuantity ? <div className="text-right font-sans text-[10px] text-[var(--text-muted)]">{t.calc.ownQuantity} shares</div> : null}
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-sans text-[var(--warning)]">● MTF fund ({(100 - ownPct).toFixed(0)}%)</span>
+                <span className="font-bold text-[var(--text-primary)]">₹{money(funded)}</span>
+              </div>
+              {t.calc.mtfQuantity ? <div className="text-right font-sans text-[10px] text-[var(--text-muted)]">{t.calc.mtfQuantity} shares</div> : null}
+              <div className="flex items-baseline justify-between gap-2 border-t border-[var(--border)] pt-1.5">
+                <span className="font-sans text-[var(--text-secondary)]">Total invested</span>
+                <span className="font-bold text-[var(--text-primary)]">₹{money(invested)}</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-sans text-[var(--text-secondary)]">Interest ({t.calc.mtfHoldingDays ?? 0}d) + pledge</span>
+                <span className="font-bold text-[var(--warning)]">-₹{money(interest)}</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-sans text-[var(--text-secondary)]">Return on your money</span>
+                <span className={`font-bold ${t.netPnL >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>
+                  {ownReturn >= 0 ? '+' : ''}{ownReturn.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
+  );
+};
+
 export const TradeHistoryTab: React.FC = () => {
-  const { tradeHistory, holdings, taxSettings, deleteTradeRecord } = useStock();
+  const { tradeHistory, holdings, taxSettings, deleteTradeRecord, updateTradeRecord } = useStock();
 
   const [preset, setPreset] = useState<RangePreset>('all');
   const [custom, setCustom] = useState<{ from: string; to: string }>({ from: '', to: '' });
   const [groupOverride, setGroupOverride] = useState<GroupBy | null>(null);
   const [period, setPeriod] = useState<PeriodGroup | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<LedgerTrade | null>(null);
 
   const ledger = useMemo(() => buildTradeLedger(tradeHistory, holdings, taxSettings), [tradeHistory, holdings, taxSettings]);
 
@@ -578,13 +695,23 @@ export const TradeHistoryTab: React.FC = () => {
                             <td className="px-4 py-3.5 text-right font-bold text-[var(--text-primary)]">{t.quantity}</td>
                             <td className="px-4 py-3.5 text-right">
                               <div className="font-bold text-[var(--text-primary)]">₹{money(t.buyP)}</div>
-                              <div className="font-sans text-[10px] text-[var(--text-secondary)]">{toYMD(t.buyDate) ? fmtDate(toYMD(t.buyDate)!) : t.buyDate}</div>
+                              <div className="font-sans text-[10px] text-[var(--text-secondary)]">
+                                {toYMD(t.buyDate) ? fmtDate(toYMD(t.buyDate)!) : t.buyDate}
+                                {!t.buyDateRecorded && (
+                                  <button onClick={() => setEditing(t)} title="No buy date was saved for this trade. Click to set it." className="ml-1 inline-flex cursor-pointer items-center gap-0.5 rounded bg-[var(--warning-bg)] px-1 text-[9px] font-semibold text-[var(--warning)]">
+                                    <Info className="h-2.5 w-2.5" />est.
+                                  </button>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3.5 text-right">
                               <div className="font-bold text-[var(--text-primary)]">₹{money(t.sellP)}</div>
                               <div className="font-sans text-[10px] text-[var(--text-secondary)]">{fmtDate(t.soldOn)}</div>
                             </td>
-                            <td className="px-4 py-3.5 text-right font-bold text-[var(--text-primary)]">₹{money(t.totalSaleValue)}</td>
+                            <td className="px-4 py-3.5 text-right">
+                              <div className="font-bold text-[var(--text-primary)]">₹{money(t.totalSaleValue)}</div>
+                              <InvestedLine t={t} />
+                            </td>
                             <td className="px-4 py-3.5 text-right">
                               <button
                                 onClick={() => setExpandedId(open ? null : t.id)}
@@ -601,15 +728,25 @@ export const TradeHistoryTab: React.FC = () => {
                               <span className={`block text-[10px] ${tone(t.netPnL)}`}>({t.netRoiPercent >= 0 ? '+' : ''}{t.netRoiPercent.toFixed(2)}%)</span>
                               <span className="block font-sans text-[9px] text-[var(--text-secondary)]">Gross {signed(t.grossPnL)}</span>
                             </td>
-                            <td className="px-4 py-3.5 text-center">
-                              <button
-                                onClick={() => handleDelete(t)}
-                                title="Remove trade log entry"
-                                aria-label={`Remove ${t.symbol} trade`}
-                                className="cursor-pointer rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--negative-bg)] hover:text-[var(--negative)]"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                            <td className="px-3 py-3.5 text-center">
+                              <div className="flex items-center justify-center gap-0.5">
+                                <button
+                                  onClick={() => setEditing(t)}
+                                  title="Edit buy / sell details"
+                                  aria-label={`Edit ${t.symbol} trade`}
+                                  className="cursor-pointer rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--brand-soft)] hover:text-[var(--brand-primary)]"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(t)}
+                                  title="Remove trade log entry"
+                                  aria-label={`Remove ${t.symbol} trade`}
+                                  className="cursor-pointer rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--negative-bg)] hover:text-[var(--negative)]"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                           {open && (
@@ -658,12 +795,20 @@ export const TradeHistoryTab: React.FC = () => {
 
                       <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2.5 text-xs">
                         <div>
-                          <span className="block text-[9px] uppercase text-[var(--text-secondary)]">Bought</span>
+                          <span className="block text-[9px] uppercase text-[var(--text-secondary)]">Bought{toYMD(t.buyDate) ? ` · ${fmtDate(toYMD(t.buyDate)!)}` : ''}{!t.buyDateRecorded ? ' (est.)' : ''}</span>
                           <span className="font-mono font-bold text-[var(--text-primary)]">₹{money(t.buyP)}</span>
                         </div>
                         <div className="text-right">
                           <span className="block text-[9px] uppercase text-[var(--text-secondary)]">Sold</span>
                           <span className="font-mono font-bold text-[var(--text-primary)]">₹{money(t.sellP)}</span>
+                        </div>
+                        <div className="border-t border-[var(--border)] pt-2">
+                          <span className="block text-[9px] uppercase text-[var(--text-secondary)]">Sale value</span>
+                          <span className="font-mono font-bold text-[var(--text-primary)]">₹{money(t.totalSaleValue)}</span>
+                        </div>
+                        <div className="border-t border-[var(--border)] pt-2 text-right">
+                          <span className="block text-[9px] uppercase text-[var(--text-secondary)]">Invested</span>
+                          <InvestedLine t={t} className="!text-xs font-mono font-bold !text-[var(--text-primary)]" />
                         </div>
                       </div>
 
@@ -676,13 +821,22 @@ export const TradeHistoryTab: React.FC = () => {
                           Charges -₹{money(t.totalDeductions)}
                           <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-secondary)] transition-transform ${open ? 'rotate-180' : ''}`} />
                         </button>
-                        <button
-                          onClick={() => handleDelete(t)}
-                          aria-label={`Remove ${t.symbol} trade`}
-                          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--negative-bg)] hover:text-[var(--negative)]"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setEditing(t)}
+                            aria-label={`Edit ${t.symbol} trade`}
+                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand-primary)]"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(t)}
+                            aria-label={`Remove ${t.symbol} trade`}
+                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--negative-bg)] hover:text-[var(--negative)]"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
 
                       {open && (
@@ -707,6 +861,17 @@ export const TradeHistoryTab: React.FC = () => {
           )}
         </div>
       </div>
+
+      {editing && (
+        <EditTradeModal
+          trade={editing}
+          onClose={() => setEditing(null)}
+          onSave={(updates) => {
+            updateTradeRecord(editing.id, updates);
+            setEditing(null);
+          }}
+        />
+      )}
     </div>
   );
 };

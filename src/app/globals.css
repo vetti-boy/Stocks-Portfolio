@@ -70,27 +70,27 @@
 
   [data-theme="dark"],
   .dark {
-    /* DARK THEME — Slate × Mauve Night (the light palette after dusk: same hues, deep-slate surfaces) */
-    --app-bg: #181826;
-    --sidebar-bg: #11111B;
+    /* DARK THEME — Black × Mauve: true-black base, slate-purple as the secondary (borders, hover, selection), mauve as the accent */
+    --app-bg: #000000;
+    --sidebar-bg: #000000;
     --sidebar-text: #F2E9E4;
     --sidebar-text-muted: #9A8C98;
-    --sidebar-border: rgba(201, 173, 167, 0.14);
-    --sidebar-active-bg: rgba(154, 140, 152, 0.18);
-    --sidebar-hover-bg: rgba(154, 140, 152, 0.09);
+    --sidebar-border: rgba(154, 140, 152, 0.16);
+    --sidebar-active-bg: rgba(74, 78, 105, 0.45);
+    --sidebar-hover-bg: rgba(74, 78, 105, 0.22);
 
-    --surface: #222238;
-    --surface-elevated: #2A2A44;
-    --surface-muted: #1D1D2F;
-    --surface-hover: #32324F;
+    --surface: #0C0C12;
+    --surface-elevated: #14141D;
+    --surface-muted: #08080D;
+    --surface-hover: #1C1C2B;
 
-    --border: #36364F;
-    --border-subtle: #2B2B42;
+    --border: #262638;
+    --border-subtle: #1A1A27;
     --border-strong: #4A4E69;
 
     --brand-primary: #C9ADA7;
     --brand-hover: #DCC5C0;
-    --brand-soft: rgba(201, 173, 167, 0.14);
+    --brand-soft: rgba(201, 173, 167, 0.13);
     --accent-primary: #9A8C98;
     --accent-secondary: #C9ADA7;
     --accent-gold: #C9ADA7;
@@ -115,22 +115,22 @@
 
     --focus-ring: #C9ADA7;
 
-    --card-bg: #222238;
-    --card-border: #36364F;
-    --card-shadow: 0 6px 24px rgba(8, 8, 16, 0.45), 0 1px 3px rgba(8, 8, 16, 0.3);
-    --card-shadow-hover: 0 10px 32px rgba(8, 8, 16, 0.55), 0 0 18px rgba(201, 173, 167, 0.1);
+    --card-bg: #0C0C12;
+    --card-border: #262638;
+    --card-shadow: 0 6px 24px rgba(0, 0, 0, 0.75), 0 1px 3px rgba(0, 0, 0, 0.5);
+    --card-shadow-hover: 0 10px 32px rgba(0, 0, 0, 0.85), 0 0 18px rgba(154, 140, 152, 0.12);
 
-    --input-bg: #1A1A2A;
-    --input-border: #3D3D5A;
+    --input-bg: #050508;
+    --input-border: #2C2C42;
     --input-focus-border: #C9ADA7;
     --input-focus-ring: rgba(201, 173, 167, 0.25);
 
-    --table-header-bg: #1D1D2F;
-    --table-row-hover: #2A2A44;
-    --table-border: #2F2F48;
+    --table-header-bg: #08080D;
+    --table-row-hover: #14141D;
+    --table-border: #1E1E2E;
 
-    --scrollbar-track: #181826;
-    --scrollbar-thumb: #3D3D5A;
+    --scrollbar-track: #000000;
+    --scrollbar-thumb: #2A2A40;
     --scrollbar-thumb-hover: #4A4E69;
   }
 
@@ -601,7 +601,7 @@ input:-webkit-autofill:active {
   }
 }
 
-/* DARK THEME (Slate × Mauve Night System) */
+/* DARK THEME (Black × Mauve System) */
 [data-theme="dark"] {
   /* Surfaces & Backgrounds */
   .bg-\[\#06080D\],
@@ -1029,4 +1029,62 @@ html[data-theme] input.palette-input::placeholder {
 }
 @media (prefers-reduced-motion: reduce) {
   .palette-panel { animation: none; }
+}
+
+/* ========================================================
+   THEME MAPPING — second pass
+   Inset panels, white-alpha borders and opacity variants that the first
+   mapping pass missed (they are separate class names in Tailwind). Modal
+   backdrops (bg-black/..) are intentionally NOT remapped.
+   ======================================================== */
+[data-theme="light"] {
+  .bg-slate-950,
+  .bg-slate-950\/60,
+  .bg-slate-950\/80,
+  .bg-\[\#090E16\]\/90,
+  .bg-\[\#05070d\]\/60,
+  .bg-\[\#111820\]\/60,
+  .bg-\[\#111820\]\/80,
+  .bg-\[\#080B10\]\/40,
+  .bg-white\/5,
+  .bg-white\/10 {
+    background-color: var(--surface-muted) !important;
+  }
+  .hover\:bg-\[\#111820\]\/60:hover,
+  .hover\:bg-\[\#111820\]\/80:hover {
+    background-color: var(--surface-hover) !important;
+  }
+  .border-white\/5,
+  .border-white\/10,
+  .border-white\/20,
+  .border-\[\#202A35\]\/50 {
+    border-color: var(--border) !important;
+  }
+  .divide-white\/5 > :not(:last-child),
+  .divide-white\/10 > :not(:last-child) {
+    border-color: var(--border) !important;
+  }
+}
+
+[data-theme="dark"] {
+  .bg-slate-950,
+  .bg-slate-950\/60,
+  .bg-slate-950\/80,
+  .bg-\[\#090E16\]\/90,
+  .bg-\[\#05070d\]\/60,
+  .bg-\[\#111820\]\/60,
+  .bg-\[\#111820\]\/80,
+  .bg-\[\#080B10\]\/40 {
+    background-color: var(--surface-muted) !important;
+  }
+  .hover\:bg-\[\#111820\]\/60:hover,
+  .hover\:bg-\[\#111820\]\/80:hover {
+    background-color: var(--surface-hover) !important;
+  }
+  .border-white\/5,
+  .border-white\/10,
+  .border-white\/20,
+  .border-\[\#202A35\]\/50 {
+    border-color: var(--border) !important;
+  }
 }
