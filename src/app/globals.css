@@ -573,6 +573,17 @@ input:-webkit-autofill:active {
   .text-amber-400 {
     color: var(--warning) !important;
   }
+  /* Pale tints designed for dark surfaces are unreadable on light cards */
+  .text-amber-200\/70,
+  .text-amber-300,
+  .text-amber-300\/90,
+  .text-amber-300\/80 {
+    color: var(--warning) !important;
+  }
+  .text-indigo-300,
+  .text-indigo-400 {
+    color: var(--brand-primary) !important;
+  }
 
   /* Tables in Light Theme */
   thead {
@@ -771,4 +782,138 @@ input:-webkit-autofill:active {
   tr:hover td {
     background-color: var(--table-row-hover) !important;
   }
+}
+
+/* ========================================================
+   PORTFOLIO MASCOT (Pulse the bull)
+   Happy = jumps for joy, Sad = cries, Idle = breathes & blinks
+   ======================================================== */
+.mascot * {
+  transform-box: view-box;
+}
+
+.mascot-body {
+  transform-origin: 60px 119px;
+}
+
+/* ---- Happy: squash, leap, hang, land ---- */
+.mascot-happy .mascot-body {
+  animation: mascot-jump 1.05s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+}
+.mascot-happy .mascot-shadow {
+  transform-origin: 60px 122px;
+  animation: mascot-shadow-jump 1.05s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+}
+.mascot-happy .mascot-arm-l {
+  transform-origin: 21px 76px;
+  animation: mascot-cheer-l 1.05s ease-in-out infinite;
+}
+.mascot-happy .mascot-arm-r {
+  transform-origin: 99px 76px;
+  animation: mascot-cheer-r 1.05s ease-in-out infinite;
+}
+.mascot-spark {
+  transform-origin: center;
+  transform-box: fill-box;
+  opacity: 0;
+  animation: mascot-twinkle 1.6s ease-in-out infinite;
+}
+.mascot-spark.s2 { animation-delay: 0.3s; }
+.mascot-spark.s3 { animation-delay: 0.6s; }
+.mascot-spark.s4 { animation-delay: 0.9s; }
+.mascot-spark.s5 { animation-delay: 1.2s; }
+
+@keyframes mascot-jump {
+  0%   { transform: translateY(0) scale(1, 1); }
+  12%  { transform: translateY(0) scale(1.1, 0.86); }
+  38%  { transform: translateY(-34px) scale(0.94, 1.1); }
+  55%  { transform: translateY(-34px) scale(0.97, 1.04); }
+  82%  { transform: translateY(0) scale(1.08, 0.88); }
+  92%  { transform: translateY(0) scale(0.97, 1.04); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes mascot-shadow-jump {
+  0%, 12%, 82%, 100% { transform: scale(1); opacity: 0.22; }
+  38%, 55% { transform: scale(0.6); opacity: 0.1; }
+}
+@keyframes mascot-cheer-l {
+  0%, 12%, 100% { transform: rotate(0deg); }
+  38%, 60% { transform: rotate(150deg); }
+}
+@keyframes mascot-cheer-r {
+  0%, 12%, 100% { transform: rotate(0deg); }
+  38%, 60% { transform: rotate(-150deg); }
+}
+@keyframes mascot-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.2) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.1) rotate(25deg); }
+}
+
+/* ---- Sad: slump, sob, cry ---- */
+.mascot-sad .mascot-body {
+  animation: mascot-sob 1.5s ease-in-out infinite;
+}
+.mascot-sad .mascot-arm-l {
+  transform-origin: 21px 76px;
+  animation: mascot-wipe-l 3s ease-in-out infinite;
+}
+.mascot-sad .mascot-arm-r {
+  transform-origin: 99px 76px;
+  transform: rotate(-6deg);
+}
+.mascot-tear {
+  opacity: 0;
+  animation: mascot-tear-fall 1.3s ease-in infinite;
+}
+.mascot-tear.t3, .mascot-tear.t4 { animation-delay: 0.65s; }
+.mascot-cloud { animation: mascot-cloud-drift 4s ease-in-out infinite; }
+.mascot-rain { opacity: 0; animation: mascot-rain-fall 0.9s linear infinite; }
+.mascot-rain.r2 { animation-delay: 0.3s; }
+.mascot-rain.r3 { animation-delay: 0.6s; }
+
+@keyframes mascot-sob {
+  0%, 100% { transform: translateY(2px) scale(1, 0.96) rotate(0deg); }
+  25% { transform: translateY(0) scale(1, 1) rotate(-1.5deg); }
+  50% { transform: translateY(2px) scale(1, 0.96) rotate(0deg); }
+  75% { transform: translateY(0) scale(1, 1) rotate(1.5deg); }
+}
+@keyframes mascot-wipe-l {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  70%, 85% { transform: rotate(-140deg); }
+}
+@keyframes mascot-tear-fall {
+  0% { opacity: 0; transform: translateY(-2px) scale(0.5); }
+  20% { opacity: 1; transform: translateY(2px) scale(1); }
+  100% { opacity: 0; transform: translateY(26px) scale(1); }
+}
+@keyframes mascot-cloud-drift {
+  0%, 100% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+}
+@keyframes mascot-rain-fall {
+  0% { opacity: 0; transform: translateY(0); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(14px); }
+}
+
+/* ---- Idle: breathe + blink ---- */
+.mascot-idle .mascot-body {
+  animation: mascot-breathe 3s ease-in-out infinite;
+}
+.mascot-idle .mascot-eye, .mascot-sad .mascot-eye {
+  transform-origin: 60px 67px;
+  animation: mascot-blink 4s infinite;
+}
+@keyframes mascot-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.02, 0.97); }
+}
+@keyframes mascot-blink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  97% { transform: scaleY(0.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot *, .mascot-cloud, .mascot-tear, .mascot-rain { animation: none !important; }
+  .mascot-tear { opacity: 1; }
 }

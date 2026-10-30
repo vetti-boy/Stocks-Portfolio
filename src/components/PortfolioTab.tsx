@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useStock } from '@/context/StockContext';
+import { PortfolioMascot } from '@/components/PortfolioMascot';
 import {
   Plus,
   Trash2,
@@ -703,6 +704,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
   return (
     <div className="space-y-8">
+      <PortfolioMascot netPnL={totalNetPnL} pnlPercent={totalPnLPercent} hasHoldings={holdings.length > 0} />
+
       {/* Top Stat Cards Grid (Double-Bezel Architecture) */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Total Invested */}
@@ -862,7 +865,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2.5">
               <span>Stock Holdings</span>
-              <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-300 border border-indigo-500/30">
+              <span className="cursor-default select-none rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-300 border border-indigo-500/30">
                 {holdings.length} Assets
               </span>
             </h2>
