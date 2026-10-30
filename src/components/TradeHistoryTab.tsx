@@ -4,9 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ResponsiveContainer,
-  ComposedChart,
+  BarChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -506,7 +505,7 @@ export const TradeHistoryTab: React.FC = () => {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-mono text-sm font-bold text-[var(--text-primary)]">Profit by {groupWord}</h3>
-              <p className="text-[11px] text-[var(--text-secondary)]">Bars are each {groupWord}&apos;s net P&amp;L · the line is your running total. Tap a bar to see just those trades.</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">Each bar is that {groupWord}&apos;s net P&amp;L (green = profit, red = loss). Hover for the running total, tap a bar to see just those trades.</p>
             </div>
             <div className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-0.5" role="radiogroup" aria-label="Group results by">
               {GROUPS.map((g) => (
@@ -532,7 +531,7 @@ export const TradeHistoryTab: React.FC = () => {
           ) : (
             <div className="h-[230px] w-full sm:h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={groups} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart data={groups} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickLine={false} axisLine={{ stroke: 'var(--border)' }} interval="preserveStartEnd" minTickGap={14} />
                   <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={axisMoney} width={52} />
@@ -547,8 +546,7 @@ export const TradeHistoryTab: React.FC = () => {
                       />
                     ))}
                   </Bar>
-                  <Line type="monotone" dataKey="cumulative" stroke="var(--brand-primary)" strokeWidth={2} dot={groups.length <= 24} activeDot={{ r: 4 }} />
-                </ComposedChart>
+                </BarChart>
               </ResponsiveContainer>
             </div>
           )}
