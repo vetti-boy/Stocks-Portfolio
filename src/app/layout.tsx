@@ -19,6 +19,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover", // lets the app use the full iPhone screen; safe-area insets keep controls clear of the notch / home bar
   themeColor: "#22223B",
 };
 
@@ -26,6 +27,14 @@ export const metadata: Metadata = {
   title: "StockPulse",
   description:
     "Real-time Indian stock portfolio tracker, live market quotes, STCG/LTCG tax breakdown, SEBI charge calculator, and secure data sync.",
+  manifest: "/manifest.webmanifest",
+  applicationName: "StockPulse",
+  appleWebApp: {
+    capable: true,
+    title: "StockPulse",
+    statusBarStyle: "black",
+  },
+  formatDetection: { telephone: false },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

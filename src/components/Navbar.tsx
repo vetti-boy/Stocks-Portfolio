@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { MarketSign } from '@/components/MarketSign';
 import { useStock } from '@/context/StockContext';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import {
@@ -73,24 +74,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
             </span>
           </div>
 
-          {/* Clean Real-Time Market Status Pill */}
-          <div
-            className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-mono shadow-sm"
-            title={marketStatus.detailText}
-          >
-            <span
-              className={`flex items-center gap-1.5 font-bold tracking-wide ${marketStatus.textColor}`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${marketStatus.dotColor} ${marketStatus.isOpen ? 'animate-pulse' : ''}`}
-              />
-              {marketStatus.statusText}
-            </span>
-            <span className="text-[10px] text-[var(--text-muted)] font-normal hidden sm:inline">•</span>
-            <span className="text-[10px] text-[var(--text-secondary)] font-normal hidden sm:inline">
-              NSE / BSE <span className="text-[var(--text-muted)]">(₹ INR)</span>
-            </span>
-          </div>
+          {/* Hanging OPEN / CLOSED board */}
+          <MarketSign status={marketStatus} />
         </div>
 
         {/* Center: Command Palette Trigger */}
@@ -109,6 +94,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
 
         {/* Action Controls & Auth Profile Dropdown */}
         <div className="flex items-center gap-2.5">
+          {/* Search / command palette (phones have no Ctrl+K, so give them a button) */}
+          {onOpenCommandPalette && (
+            <button
+              onClick={onOpenCommandPalette}
+              aria-label="Search stocks and commands"
+              title="Search stocks and commands"
+              className="md:hidden flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--brand-primary)] shadow-sm transition active:scale-95 cursor-pointer"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          )}
+
           {/* Lock Screen Security Button */}
           {onLockScreen && (
             <button

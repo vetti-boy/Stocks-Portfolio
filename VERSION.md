@@ -2,6 +2,22 @@
 
 This file maintains a strict chronological record of all application versions, feature updates, bug fixes, and architectural modifications.
 
+## [v1.12.0] - 2026-10-30
+### Trade History Tab, Animated Brand, Slate x Mauve Dark Theme & Mobile / iPhone Polish
+- **New "Trade History" tab** (`TradeHistoryTab.tsx`, `lib/tradeLedger.ts`):
+  - The Trade History & Realized P&L Ledger moved out of the Portfolio tab into its own tab (sidebar, mobile bottom nav and Ctrl+K palette).
+  - Range presets: This Week, Last Week, This Month, Last Month, This Financial Year (1 Apr - 31 Mar), All Time and Custom dates. Weeks run Mon-Sun.
+  - Daily / Weekly / Monthly grouping (auto-suggested from the range) with a profit bar chart + running-total line; tap a bar or row to filter the ledger to that period.
+  - KPIs: net realized P&L and ROI, win rate and profit factor, average per trade, charges paid, best and worst trade; per-stock profit ranking.
+  - Ledger with expandable charges breakdown, CSV / JSON export of the filtered trades, delete with confirmation.
+  - Date maths and aggregation live in a pure module and were verified with 41 checks (week/month/FY boundaries, leap years, gap filling, legacy records).
+- **Brand & theme**: animated SVG app icon (replaces the black/gold PNGs), `BrandLogo` component, dark theme rebuilt as the night version of the Slate x Mauve light palette, light-theme contrast fixes for pale amber / indigo text.
+- **Portfolio mascot "Pulse"**: jumps when the portfolio is in profit, cries when in loss, idles otherwise.
+- **Market sign**: header market status is now a hanging OPEN / CLOSED shop board (no exchange text).
+- **Command palette redesign**: theme-native colours, borderless search field, stable active-row marker, empty state, scroll-into-view on arrow keys; phones get a search button to open it.
+- **Mobile / iPhone**: web manifest, full-screen home-screen app metadata, opaque Apple touch icon, safe-area padding for the bottom nav; verified no horizontal overflow at 390 px.
+- **Fixes**: Trade History MTF badge fell back to 4x instead of 2.5x; brokerage reverse-mode / MTF split / long-term-holding calculation fixes; quote API no longer fabricates prices.
+
 ## [v1.11.0] - 2026-10-22
 ### MTF Analyzer Removal & Multiplier-Based Automated MTF Split Engine
 - **Removed MTF Analyzer Modal & Action Buttons**:

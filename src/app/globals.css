@@ -917,3 +917,116 @@ input:-webkit-autofill:active {
   .mascot *, .mascot-cloud, .mascot-tear, .mascot-rain { animation: none !important; }
   .mascot-tear { opacity: 1; }
 }
+
+/* ========================================================
+   MARKET SIGN — hanging OPEN / CLOSED shop board
+   ======================================================== */
+.market-sign {
+  display: inline-block;
+  line-height: 0;
+  flex-shrink: 0;
+}
+.market-sign-swing {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 2px;
+  animation: market-sign-swing 5s ease-in-out infinite;
+}
+.market-sign-cord {
+  display: block;
+  margin-bottom: -1px;
+}
+.market-sign-board {
+  position: relative;
+  display: flex;
+  min-width: 64px;
+  height: 25px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 6px;
+  color: #FBF3EA;
+  box-shadow: 0 3px 8px rgba(20, 20, 35, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+  transform-origin: 50% 0;
+  animation: market-sign-flip 0.7s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+/* painted keyline just inside the edge, like an enamel sign */
+.market-sign-board::after {
+  content: '';
+  position: absolute;
+  inset: 2.5px;
+  border: 1px solid rgba(251, 243, 234, 0.5);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.market-sign-open .market-sign-board {
+  background: linear-gradient(180deg, #2F9A68 0%, #1E6B4A 100%);
+  animation: market-sign-flip 0.7s cubic-bezier(0.3, 1.4, 0.5, 1), market-sign-glow 2.4s ease-in-out 0.7s infinite;
+}
+.market-sign-closed .market-sign-board {
+  background: linear-gradient(180deg, #B8404E 0%, #8E2A37 100%);
+}
+.market-sign-text {
+  font-family: var(--font-sans), -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.market-sign-hole {
+  position: absolute;
+  top: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(15, 15, 25, 0.55);
+  box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.3);
+}
+
+@keyframes market-sign-swing {
+  0%, 100% { transform: rotate(-3.5deg); }
+  50% { transform: rotate(3.5deg); }
+}
+@keyframes market-sign-flip {
+  0% { transform: perspective(200px) rotateX(-90deg); opacity: 0; }
+  100% { transform: perspective(200px) rotateX(0deg); opacity: 1; }
+}
+@keyframes market-sign-glow {
+  0%, 100% { box-shadow: 0 3px 8px rgba(20, 20, 35, 0.28), 0 0 0 rgba(61, 220, 151, 0), inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.18); }
+  50% { box-shadow: 0 3px 8px rgba(20, 20, 35, 0.28), 0 0 14px rgba(61, 220, 151, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -2px 0 rgba(0, 0, 0, 0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .market-sign-swing, .market-sign-board { animation: none !important; }
+}
+
+/* ========================================================
+   COMMAND PALETTE
+   ======================================================== */
+.palette-panel {
+  animation: palette-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes palette-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Borderless search field: beat the global themed input rules (box, ring, tinted background) */
+html[data-theme] input.palette-input:not([type="checkbox"]):not([type="radio"]) {
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans), -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+html[data-theme] input.palette-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+@media (prefers-reduced-motion: reduce) {
+  .palette-panel { animation: none; }
+}

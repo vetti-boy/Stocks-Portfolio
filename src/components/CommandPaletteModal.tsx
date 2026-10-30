@@ -9,18 +9,94 @@ import {
   Plus,
   Lock,
   Download,
+  History,
   X,
   ArrowRight,
   Loader2,
+  SearchX,
 } from 'lucide-react';
 
 interface CommandPaletteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigateTab: (tab: 'portfolio' | 'calculator' | 'admin') => void;
+  onNavigateTab: (tab: 'portfolio' | 'calculator' | 'history' | 'admin') => void;
   onOpenAddModal: () => void;
   onLockScreen: () => void;
 }
+
+interface RowProps {
+  selected: boolean;
+  index: number;
+  onClick: () => void;
+  onHover: () => void;
+  icon: React.ReactNode;
+  title: React.ReactNode;
+  subtitle: React.ReactNode;
+  right?: React.ReactNode;
+}
+
+/** One palette row. The active marker is absolutely positioned so rows never shift or misalign. */
+const Row: React.FC<RowProps> = ({ selected, index, onClick, onHover, icon, title, subtitle, right }) => (
+  <button
+    type="button"
+    role="option"
+    aria-selected={selected}
+    data-palette-index={index}
+    onClick={onClick}
+    onMouseEnter={onHover}
+    className={`relative flex min-h-[52px] w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${
+      selected ? 'bg-[var(--surface-hover)]' : 'hover:bg-[var(--surface-muted)]'
+    }`}
+  >
+    {selected && (
+      <span className="absolute bottom-2.5 left-0 top-2.5 w-[3px] rounded-full bg-[var(--brand-primary)]" />
+    )}
+    {icon}
+    <div className="min-w-0 flex-1">
+      <div className="truncate text-sm font-semibold text-[var(--text-primary)]">{title}</div>
+      <div className="truncate text-xs text-[var(--text-muted)]">{subtitle}</div>
+    </div>
+    {right}
+  </button>
+);
+
+const SectionLabel: React.FC<{ children: React.ReactNode; tone?: 'brand' | 'positive' | 'muted' }> = ({
+  children,
+  tone = 'muted',
+}) => (
+  <div
+    className={`px-3 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.12em] ${
+      tone === 'positive'
+        ? 'text-[var(--positive)]'
+        : tone === 'brand'
+        ? 'text-[var(--brand-primary)]'
+        : 'text-[var(--text-muted)]'
+    }`}
+  >
+    {children}
+  </div>
+);
+
+const IconTile: React.FC<{ children: React.ReactNode; tone?: 'brand' | 'positive' }> = ({
+  children,
+  tone = 'brand',
+}) => (
+  <div
+    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border font-mono text-xs font-bold ${
+      tone === 'positive'
+        ? 'border-[var(--positive-border)] bg-[var(--positive-bg)] text-[var(--positive)]'
+        : 'border-[var(--border)] bg-[var(--brand-soft)] text-[var(--brand-primary)]'
+    }`}
+  >
+    {children}
+  </div>
+);
+
+const Kbd: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <kbd className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-1.5 py-0.5 font-sans text-[10px] font-semibold text-[var(--text-secondary)]">
+    {children}
+  </kbd>
+);
 
 export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   isOpen,
@@ -42,6 +118,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Focus input on open
   useEffect(() => {
@@ -51,6 +128,13 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
+
+  // Keep the active row visible while arrowing through a long list
+  useEffect(() => {
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-palette-index="${selectedIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex]);
 
   // Live stock API search when user types
   useEffect(() => {
@@ -108,6 +192,16 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       icon: Calculator,
       action: () => {
         onNavigateTab('calculator');
+        onClose();
+      },
+    },
+    {
+      id: 'nav-history',
+      title: 'Open Trade History & P&L Ledger',
+      category: 'Navigation',
+      icon: History,
+      action: () => {
+        onNavigateTab('history');
         onClose();
       },
     },
@@ -203,224 +297,213 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
 
   if (!isOpen) return null;
 
+  const hasQuery = query.trim().length > 0;
+  const noResults = hasQuery && !isSearching && totalItemsCount === 0;
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 bg-black/80 p-4 backdrop-blur-md animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/55 px-3 pt-[10vh] backdrop-blur-sm sm:px-4 sm:pt-[14vh]"
       onClick={onClose}
     >
       <div
-        className="bg-[#0D1218] rounded-2xl w-full max-w-2xl border border-[#202A35] shadow-2xl overflow-hidden"
+        role="dialog"
+        aria-label="Command palette"
+        className="palette-panel w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-0 space-y-0 overflow-hidden">
-          {/* Search Input Bar */}
-          <div className="flex items-center gap-3 border-b border-[#202A35] px-5 py-4 bg-[#080B10]">
-            <Search className="h-5 w-5 text-[#38BDF8] shrink-0" />
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="Search stocks or commands (e.g. RELIANCE, TCS, Calculator, Lock)..."
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelectedIndex(0);
-              }}
-              onKeyDown={handleKeyDown}
-              className="w-full bg-transparent text-base text-[#F4F7FA] outline-none placeholder:text-[#596574] font-mono"
-            />
-            {isSearching ? (
-              <Loader2 className="h-5 w-5 animate-spin text-[#38BDF8] shrink-0" />
-            ) : (
-              <button
-                onClick={onClose}
-                className="rounded-lg p-1 text-[#8D99A8] hover:text-white transition"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+        {/* Search bar */}
+        <div className="flex items-center gap-3 border-b border-[var(--border)] px-4 py-3.5">
+          <Search className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)]" />
+          <input
+            ref={inputRef}
+            type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="palette-list"
+            placeholder="Search stocks or type a command…"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
+            onKeyDown={handleKeyDown}
+            autoComplete="off"
+            spellCheck={false}
+            className="palette-input min-w-0 flex-1 text-[15px] font-medium"
+          />
+          {isSearching ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--brand-primary)]" />
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-7 shrink-0 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
+            >
+              <span className="hidden sm:block">
+                <Kbd>Esc</Kbd>
+              </span>
+              <X className="h-4 w-4 sm:hidden" />
+            </button>
+          )}
+        </div>
 
-          {/* Results Area */}
-          <div className="max-h-[60vh] overflow-y-auto p-2 divide-y divide-[#202A35]">
-            {/* Owned Portfolio Holding Matches */}
-            {portfolioMatches.length > 0 && (
-              <div className="py-2 space-y-1">
-                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#22C55E] font-mono">
-                  Your Portfolio Holdings ({portfolioMatches.length})
-                </div>
-                {portfolioMatches.map((holding, idx) => {
-                  const isSelected = selectedIndex === idx;
-                  return (
-                    <button
-                      key={holding.id}
-                      onClick={() => handleSelectPortfolioHolding(holding.id)}
-                      onMouseEnter={() => setSelectedIndex(idx)}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition text-left ${
-                        isSelected
-                          ? 'bg-[#111820] border-l-2 border-[#22C55E] text-[#F4F7FA]'
-                          : 'hover:bg-[#111820]/60 text-[#8D99A8]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#080B10] border border-[#202A35] text-[#22C55E] font-mono font-bold text-xs">
-                          {holding.symbol.slice(0, 3)}
+        {/* Results */}
+        <div
+          id="palette-list"
+          role="listbox"
+          ref={listRef}
+          className="max-h-[min(60vh,420px)] overflow-y-auto overscroll-contain p-2 pt-0"
+        >
+          {/* Owned holdings */}
+          {portfolioMatches.length > 0 && (
+            <div>
+              <SectionLabel tone="positive">Your holdings · {portfolioMatches.length}</SectionLabel>
+              {portfolioMatches.map((holding, idx) => (
+                <Row
+                  key={holding.id}
+                  index={idx}
+                  selected={selectedIndex === idx}
+                  onClick={() => handleSelectPortfolioHolding(holding.id)}
+                  onHover={() => setSelectedIndex(idx)}
+                  icon={<IconTile tone="positive">{holding.symbol.slice(0, 3)}</IconTile>}
+                  title={
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono">{holding.symbol}</span>
+                      <span className="rounded-md border border-[var(--positive-border)] bg-[var(--positive-bg)] px-1.5 py-px text-[10px] font-semibold text-[var(--positive)]">
+                        {holding.quantity} qty
+                      </span>
+                    </span>
+                  }
+                  subtitle={holding.companyName || 'Portfolio holding'}
+                  right={
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <div className="text-right font-mono">
+                        <div className="text-xs font-bold text-[var(--text-primary)]">
+                          ₹{holding.currentPrice.toLocaleString('en-IN')}
                         </div>
-                        <div>
-                          <div className="font-bold text-[#F4F7FA] font-mono text-sm flex items-center gap-2">
-                            <span>{holding.symbol}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/30 font-sans font-semibold">
-                              Owned • {holding.quantity} Qty
-                            </span>
-                          </div>
-                          <div className="text-xs text-[#8D99A8] truncate max-w-[280px]">
-                            {holding.companyName || 'Portfolio Holding'}
-                          </div>
-                        </div>
+                        <div className="text-[9px] text-[var(--text-muted)]">CMP</div>
                       </div>
+                      <ArrowRight
+                        className={`h-4 w-4 ${
+                          selectedIndex === idx ? 'text-[var(--brand-primary)]' : 'text-[var(--text-muted)]'
+                        }`}
+                      />
+                    </div>
+                  }
+                />
+              ))}
+            </div>
+          )}
 
-                      <div className="flex items-center gap-3 font-mono">
-                        <div className="text-right">
-                          <div className="text-xs font-bold text-white">
-                            ₹{holding.currentPrice.toLocaleString('en-IN')}
-                          </div>
-                          <div className="text-[9px] text-[#596574]">CMP</div>
-                        </div>
-                        <span className="text-xs font-semibold text-[#22C55E] flex items-center gap-1">
-                          Open in Calc <ArrowRight className="h-3.5 w-3.5" />
+          {/* Live stock results */}
+          {searchResults.length > 0 && (
+            <div>
+              <SectionLabel tone="brand">Stocks · {searchResults.length}</SectionLabel>
+              {searchResults.map((stock, idx) => {
+                const globalIdx = portfolioMatches.length + idx;
+                return (
+                  <Row
+                    key={stock.symbol}
+                    index={globalIdx}
+                    selected={selectedIndex === globalIdx}
+                    onClick={() => handleSelectStock(stock)}
+                    onHover={() => setSelectedIndex(globalIdx)}
+                    icon={<IconTile>{stock.symbol.slice(0, 3)}</IconTile>}
+                    title={
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono">{stock.symbol}</span>
+                        <span className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-1.5 py-px text-[10px] font-medium text-[var(--text-secondary)]">
+                          {stock.exchange}
                         </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Live Stock Results */}
-            {searchResults.length > 0 && (
-              <div className="py-2 space-y-1">
-                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#38BDF8] font-mono">
-                  Live Stock Search ({searchResults.length})
-                </div>
-                {searchResults.map((stock, idx) => {
-                  const globalIdx = portfolioMatches.length + idx;
-                  const isSelected = selectedIndex === globalIdx;
-                  return (
-                    <button
-                      key={stock.symbol}
-                      onClick={() => handleSelectStock(stock)}
-                      onMouseEnter={() => setSelectedIndex(globalIdx)}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition text-left ${
-                        isSelected
-                          ? 'bg-[#111820] border-l-2 border-[#38BDF8] text-[#F4F7FA]'
-                          : 'hover:bg-[#111820]/60 text-[#8D99A8]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#080B10] border border-[#202A35] text-[#38BDF8] font-mono font-bold text-xs">
-                          {stock.symbol.slice(0, 3)}
-                        </div>
-                        <div>
-                          <div className="font-bold text-[#F4F7FA] font-mono text-sm flex items-center gap-2">
-                            <span>{stock.symbol}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#111820] text-[#8D99A8] border border-[#202A35]">
-                              {stock.exchange}
-                            </span>
-                          </div>
-                          <div className="text-xs text-[#8D99A8] truncate max-w-[280px]">
-                            {stock.companyName}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 font-mono">
+                      </span>
+                    }
+                    subtitle={stock.companyName}
+                    right={
+                      <div className="flex shrink-0 items-center gap-2.5">
                         {stock.price > 0 && (
-                          <div className="text-right">
-                            <div className="text-xs font-bold text-[#22C55E]">
+                          <div className="text-right font-mono">
+                            <div className="text-xs font-bold text-[var(--positive)]">
                               ₹{stock.price.toLocaleString('en-IN')}
                             </div>
-                            <div className="text-[9px] text-[#596574]">LTP</div>
+                            <div className="text-[9px] text-[var(--text-muted)]">LTP</div>
                           </div>
                         )}
-                        <span className="text-xs font-semibold text-[#38BDF8] flex items-center gap-1">
-                          Add <ArrowRight className="h-3.5 w-3.5" />
+                        <span className="rounded-md bg-[var(--brand-soft)] px-2 py-1 text-[11px] font-semibold text-[var(--brand-primary)]">
+                          + Add
                         </span>
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Default Essential Shortcuts */}
-            <div className="py-2 space-y-1">
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#596574] font-mono">
-                Quick Shortcuts
-              </div>
-              {filteredActions.map((action, idx) => {
-                const globalIdx = portfolioMatches.length + searchResults.length + idx;
-                const isSelected = selectedIndex === globalIdx;
-                const Icon = action.icon;
-
-                return (
-                  <button
-                    key={action.id}
-                    onClick={action.action}
-                    onMouseEnter={() => setSelectedIndex(globalIdx)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition text-left ${
-                      isSelected
-                        ? 'bg-[#111820] border-l-2 border-[#38BDF8] text-[#F4F7FA]'
-                        : 'hover:bg-[#111820]/60 text-[#8D99A8]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#080B10] border border-[#202A35] text-[#38BDF8]">
-                        <Icon className="h-4 w-4 text-[#38BDF8]" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-[#F4F7FA] text-sm flex items-center gap-2">
-                          <span>{action.title}</span>
-                        </div>
-                        <div className="text-xs text-[#8D99A8]">{action.category}</div>
-                      </div>
-                    </div>
-
-                    <ArrowRight
-                      className={`h-4 w-4 transition ${
-                        isSelected ? 'translate-x-1 text-[#38BDF8]' : 'text-[#596574]'
-                      }`}
-                    />
-                  </button>
+                    }
+                  />
                 );
               })}
             </div>
-          </div>
+          )}
 
-          {/* Footer Navigation Hints */}
-          <div className="flex items-center justify-between border-t border-[#202A35] px-5 py-3 bg-[#080B10] text-[11px] text-[#8D99A8]">
-            <div className="flex items-center gap-3 font-mono">
-              <span className="flex items-center gap-1">
-                <kbd className="rounded bg-[#111820] px-1.5 py-0.5 border border-[#202A35] text-[#F4F7FA] text-[10px]">
-                  ↑↓
-                </kbd>{' '}
-                Navigate
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="rounded bg-[#111820] px-1.5 py-0.5 border border-[#202A35] text-[#F4F7FA] text-[10px]">
-                  ↵
-                </kbd>{' '}
-                Select
-              </span>
-              <span className="flex items-center gap-1">
-                <kbd className="rounded bg-[#111820] px-1.5 py-0.5 border border-[#202A35] text-[#F4F7FA] text-[10px]">
-                  Esc
-                </kbd>{' '}
-                Close
-              </span>
+          {/* Shortcuts / actions */}
+          {filteredActions.length > 0 && (
+            <div>
+              <SectionLabel>{hasQuery ? 'Actions' : 'Quick shortcuts'}</SectionLabel>
+              {filteredActions.map((action, idx) => {
+                const globalIdx = portfolioMatches.length + searchResults.length + idx;
+                const Icon = action.icon;
+                const selected = selectedIndex === globalIdx;
+                return (
+                  <Row
+                    key={action.id}
+                    index={globalIdx}
+                    selected={selected}
+                    onClick={action.action}
+                    onHover={() => setSelectedIndex(globalIdx)}
+                    icon={
+                      <IconTile>
+                        <Icon className="h-4 w-4" />
+                      </IconTile>
+                    }
+                    title={action.title}
+                    subtitle={action.category}
+                    right={
+                      <ArrowRight
+                        className={`h-4 w-4 shrink-0 transition-transform ${
+                          selected ? 'translate-x-0.5 text-[var(--brand-primary)]' : 'text-[var(--text-muted)]'
+                        }`}
+                      />
+                    }
+                  />
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1.5 font-bold font-mono text-white text-[11px]">
-              <img src="/logo-icon.svg" alt="StockPulse" className="h-4 w-4 object-contain" />
-              <span>STOCK<span className="text-[#E5C07B]">PULSE</span></span>
+          )}
+
+          {noResults && (
+            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+              <SearchX className="h-7 w-7 text-[var(--text-muted)]" />
+              <p className="text-sm font-semibold text-[var(--text-primary)]">No results for “{query.trim()}”</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Try a stock symbol like RELIANCE, or a command like “lock”.
+              </p>
             </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-[var(--border)] bg-[var(--surface-muted)] px-4 py-2.5 text-[11px] text-[var(--text-muted)]">
+          <div className="hidden items-center gap-4 sm:flex">
+            <span className="flex items-center gap-1.5">
+              <Kbd>↑↓</Kbd> Navigate
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Kbd>↵</Kbd> Select
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Kbd>Esc</Kbd> Close
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] font-extrabold tracking-wide text-[var(--text-primary)] sm:ml-auto">
+            <img src="/logo-icon.svg" alt="" className="h-4 w-4 object-contain" />
+            <span>
+              STOCK<span className="text-[var(--brand-primary)]">PULSE</span>
+            </span>
           </div>
         </div>
       </div>

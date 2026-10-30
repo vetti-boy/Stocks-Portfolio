@@ -77,7 +77,7 @@ export const PortfolioMascot: React.FC<PortfolioMascotProps> = ({ netPnL, pnlPer
         onClick={() => setHiddenPersist(false)}
         aria-label="Show portfolio mascot"
         title="Show mascot"
-        className="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--brand-primary)] shadow-lg transition hover:scale-110 cursor-pointer"
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 md:bottom-5 md:right-5 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--brand-primary)] shadow-lg transition hover:scale-110 cursor-pointer"
       >
         <Smile className="h-4 w-4" />
       </button>
@@ -88,7 +88,7 @@ export const PortfolioMascot: React.FC<PortfolioMascotProps> = ({ netPnL, pnlPer
   const bodyId = `${uid}-body`;
 
   return (
-    <div className="fixed bottom-[4.75rem] right-2 md:bottom-4 md:right-5 z-30 select-none" data-mood={mood}>
+    <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-2 md:bottom-4 md:right-5 z-30 select-none" data-mood={mood}>
       {/* Speech bubble */}
       <div
         role="status"

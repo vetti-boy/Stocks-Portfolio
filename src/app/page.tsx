@@ -7,25 +7,26 @@ import { StockProvider } from '@/context/StockContext';
 import { Navbar } from '@/components/Navbar';
 import { PortfolioTab } from '@/components/PortfolioTab';
 import { CalculatorTab } from '@/components/CalculatorTab';
+import { TradeHistoryTab } from '@/components/TradeHistoryTab';
 import { AdminPanel } from '@/components/AdminPanel';
 import { AuthModal } from '@/components/AuthModal';
 import { PinLockModal } from '@/components/PinLockModal';
 import { CommandPaletteModal } from '@/components/CommandPaletteModal';
-import { Briefcase, Calculator, ShieldCheck, ChevronLeft } from 'lucide-react';
+import { Briefcase, Calculator, History, ShieldCheck, ChevronLeft } from 'lucide-react';
 import { BrandLogo } from '@/components/BrandLogo';
 
 function DashboardContent() {
   const { user } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'calculator' | 'admin'>('portfolio');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'calculator' | 'history' | 'admin'>('portfolio');
   const [storedPin, setStoredPin] = useState('1234');
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
     try {
-      const savedTab = localStorage.getItem('stocks_active_tab') as 'portfolio' | 'calculator' | 'admin';
-      if (savedTab && ['portfolio', 'calculator', 'admin'].includes(savedTab)) {
+      const savedTab = localStorage.getItem('stocks_active_tab') as 'portfolio' | 'calculator' | 'history' | 'admin';
+      if (savedTab && ['portfolio', 'calculator', 'history', 'admin'].includes(savedTab)) {
         setActiveTab(savedTab);
       }
       const pin = localStorage.getItem('app_screen_lock_pin');
@@ -37,7 +38,7 @@ function DashboardContent() {
     }
   }, []);
 
-  const changeTab = (tab: 'portfolio' | 'calculator' | 'admin') => {
+  const changeTab = (tab: 'portfolio' | 'calculator' | 'history' | 'admin') => {
     setActiveTab(tab);
     if (typeof window !== 'undefined') {
       try {
@@ -170,7 +171,23 @@ function DashboardContent() {
                   {!isSidebarCollapsed && <span>Tax P&L Engine</span>}
                 </button>
 
-                {/* Tab 3: Enterprise Console */}
+                {/* Tab 3: Trade History & Realized P&L */}
+                <button
+                  onClick={() => changeTab('history')}
+                  title="Trade History"
+                  className={`w-full flex items-center ${
+                    isSidebarCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+                  } rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    activeTab === 'history'
+                      ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-text)] border border-[var(--sidebar-border)] shadow-sm font-bold'
+                      : 'text-[var(--sidebar-text-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]'
+                  }`}
+                >
+                  <History className={`h-4 w-4 shrink-0 ${activeTab === 'history' ? 'text-[var(--sidebar-text)]' : 'text-[var(--sidebar-text-muted)]'}`} />
+                  {!isSidebarCollapsed && <span>Trade History</span>}
+                </button>
+
+                {/* Tab 4: Enterprise Console */}
                 {isAdmin && (
                   <button
                     onClick={() => changeTab('admin')}
@@ -224,6 +241,14 @@ function DashboardContent() {
             >
               Tax Engine
             </button>
+            <button
+              onClick={() => changeTab('history')}
+              className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
+                activeTab === 'history' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
+              }`}
+            >
+              History
+            </button>
             {isAdmin && (
               <button
                 onClick={() => changeTab('admin')}
@@ -238,16 +263,17 @@ function DashboardContent() {
         </div>
 
         {/* Main Workspace Area (The 3 Tab Components) */}
-        <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-5 sm:px-6 lg:px-8 space-y-6 pb-24 md:pb-8">
+        <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-5 sm:px-6 lg:px-8 space-y-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
           {activeTab === 'portfolio' && (
             <PortfolioTab onOpenInCalculator={() => changeTab('calculator')} />
           )}
           {activeTab === 'calculator' && <CalculatorTab />}
+          {activeTab === 'history' && <TradeHistoryTab />}
           {activeTab === 'admin' && <AdminPanel />}
         </main>
 
         {/* Fixed Mobile Bottom Navigation Bar (iOS & Android Smartphone Native Experience) */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--surface)]/95 backdrop-blur-lg border-t border-[var(--border)] px-4 py-2 flex items-center justify-around shadow-2xl">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--surface)]/95 backdrop-blur-lg border-t border-[var(--border)] px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex items-center justify-around shadow-2xl">
           <button
             onClick={() => changeTab('portfolio')}
             className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
@@ -270,6 +296,18 @@ function DashboardContent() {
               <Calculator className="h-4 w-4" />
             </div>
             <span>Tax Engine</span>
+          </button>
+
+          <button
+            onClick={() => changeTab('history')}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+              activeTab === 'history' ? 'text-[var(--brand-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <div className={`p-1.5 rounded-lg transition ${activeTab === 'history' ? 'bg-[var(--brand-primary)]/15 border border-[var(--brand-primary)]/30' : ''}`}>
+              <History className="h-4 w-4" />
+            </div>
+            <span>History</span>
           </button>
 
           {isAdmin && (
