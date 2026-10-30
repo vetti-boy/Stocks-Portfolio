@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import { useStock } from '@/context/StockContext';
 import { EditTradeModal } from '@/components/EditTradeModal';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { CapitalPieCard } from '@/components/CapitalPieCard';
 import {
   LedgerTrade,
   PeriodGroup,
@@ -42,6 +44,7 @@ import {
   filterByRange,
   groupTrades,
   summarize,
+  capitalBreakdown,
   bySymbol,
   suggestGroupBy,
   toYMD,
@@ -203,6 +206,7 @@ export const TradeHistoryTab: React.FC = () => {
   const [period, setPeriod] = useState<PeriodGroup | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<LedgerTrade | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const ledger = useMemo(() => buildTradeLedger(tradeHistory, holdings, taxSettings), [tradeHistory, holdings, taxSettings]);
 
@@ -211,6 +215,8 @@ export const TradeHistoryTab: React.FC = () => {
   const groupBy = groupOverride ?? suggestGroupBy(range, inRange);
   const groups = useMemo(() => groupTrades(inRange, groupBy), [inRange, groupBy]);
   const summary = useMemo(() => summarize(inRange), [inRange]);
+  const capital = useMemo(() => capitalBreakdown(inRange), [inRange]);
+  const tradeDays = useMemo(() => new Set(ledger.map((t) => t.soldOn)), [ledger]);
   const symbols = useMemo(() => bySymbol(inRange), [inRange]);
 
   // Ledger rows: the chosen range, optionally narrowed to one clicked period, newest first
@@ -234,6 +240,7 @@ export const TradeHistoryTab: React.FC = () => {
     setPreset(p);
     setGroupOverride(null);
     setPeriod(null);
+    setPickerOpen(p === 'custom'); // choosing Custom opens the calendar straight away
   };
 
   const selectPeriod = (g: PeriodGroup) => setPeriod((cur) => (cur?.key === g.key ? null : g));
@@ -384,35 +391,19 @@ export const TradeHistoryTab: React.FC = () => {
           </div>
 
           {preset === 'custom' && (
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="text-[11px] font-semibold text-[var(--text-secondary)]">
-                From
-                <input
-                  type="date"
-                  value={custom.from}
-                  max={custom.to || undefined}
-                  onChange={(e) => { setCustom((c) => ({ ...c, from: e.target.value })); setPeriod(null); setGroupOverride(null); }}
-                  className="glass-input mt-1 block w-full min-w-[9.5rem]"
-                />
-              </label>
-              <label className="text-[11px] font-semibold text-[var(--text-secondary)]">
-                To
-                <input
-                  type="date"
-                  value={custom.to}
-                  min={custom.from || undefined}
-                  onChange={(e) => { setCustom((c) => ({ ...c, to: e.target.value })); setPeriod(null); setGroupOverride(null); }}
-                  className="glass-input mt-1 block w-full min-w-[9.5rem]"
-                />
-              </label>
-              {(custom.from || custom.to) && (
-                <button
-                  onClick={() => { setCustom({ from: '', to: '' }); setPeriod(null); }}
-                  className="mb-1 cursor-pointer text-xs font-semibold text-[var(--text-secondary)] underline-offset-2 hover:text-[var(--text-primary)] hover:underline"
-                >
-                  Clear dates
-                </button>
-              )}
+            <div className="flex flex-wrap items-center gap-3">
+              <DateRangePicker
+                value={custom}
+                onChange={(r) => {
+                  setCustom(r);
+                  setPeriod(null);
+                  setGroupOverride(null);
+                }}
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                markedDates={tradeDays}
+              />
+              <span className="text-[11px] text-[var(--text-muted)]">Click a start date, then an end date.</span>
             </div>
           )}
 
@@ -498,6 +489,9 @@ export const TradeHistoryTab: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Where the money went: my money vs MTF fund vs profit */}
+      <CapitalPieCard breakdown={capital} mode="realized" />
 
       {/* Profit chart */}
       <div className="glass-shell">

@@ -388,3 +388,49 @@ export function suggestGroupBy(range: DateRange | null, trades: { soldOn: string
   if (span <= 190) return 'week';
   return 'month';
 }
+
+// ---------------------------------------------------------------------------
+// Capital breakdown: how much was your money, how much was MTF funding, and
+// what you made on it. Works for sold trades and for open holdings alike.
+// ---------------------------------------------------------------------------
+
+export interface CapitalBreakdown {
+  /** Your own cash that was deployed. */
+  own: number;
+  /** Money the broker funded through MTF. */
+  mtf: number;
+  /** Total money deployed (own + MTF). */
+  invested: number;
+  /** Net profit (positive) or loss (negative) after all charges and MTF interest. */
+  profit: number;
+  /** Your money plus the profit, i.e. what your own capital grew to. */
+  ownPlusProfit: number;
+  returnOnOwn: number;
+  returnOnTotal: number;
+  count: number;
+}
+
+export function capitalBreakdown(
+  items: { grossInvested: number; netPnL: number; calc: { ownInvestment?: number; mtfBorrowedAmount?: number } }[]
+): CapitalBreakdown {
+  let own = 0;
+  let mtf = 0;
+  let profit = 0;
+  for (const it of items) {
+    const funded = Math.max(0, it.calc.mtfBorrowedAmount ?? 0);
+    own += it.calc.ownInvestment ?? it.grossInvested - funded;
+    mtf += funded;
+    profit += it.netPnL;
+  }
+  const invested = own + mtf;
+  return {
+    own,
+    mtf,
+    invested,
+    profit,
+    ownPlusProfit: own + profit,
+    returnOnOwn: own > 0 ? (profit / own) * 100 : 0,
+    returnOnTotal: invested > 0 ? (profit / invested) * 100 : 0,
+    count: items.length,
+  };
+}

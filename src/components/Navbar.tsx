@@ -7,7 +7,6 @@ import { useStock } from '@/context/StockContext';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import {
   Lock,
-  Search,
   User as UserIcon,
   LogOut,
   ChevronDown,
@@ -17,10 +16,9 @@ import {
 
 interface NavbarProps {
   onLockScreen?: () => void;
-  onOpenCommandPalette?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalette }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onLockScreen }) => {
   const { user, openAuthModal, logout } = useAuth();
   const { marketStatus } = useStock();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -78,34 +76,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
           <MarketSign status={marketStatus} />
         </div>
 
-        {/* Center: Command Palette Trigger */}
-        {onOpenCommandPalette && (
-          <button
-            onClick={onOpenCommandPalette}
-            className="hidden md:flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)] px-3.5 py-1.5 text-xs text-[var(--text-secondary)] transition-all duration-180 group cursor-pointer shadow-sm"
-          >
-            <Search className="h-3.5 w-3.5 text-[var(--brand-primary)] group-hover:scale-105 transition-transform" />
-            <span className="text-[var(--text-secondary)] text-xs">Search stocks, actions...</span>
-            <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5 text-[9px] font-mono font-bold text-[var(--text-primary)] border border-[var(--border)]">
-              Ctrl + K
-            </kbd>
-          </button>
-        )}
-
         {/* Action Controls & Auth Profile Dropdown */}
         <div className="flex items-center gap-2.5">
-          {/* Search / command palette (phones have no Ctrl+K, so give them a button) */}
-          {onOpenCommandPalette && (
-            <button
-              onClick={onOpenCommandPalette}
-              aria-label="Search stocks and commands"
-              title="Search stocks and commands"
-              className="md:hidden flex h-[34px] w-[34px] items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--brand-primary)] shadow-sm transition active:scale-95 cursor-pointer"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-          )}
-
           {/* Lock Screen Security Button */}
           {onLockScreen && (
             <button

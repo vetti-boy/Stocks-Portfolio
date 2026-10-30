@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useStock } from '@/context/StockContext';
 import { PortfolioMascot } from '@/components/PortfolioMascot';
+import { CapitalPieCard } from '@/components/CapitalPieCard';
+import { capitalBreakdown } from '@/lib/tradeLedger';
 import {
   Plus,
   Trash2,
@@ -652,6 +654,9 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
           </div>
         </div>
       </div>
+
+      {/* Where your money is: own cash vs MTF fund vs unrealized profit */}
+      {holdings.length > 0 && <CapitalPieCard breakdown={capitalBreakdown(holdingsWithCalculations)} mode="unrealized" />}
 
       {/* Broker Allocation Bar */}
       {currentVal > 0 && (

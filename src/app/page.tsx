@@ -220,7 +220,6 @@ function DashboardContent() {
         <div className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--surface)]">
           <Navbar
             onLockScreen={() => setIsLocked(true)}
-            onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           />
 
           {/* Mobile Tab Switcher */}
