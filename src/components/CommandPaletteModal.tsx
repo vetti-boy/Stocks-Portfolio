@@ -418,7 +418,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-1.5 font-bold font-mono text-white text-[11px]">
-              <img src="/logo-icon.png" alt="StockPulse" className="h-4 w-4 object-contain" />
+              <img src="/logo-icon.svg" alt="StockPulse" className="h-4 w-4 object-contain" />
               <span>STOCK<span className="text-[#E5C07B]">PULSE</span></span>
             </div>
           </div>

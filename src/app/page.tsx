@@ -12,6 +12,7 @@ import { AuthModal } from '@/components/AuthModal';
 import { PinLockModal } from '@/components/PinLockModal';
 import { CommandPaletteModal } from '@/components/CommandPaletteModal';
 import { Briefcase, Calculator, ShieldCheck, ChevronLeft } from 'lucide-react';
+import { BrandLogo } from '@/components/BrandLogo';
 
 function DashboardContent() {
   const { user } = useAuth();
@@ -96,14 +97,7 @@ function DashboardContent() {
             {!isSidebarCollapsed ? (
               <>
                 <div className="flex items-center">
-                  <img
-                    src="/logo.png"
-                    alt="StockPulse — Portfolio Intelligence"
-                    width={180}
-                    height={36}
-                    style={{ height: '36px', width: 'auto', maxWidth: '180px' }}
-                    className="h-9 w-auto max-w-[180px] object-contain shrink-0"
-                  />
+                  <BrandLogo size={38} />
                 </div>
                 <button
                   onClick={() => setIsSidebarCollapsed(true)}
@@ -122,7 +116,7 @@ function DashboardContent() {
                   aria-label="Click to expand sidebar"
                 >
                   <img
-                    src="/logo-icon.png"
+                    src="/logo-icon.svg"
                     alt="StockPulse"
                     width={32}
                     height={32}

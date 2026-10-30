@@ -1343,7 +1343,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                           <span>{trade.symbol}</span>
                           {trade.isMTF && (
                             <span className="rounded bg-amber-500/15 px-1.5 py-0.2 text-[9px] font-bold text-amber-400 border border-amber-500/30">
-                              MTF {trade.mtfMultiplier || 4}x
+                              MTF {trade.mtfMultiplier || 2.5}x
                             </span>
                           )}
                         </div>
@@ -1457,7 +1457,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                       <span className="font-bold text-[var(--text-primary)] font-mono text-sm">{trade.symbol}</span>
                       {trade.isMTF && (
                         <span className="rounded bg-amber-500/15 px-1.5 py-0.2 text-[9px] font-bold text-amber-400 border border-amber-500/30">
-                          MTF {trade.mtfMultiplier || 4}x
+                          MTF {trade.mtfMultiplier || 2.5}x
                         </span>
                       )}
                       {(trade.broker || 'ZERODHA') === 'ANGELONE' ? (

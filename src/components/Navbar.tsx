@@ -61,7 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen, onOpenCommandPalet
           {/* Mobile-only Brand (shown only when left sidebar is hidden) */}
           <div className="flex md:hidden items-center gap-2">
             <img
-              src="/logo-icon.png"
+              src="/logo-icon.svg"
               alt="StockPulse Logo"
               width={26}
               height={26}
