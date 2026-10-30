@@ -2,17 +2,18 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserDataModel } from '@/models/UserData';
 import { decryptPayload } from '@/lib/encryption';
+import { getAuthedUser, unauthorized } from '@/lib/session';
 
 // SAVE (STORE USER PORTFOLIO DATA DIRECTLY IN DATABASE)
 export async function POST(req: Request) {
   try {
-    const { userId, userEmail, holdings, watchlist, tradeHistory, taxSettings } = await req.json();
+    // Identity always comes from the signed session, never from the request body
+    const authed = await getAuthedUser(req);
+    if (!authed) return unauthorized();
+    const userId: string = authed._id.toString();
+    const cleanEmail: string = authed.email.toLowerCase().trim();
 
-    if (!userId && !userEmail) {
-      return NextResponse.json({ error: 'userId or userEmail is required' }, { status: 400 });
-    }
-
-    const cleanEmail = userEmail ? userEmail.toLowerCase().trim() : '';
+    const { holdings, watchlist, tradeHistory, taxSettings } = await req.json();
     const payload = {
       holdings: Array.isArray(holdings) ? holdings : [],
       watchlist: Array.isArray(watchlist) ? watchlist : [],
@@ -39,8 +40,8 @@ export async function POST(req: Request) {
     await UserDataModel.findOneAndUpdate(
       query,
       {
-        userId: userId || cleanEmail,
-        userEmail: cleanEmail || 'user@stocks.io',
+        userId,
+        userEmail: cleanEmail,
         payload,
       },
       { upsert: true, returnDocument: 'after' }
@@ -59,15 +60,10 @@ export async function POST(req: Request) {
 // FETCH (READ USER PORTFOLIO DATA FROM DATABASE)
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-    const userEmail = searchParams.get('userEmail');
-
-    if (!userId && !userEmail) {
-      return NextResponse.json({ error: 'userId or userEmail query parameter is required' }, { status: 400 });
-    }
-
-    const cleanEmail = userEmail ? userEmail.toLowerCase().trim() : '';
+    const authed = await getAuthedUser(req);
+    if (!authed) return unauthorized();
+    const userId: string = authed._id.toString();
+    const cleanEmail: string = authed.email.toLowerCase().trim();
 
     const db = await connectToDatabase();
     if (!db) {

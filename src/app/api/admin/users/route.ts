@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
+import { getAuthedAdmin } from '@/lib/session';
+import { MASTER_ADMIN_EMAIL } from '@/lib/config';
+
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const adminRole = searchParams.get('adminRole');
-
-    if (adminRole !== 'ADMIN') {
+    if (!(await getAuthedAdmin(req))) {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 
@@ -17,11 +17,11 @@ export async function GET(req: Request) {
     }
 
     // Auto-seed Master Admin into MongoDB Cloud DB if not present
-    const masterAdminInMongo = await UserModel.findOne({ email: 'mailfortempusage@gmail.com' });
+    const masterAdminInMongo = await UserModel.findOne({ email: MASTER_ADMIN_EMAIL });
     if (!masterAdminInMongo) {
       await UserModel.create({
         name: 'System Administrator',
-        email: 'mailfortempusage@gmail.com',
+        email: MASTER_ADMIN_EMAIL,
         role: 'ADMIN',
         currency: 'INR',
         isDisabled: false,

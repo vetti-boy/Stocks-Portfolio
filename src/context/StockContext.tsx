@@ -57,6 +57,33 @@ const generateHistory = (basePrice: number): PricePoint[] => {
   return points;
 };
 
+const newId = (prefix: string): string =>
+  `${prefix}_${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10)}`;
+
+const isRecord = (v: unknown): v is Record<string, any> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isFiniteNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+const sanitizeHoldings = (arr: unknown): StockHolding[] =>
+  (Array.isArray(arr) ? arr : []).filter(
+    (h) => isRecord(h) && typeof h.symbol === 'string' && h.symbol && isFiniteNum(h.quantity) && h.quantity > 0 && isFiniteNum(h.buyPrice) && h.buyPrice >= 0
+  ).map((h, i) => ({
+    ...h,
+    id: typeof h.id === 'string' && h.id ? h.id : newId('hold'),
+    currentPrice: isFiniteNum(h.currentPrice) ? h.currentPrice : h.buyPrice,
+    previousClose: isFiniteNum(h.previousClose) ? h.previousClose : h.buyPrice,
+    dayChangePercent: isFiniteNum(h.dayChangePercent) ? h.dayChangePercent : 0,
+  })) as StockHolding[];
+
+const sanitizeWatchlist = (arr: unknown): WatchlistItem[] =>
+  (Array.isArray(arr) ? arr : []).filter(
+    (w) => isRecord(w) && typeof w.symbol === 'string' && w.symbol && isFiniteNum(w.currentPrice)
+  ).map((w) => ({ ...w, history: Array.isArray(w.history) ? w.history : generateHistory(w.currentPrice) })) as WatchlistItem[];
+
+const sanitizeTrades = (arr: unknown): TradeRecord[] =>
+  (Array.isArray(arr) ? arr : []).filter(
+    (t) => isRecord(t) && typeof t.symbol === 'string' && t.symbol && isFiniteNum(t.quantity) && isFiniteNum(t.price)
+  ) as TradeRecord[];
+
 const DEFAULT_TAX_SETTINGS: TaxSettings = {
   holdingPeriodMonths: 12,
   stcgRatePercent: 20.0,
@@ -68,6 +95,25 @@ const DEFAULT_TAX_SETTINGS: TaxSettings = {
   stampDutyPercent: 0.015,
   sttPercent: 0.1,
   gstPercent: 18.0,
+};
+
+const setPendingSync = (userId: string, pending: boolean) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (pending) localStorage.setItem(`stocks_pending_sync_${userId}`, '1');
+    else localStorage.removeItem(`stocks_pending_sync_${userId}`);
+  } catch {
+    // Ignored
+  }
+};
+
+const hasPendingSync = (userId: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(`stocks_pending_sync_${userId}`) === '1';
+  } catch {
+    return false;
+  }
 };
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -147,9 +193,9 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               return {
                 ...item,
                 currentPrice: liveMatch.currentPrice,
-                previousClose: liveMatch.previousClose || item.previousClose,
-                dayChange: liveMatch.dayChange || item.dayChange,
-                dayChangePercent: liveMatch.dayChangePercent || item.dayChangePercent,
+                previousClose: liveMatch.previousClose ?? item.previousClose,
+                dayChange: liveMatch.dayChange ?? item.dayChange,
+                dayChangePercent: liveMatch.dayChangePercent ?? item.dayChangePercent,
                 high52: liveMatch.high52 || item.high52,
                 low52: liveMatch.low52 || item.low52,
                 volume: liveMatch.volume || item.volume,
@@ -171,7 +217,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               return {
                 ...h,
                 currentPrice: liveMatch.currentPrice,
-                dayChangePercent: liveMatch.dayChangePercent || h.dayChangePercent,
+                dayChangePercent: liveMatch.dayChangePercent ?? h.dayChangePercent,
               };
             }
             return h;
@@ -241,6 +287,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // 3. Persist to MongoDB Cloud Database if user is an authenticated Google user
+    // (flag the local copy as unsynced until the server confirms, so a later load never overwrites it)
+    setPendingSync(currentUser.id, true);
     setSyncStatus('encrypting');
     try {
       const res = await fetch('/api/user/data', {
@@ -257,12 +305,15 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
 
       if (res.ok) {
+        setPendingSync(currentUser.id, false);
         setSyncStatus('synced');
       } else {
+        setPendingSync(currentUser.id, true);
         setSyncStatus('offline');
       }
     } catch (err) {
       console.warn('Server database save error:', err);
+      setPendingSync(currentUser.id, true);
       setSyncStatus('offline');
     }
   };
@@ -311,7 +362,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (localCache.taxSettings) setTaxSettings(localCache.taxSettings);
         }
 
-        const guestRaw = localStorage.getItem('stocks_user_data_guest');
+        const guestRaw = sessionStorage.getItem('stocks_guest_portfolio');
         if (guestRaw) guestCache = JSON.parse(guestRaw);
       } catch {
         // Ignored
@@ -329,7 +380,18 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const res = await fetch(`/api/user/data?${queryParams.toString()}`);
         const result = await res.json();
 
-        if (result.success && result.data) {
+        if (localCache && hasPendingSync(user.id)) {
+          // Local edits never reached the server: they are newer than the cloud copy, so push them up
+          const h = sanitizeHoldings(localCache.holdings);
+          const w = sanitizeWatchlist(localCache.watchlist);
+          const t = sanitizeTrades(localCache.tradeHistory);
+          const tax = localCache.taxSettings || DEFAULT_TAX_SETTINGS;
+          holdingsRef.current = h;
+          watchlistRef.current = w;
+          tradeHistoryRef.current = t;
+          taxSettingsRef.current = tax;
+          persistPortfolio(h, w, t, tax, user);
+        } else if (result.success && result.data) {
           const cloudHoldings = Array.isArray(result.data.holdings) ? result.data.holdings : [];
           const cloudWatchlist = Array.isArray(result.data.watchlist) ? result.data.watchlist : [];
           const cloudHistory = Array.isArray(result.data.tradeHistory) ? result.data.tradeHistory : [];
@@ -380,6 +442,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setHoldings([]);
             setWatchlist([]);
             setTradeHistory([]);
+            setTaxSettings(DEFAULT_TAX_SETTINGS);
             setSyncStatus('synced');
           }
         }
@@ -409,7 +472,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const newHolding: StockHolding = {
       ...data,
-      id: 'hold_' + Date.now(),
+      id: newId('hold'),
       symbol: data.symbol.toUpperCase(),
       currentPrice,
       previousClose,
@@ -458,6 +521,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateHolding = (id: string, updated: Partial<StockHolding>) => {
+    if (updated.quantity !== undefined && !(isFiniteNum(updated.quantity) && updated.quantity > 0)) return;
+    if (updated.buyPrice !== undefined && !(isFiniteNum(updated.buyPrice) && updated.buyPrice >= 0)) return;
     const nextHoldings = holdingsRef.current.map((h) => (h.id === id ? { ...h, ...updated } : h));
     holdingsRef.current = nextHoldings;
     setHoldings(nextHoldings);
@@ -473,6 +538,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   ) => {
     const targetHolding = holdingsRef.current.find((h) => h.id === id);
     if (!targetHolding) return;
+    if (!isFiniteNum(sellQty) || sellQty <= 0 || !isFiniteNum(sellPrice) || sellPrice < 0) return;
 
     const qtyToSell = Math.min(sellQty, targetHolding.quantity);
     const validBuyDate =
@@ -485,7 +551,12 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const buyTime = new Date(validBuyDate).getTime();
     const sellTime = new Date(validSellDate).getTime();
     const daysHeld = Math.max(0, Math.floor((sellTime - buyTime) / (1000 * 60 * 60 * 24)));
-    const holdingMonths = daysHeld / 30;
+    const holdingMonths = daysHeld / 30.4375; // 365.25 / 12, so >365 days counts as >12 months
+
+    // Pro-rate the own/MTF split to the quantity being sold
+    const sellFraction = targetHolding.quantity > 0 ? qtyToSell / targetHolding.quantity : 1;
+    const soldOwnQty = targetHolding.ownQuantity ? Math.round(targetHolding.ownQuantity * sellFraction) : undefined;
+    const soldMtfQty = targetHolding.mtfQuantity ? Math.round(targetHolding.mtfQuantity * sellFraction) : undefined;
 
     const hTaxSettings = {
       ...taxSettingsRef.current,
@@ -501,8 +572,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       taxSettings: hTaxSettings,
       isMTF: targetHolding.isMTF,
       mtfMultiplier: targetHolding.mtfMultiplier,
-      ownQuantity: targetHolding.ownQuantity ? Math.min(qtyToSell, targetHolding.ownQuantity) : undefined,
-      mtfQuantity: targetHolding.mtfQuantity ? Math.min(qtyToSell, targetHolding.mtfQuantity) : undefined,
+      ownQuantity: soldOwnQty,
+      mtfQuantity: soldMtfQty,
       mtfDays: daysHeld,
     });
 
@@ -514,7 +585,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const netRoiPercent = calc.netRoiPercent;
 
     const sellRecord: TradeRecord = {
-      id: 'tr_sell_' + Date.now(),
+      id: newId('tr_sell'),
       symbol: targetHolding.symbol,
       companyName: targetHolding.companyName,
       quantity: qtyToSell,
@@ -532,8 +603,8 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       exchange: targetHolding.exchange,
       isMTF: targetHolding.isMTF,
       mtfMultiplier: targetHolding.mtfMultiplier,
-      ownQuantity: targetHolding.ownQuantity,
-      mtfQuantity: targetHolding.mtfQuantity,
+      ownQuantity: soldOwnQty,
+      mtfQuantity: soldMtfQty,
       mtfDaysHeld: daysHeld,
       mtfInterestDeducted: +(calc.mtfInterestCost || 0).toFixed(2),
       mtfPledgeCharges: +(calc.mtfPledgeUnpledgeFee || 0).toFixed(2),
@@ -555,7 +626,16 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (qtyToSell >= targetHolding.quantity) {
       nextHoldings = holdingsRef.current.filter((h) => h.id !== id);
     } else {
-      nextHoldings = holdingsRef.current.map((h) => (h.id === id ? { ...h, quantity: h.quantity - qtyToSell } : h));
+      nextHoldings = holdingsRef.current.map((h) =>
+        h.id === id
+          ? {
+              ...h,
+              quantity: h.quantity - qtyToSell,
+              ...(soldOwnQty !== undefined && h.ownQuantity !== undefined ? { ownQuantity: h.ownQuantity - soldOwnQty } : {}),
+              ...(soldMtfQty !== undefined && h.mtfQuantity !== undefined ? { mtfQuantity: h.mtfQuantity - soldMtfQty } : {}),
+            }
+          : h
+      );
     }
 
     tradeHistoryRef.current = nextHistory;
@@ -635,10 +715,11 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const importPortfolioJSON = (jsonString: string): boolean => {
     try {
       const parsed = JSON.parse(jsonString);
-      const nextHoldings = Array.isArray(parsed.holdings) ? parsed.holdings : [];
-      const nextWatchlist = Array.isArray(parsed.watchlist) ? parsed.watchlist : [];
-      const nextHistory = Array.isArray(parsed.tradeHistory) ? parsed.tradeHistory : [];
-      const nextTax = parsed.taxSettings || DEFAULT_TAX_SETTINGS;
+      if (!isRecord(parsed) || !('holdings' in parsed || 'watchlist' in parsed || 'tradeHistory' in parsed)) return false;
+      const nextHoldings = sanitizeHoldings(parsed.holdings);
+      const nextWatchlist = sanitizeWatchlist(parsed.watchlist);
+      const nextHistory = sanitizeTrades(parsed.tradeHistory);
+      const nextTax = isRecord(parsed.taxSettings) ? { ...DEFAULT_TAX_SETTINGS, ...parsed.taxSettings } : DEFAULT_TAX_SETTINGS;
 
       holdingsRef.current = nextHoldings;
       watchlistRef.current = nextWatchlist;

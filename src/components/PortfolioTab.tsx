@@ -454,7 +454,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
       const buyTime = new Date(resolvedBuyDate).getTime();
       const sellTime = t.sellDate ? new Date(t.sellDate).getTime() : (t.date ? new Date(t.date).getTime() : Date.now());
       const daysHeld = Math.max(0, Math.floor((sellTime - buyTime) / (1000 * 60 * 60 * 24)));
-      const holdingMonths = daysHeld / 30;
+      const holdingMonths = daysHeld / 30.4375; // 365.25 / 12, so >365 days counts as >12 months
 
       const tTaxSettings = {
         ...taxSettings,
@@ -1992,7 +1992,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
         const buyTime = sellingHolding.buyDate ? new Date(sellingHolding.buyDate).getTime() : Date.now();
         const sellTime = sellFormData.sellDate ? new Date(sellFormData.sellDate).getTime() : Date.now();
         const daysHeld = Math.max(0, Math.floor((sellTime - buyTime) / (1000 * 60 * 60 * 24)));
-        const holdingMonths = daysHeld / 30;
+        const holdingMonths = daysHeld / 30.4375; // 365.25 / 12, so >365 days counts as >12 months
 
         const activeHoldingBroker = (sellingHolding.broker || 'ZERODHA') as 'ZERODHA' | 'GROWW' | 'ANGELONE';
         const hTaxSettings = {
@@ -2009,8 +2009,8 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
           taxSettings: hTaxSettings,
           isMTF: sellingHolding.isMTF,
           mtfMultiplier: sellingHolding.mtfMultiplier,
-          ownQuantity: sellingHolding.ownQuantity ? Math.min(sellQtyNum, sellingHolding.ownQuantity) : undefined,
-          mtfQuantity: sellingHolding.mtfQuantity ? Math.min(sellQtyNum, sellingHolding.mtfQuantity) : undefined,
+          ownQuantity: sellingHolding.ownQuantity ? Math.round(sellingHolding.ownQuantity * Math.min(1, sellQtyNum / sellingHolding.quantity)) : undefined,
+          mtfQuantity: sellingHolding.mtfQuantity ? Math.round(sellingHolding.mtfQuantity * Math.min(1, sellQtyNum / sellingHolding.quantity)) : undefined,
           mtfDays: daysHeld,
         });
 

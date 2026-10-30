@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
+import { getAuthedAdmin } from '@/lib/session';
+
 import { UserDataModel } from '@/models/UserData';
 import { decryptPayload } from '@/lib/encryption';
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const adminRole = searchParams.get('adminRole');
     const targetUserId = searchParams.get('targetUserId');
 
     // Strict authorization: Only Admin users can inspect other users' portfolios
-    if (adminRole !== 'ADMIN') {
+    if (!(await getAuthedAdmin(req))) {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 

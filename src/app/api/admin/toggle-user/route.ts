@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
+import { getAuthedAdmin } from '@/lib/session';
+import { isMasterAdminEmail } from '@/lib/config';
+
 
 export async function POST(req: Request) {
   try {
-    const { targetUserId, isDisabled, adminRole } = await req.json();
+    const { targetUserId, isDisabled } = await req.json();
 
-    if (adminRole !== 'ADMIN') {
+    if (!(await getAuthedAdmin(req))) {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 
@@ -21,7 +24,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (existingUser.email === 'mailfortempusage@gmail.com') {
+    if (isMasterAdminEmail(existingUser.email)) {
       return NextResponse.json({ error: 'Master Administrator account cannot be disabled.' }, { status: 400 });
     }
 

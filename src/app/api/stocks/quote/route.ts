@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+const MAX_SYMBOLS_PER_REQUEST = 50;
+
 /**
  * Real-Time Indian Stock Market Quote API Proxy
  * Fetches authentic live prices directly from Yahoo Finance v8 Chart APIs for Indian equities (.NS / .BO)
@@ -18,7 +20,9 @@ export async function GET(req: Request) {
       });
     }
 
-    const rawSymbols = symbolsInput.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+    const rawSymbols = Array.from(
+      new Set(symbolsInput.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean))
+    ).slice(0, MAX_SYMBOLS_PER_REQUEST);
     
     // Convert symbols to NSE ticker format (e.g. RELIANCE -> RELIANCE.NS, SOLARA.NS -> SOLARA.NS)
     const nseSymbols = rawSymbols.map((s) => {
@@ -65,9 +69,6 @@ export async function GET(req: Request) {
                 open: meta.regularMarketDayOpen || currentPrice,
                 highDay: meta.regularMarketDayHigh || currentPrice,
                 lowDay: meta.regularMarketDayLow || currentPrice,
-                volume: '24.5 L',
-                marketCap: '₹12,500Cr',
-                peRatio: 22.5,
                 high52: meta.fiftyTwoWeekHigh || +(currentPrice * 1.25).toFixed(2),
                 low52: meta.fiftyTwoWeekLow || +(currentPrice * 0.75).toFixed(2),
                 category: 'Equity',
@@ -79,48 +80,18 @@ export async function GET(req: Request) {
           console.warn(`Live quote fetch error for ${nsSym}:`, err);
         }
 
-        // Realistic Indian Stock Base Prices Fallback
-        const basePriceMap: Record<string, number> = {
-          'RELIANCE': 2980.50,
-          'TCS': 4210.00,
-          'INFY': 1895.00,
-          'HDFCBANK': 1650.00,
-          'ICICIBANK': 1220.00,
-          'TATAMOTORS': 975.00,
-          'SBIN': 790.00,
-          'BHARTIARTL': 1610.00,
-          'ITC': 505.00,
-          'ZOMATO': 275.40,
-          'SOLARA': 714.85,
-        };
-
-        const price = basePriceMap[cleanSymbol] || 750.00;
-        return {
-          symbol: nsSym,
-          cleanSymbol: cleanSymbol,
-          companyName: `${cleanSymbol} Ltd.`,
-          exchange: 'NSE',
-          currentPrice: price,
-          previousClose: price - 5.0,
-          dayChange: 5.0,
-          dayChangePercent: 0.67,
-          open: price - 2,
-          highDay: price + 8,
-          lowDay: price - 4,
-          volume: '15.2 L',
-          marketCap: '₹4,500Cr',
-          peRatio: 21.5,
-          high52: +(price * 1.2).toFixed(2),
-          low52: +(price * 0.8).toFixed(2),
-          category: 'Equity',
-          lastUpdated: new Date().toISOString(),
-        };
+        // No live data: report the symbol as unavailable instead of inventing a price
+        return null;
       })
     );
 
+    const quotes = liveQuotes.filter((q): q is NonNullable<typeof q> => q !== null);
+    const unavailable = nseSymbols.filter((_, i) => liveQuotes[i] === null);
+
     return NextResponse.json({
       success: true,
-      quotes: liveQuotes,
+      quotes,
+      unavailable,
       source: 'LiveYahooChartAPI',
       timestamp: new Date().toISOString(),
     });

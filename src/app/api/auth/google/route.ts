@@ -1,49 +1,59 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
+import { GOOGLE_CLIENT_ID, isMasterAdminEmail } from '@/lib/config';
+import { setSessionCookie } from '@/lib/session';
 
-function decodeJwtPayload(token: string): any {
+interface VerifiedGoogleIdentity {
+  email: string;
+  name: string;
+  avatar: string;
+  googleId: string;
+}
+
+async function fetchJson(url: string, init?: RequestInit): Promise<any | null> {
   try {
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    console.warn('Failed to parse Google JWT payload:', e);
+    const res = await fetch(url, { ...init, cache: 'no-store' });
+    return res.ok ? await res.json() : null;
+  } catch {
     return null;
   }
+}
+
+/** Verifies a Google Identity Services ID token (signature, expiry) via Google and checks audience. */
+async function verifyIdToken(idToken: string): Promise<VerifiedGoogleIdentity | null> {
+  const info = await fetchJson(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+  if (!info || info.aud !== GOOGLE_CLIENT_ID) return null;
+  if (!info.email || String(info.email_verified) !== 'true') return null;
+  if (Number(info.exp) < Date.now() / 1000) return null;
+  return { email: info.email, name: info.name || info.given_name || '', avatar: info.picture || '', googleId: info.sub || '' };
+}
+
+/** Verifies an OAuth access token was issued to this app's client, then reads the profile. */
+async function verifyAccessToken(accessToken: string): Promise<VerifiedGoogleIdentity | null> {
+  const info = await fetchJson(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`);
+  if (!info || (info.aud !== GOOGLE_CLIENT_ID && info.azp !== GOOGLE_CLIENT_ID)) return null;
+  const profile = await fetchJson('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!profile?.email || profile.email_verified === false) return null;
+  return { email: profile.email, name: profile.name || profile.given_name || '', avatar: profile.picture || '', googleId: profile.sub || '' };
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { credential, profile } = body;
+    const { credential, accessToken } = body;
 
-    let email = '';
-    let name = '';
-    let avatar = '';
-    let googleId = '';
+    let identity: VerifiedGoogleIdentity | null = null;
+    if (typeof credential === 'string' && credential) identity = await verifyIdToken(credential);
+    else if (typeof accessToken === 'string' && accessToken) identity = await verifyAccessToken(accessToken);
 
-    // 1. Extract from Google Identity Services ID Token (JWT)
-    if (credential) {
-      const payload = decodeJwtPayload(credential);
-      if (payload) {
-        email = payload.email || '';
-        name = payload.name || payload.given_name || '';
-        avatar = payload.picture || '';
-        googleId = payload.sub || '';
-      }
+    if (!identity) {
+      return NextResponse.json({ error: 'Google authentication could not be verified.' }, { status: 401 });
     }
 
-    // 2. Extract from Direct Google Profile (fallback / dev / direct Google OAuth)
-    if (!email && profile?.email) {
-      email = profile.email;
-      name = profile.name || email.split('@')[0];
-      avatar = profile.avatar || '';
-      googleId = profile.googleId || '';
-    }
+    const { email, name, avatar, googleId } = identity;
 
     if (!email) {
       return NextResponse.json(
@@ -56,9 +66,7 @@ export async function POST(req: Request) {
     const displayName = name.trim() || cleanEmail.split('@')[0];
 
     // Master admin email designation
-    const isAdminEmail =
-      cleanEmail === 'mailfortempusage@gmail.com' ||
-      cleanEmail === (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
+    const isAdminEmail = isMasterAdminEmail(cleanEmail);
 
     const db = await connectToDatabase();
     if (!db) {
@@ -107,7 +115,7 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Google authentication successful.',
       user: {
@@ -121,25 +129,17 @@ export async function POST(req: Request) {
         isDisabled: false,
       },
     });
+    setSessionCookie(response, user._id.toString());
+    return response;
   } catch (err: any) {
     console.error('Google authentication API error:', err);
-    return NextResponse.json(
-      { error: err?.message || 'Internal server error during Google sign in.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error during Google sign in.' }, { status: 500 });
   }
 }
 
-const DEFAULT_GOOGLE_CLIENT_ID = '340953449815-qatnff0fgk0ee9jel8nk8o7tk1mlj4dp.apps.googleusercontent.com';
-
 export async function GET() {
-  const clientId =
-    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-    process.env.GOOGLE_CLIENT_ID ||
-    DEFAULT_GOOGLE_CLIENT_ID;
-
   return NextResponse.json({
-    clientId,
-    isConfigured: Boolean(clientId),
+    clientId: GOOGLE_CLIENT_ID,
+    isConfigured: Boolean(GOOGLE_CLIENT_ID),
   });
 }

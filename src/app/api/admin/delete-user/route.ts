@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
+import { getAuthedAdmin } from '@/lib/session';
+import { isMasterAdminEmail } from '@/lib/config';
+
 import { UserDataModel } from '@/models/UserData';
 
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const targetUserId = searchParams.get('targetUserId');
-    const adminRole = searchParams.get('adminRole');
 
-    if (adminRole !== 'ADMIN') {
+    if (!(await getAuthedAdmin(req))) {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 
@@ -24,7 +26,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (existingUser.email === 'mailfortempusage@gmail.com') {
+    if (isMasterAdminEmail(existingUser.email)) {
       return NextResponse.json({ error: 'Master Administrator account cannot be deleted.' }, { status: 400 });
     }
 

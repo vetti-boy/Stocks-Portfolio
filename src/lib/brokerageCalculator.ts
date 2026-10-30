@@ -58,7 +58,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     mtfDays = 0,
   } = params;
 
-  const qty = Math.max(0.0001, quantity || 0);
+  const qty = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
   const buyP = Math.max(0, buyPrice || 0);
   const sellP = Math.max(0, sellPrice || 0);
 
@@ -72,12 +72,14 @@ export function calculateEquityDeliveryBrokerage(params: {
   // MTF Own vs Borrowed Capital Split (1x Own, (M - 1)x Broker Funded)
   let ownQty = qty;
   let mtfQty = 0;
+  let hasCustomSplit = false;
   const validMultiplier = (mtfMultiplier !== undefined && mtfMultiplier >= 1) ? mtfMultiplier : 2.5;
   const ownRatio = 1 / validMultiplier;
 
   if (isMTF) {
     if (ownQuantity !== undefined && ownQuantity >= 0 && ownQuantity !== null && !isNaN(ownQuantity) && ownQuantity <= qty && ownQuantity > 0) {
       ownQty = Math.min(qty, ownQuantity);
+      hasCustomSplit = true;
       mtfQty = Math.max(0, qty - ownQty);
     } else {
       ownQty = qty > 0 ? Math.min(qty, Math.max(1, Math.round(qty * ownRatio))) : 0;
@@ -86,7 +88,7 @@ export function calculateEquityDeliveryBrokerage(params: {
   }
 
   const buyTurnover = qty * buyP;
-  const ownInvestment = isMTF ? +( buyTurnover * ownRatio ).toFixed(2) : buyTurnover;
+  const ownInvestment = isMTF ? +( hasCustomSplit ? ownQty * buyP : buyTurnover * ownRatio ).toFixed(2) : buyTurnover;
   const mtfBorrowedAmount = isMTF ? +( buyTurnover - ownInvestment ).toFixed(2) : 0;
   const totalInvestment = buyTurnover;
 
@@ -294,7 +296,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     const dpChargeTotal = isAngelOne ? 20.00 : (baseDpCharge + dpGst);
 
     let reqSellP = buyP;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; qty > 0 && i < 10; i++) {
       const estSellTurnover = qty * reqSellP;
       let estSellBrokerage = 0;
       if (isMTF) {
@@ -337,7 +339,7 @@ export function calculateEquityDeliveryBrokerage(params: {
     let sellBrokerage = 0;
     if (isMTF) {
       if (isGroww) {
-        sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, Math.max(5, requiredGrossSaleValue * 0.001)) : 0;
+        sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, Math.max(5, requiredGrossSaleValue * 0.0005)) : 0;
       } else if (isAngelOne) {
         sellBrokerage = requiredGrossSaleValue > 0 ? Math.min(20, (requiredGrossSaleValue * 0.1) / 100) : 0;
       } else {
@@ -345,7 +347,7 @@ export function calculateEquityDeliveryBrokerage(params: {
       }
     } else {
       if (isGroww && requiredGrossSaleValue > 0) {
-        sellBrokerage = Math.min(20, Math.max(5, requiredGrossSaleValue * 0.001));
+        sellBrokerage = Math.min(20, Math.max(5, requiredGrossSaleValue * 0.0005));
       } else if (isAngelOne && requiredGrossSaleValue > 0) {
         sellBrokerage = 20;
       } else {

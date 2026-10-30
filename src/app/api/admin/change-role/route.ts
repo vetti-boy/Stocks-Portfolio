@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { UserModel } from '@/models/User';
+import { getAuthedAdmin } from '@/lib/session';
+import { isMasterAdminEmail } from '@/lib/config';
+
 
 declare global {
   // eslint-disable-next-line no-var
@@ -9,9 +12,9 @@ declare global {
 
 export async function POST(req: Request) {
   try {
-    const { targetUserId, newRole, adminRole } = await req.json();
+    const { targetUserId, newRole } = await req.json();
 
-    if (adminRole !== 'ADMIN') {
+    if (!(await getAuthedAdmin(req))) {
       return NextResponse.json({ error: 'Unauthorized admin access' }, { status: 403 });
     }
 
@@ -32,7 +35,7 @@ export async function POST(req: Request) {
 
     // Prevent changing Master Admin email
     const existingUser = await UserModel.findById(targetUserId);
-    if (existingUser && existingUser.email === 'mailfortempusage@gmail.com') {
+    if (existingUser && isMasterAdminEmail(existingUser.email)) {
       return NextResponse.json({ error: 'System Administrator role cannot be demoted.' }, { status: 400 });
     }
 
