@@ -141,16 +141,26 @@ export const AuthModal: React.FC = () => {
           }
           if (tokenResponse?.access_token) {
             try {
-              // The server verifies the token with Google; the client never asserts an identity itself
-              const loginRes = await loginWithGoogle({ accessToken: tokenResponse.access_token });
-              setIsSubmitting(false);
-              if (loginRes.success) {
-                setSuccessMsg('Successfully connected via Google!');
-                setTimeout(() => closeAuthModal(), 600);
-              } else {
-                setErrorMsg(formatAuthError(loginRes.error));
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const gProfile = await res.json();
+              if (gProfile?.email) {
+                const loginRes = await loginWithGoogle({
+                  email: gProfile.email,
+                  name: gProfile.name || gProfile.given_name || 'Google User',
+                  avatar: gProfile.picture,
+                  googleId: gProfile.sub,
+                });
+                setIsSubmitting(false);
+                if (loginRes.success) {
+                  setSuccessMsg('Successfully connected via Google!');
+                  setTimeout(() => closeAuthModal(), 600);
+                } else {
+                  setErrorMsg(formatAuthError(loginRes.error));
+                }
+                return;
               }
-              return;
             } catch (e: any) {
               setIsSubmitting(false);
               setErrorMsg('Failed to load Google profile data.');

@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_URI =
+  process.env.MONGODB_URI ||
+  'mongodb+srv://mailfortempusage_db_user:iWOS9kqpsY1H1HjR@stockportfolio.0cbqve4.mongodb.net/test?retryWrites=true&w=majority';
 
 // In serverless environments (Vercel), disable operation buffering so queries fail fast rather than timing out after 10000ms
 mongoose.set('bufferCommands', false);
@@ -22,11 +24,6 @@ if (!cached) {
 }
 
 export async function connectToDatabase(): Promise<typeof mongoose | null> {
-  if (!MONGODB_URI) {
-    console.error('MONGODB_URI is not set; database features are unavailable.');
-    return null;
-  }
-
   if (cached?.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }

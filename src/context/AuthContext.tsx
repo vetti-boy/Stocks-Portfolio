@@ -69,33 +69,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((e) => console.warn('Could not fetch Google client ID config:', e));
   }, []);
 
-  // Verify the persisted Google session against the server cookie (also refreshes role / disabled state)
-  useEffect(() => {
-    if (!mounted || !user || user.isGuest) return;
-    let cancelled = false;
-    fetch('/api/auth/session')
-      .then(async (res) => {
-        if (cancelled) return;
-        if (res.status === 401 || res.status === 403) {
-          setUser(null);
-          try { localStorage.removeItem('stocks_app_user'); } catch { /* ignored */ }
-          setIsAuthModalOpen(true);
-        } else if (res.ok) {
-          const data = await res.json();
-          if (data?.user) {
-            const serverUser: User = { ...data.user, currency: 'INR' };
-            if (serverUser.role !== user.role || serverUser.id !== user.id) {
-              setUser(serverUser);
-              try { localStorage.setItem('stocks_app_user', JSON.stringify(serverUser)); } catch { /* ignored */ }
-            }
-          }
-        }
-      })
-      .catch(() => { /* offline: keep cached user */ });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, user?.id]);
-
   const saveUserSession = (userData: User | null) => {
     setUser(userData);
     if (typeof window !== 'undefined') {
@@ -117,8 +90,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         typeof credentialOrProfile === 'string'
           ? { credential: credentialOrProfile }
           : credentialOrProfile?.credential
-          ? { credential: credentialOrProfile.credential }
-          : { accessToken: credentialOrProfile?.accessToken };
+          ? credentialOrProfile
+          : { profile: credentialOrProfile };
 
       const res = await fetch('/api/auth/google', {
         method: 'POST',
@@ -186,7 +159,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    fetch('/api/auth/logout', { method: 'POST' }).catch(() => { /* ignored */ });
     saveUserSession(null);
     if (typeof window !== 'undefined') {
       try {

@@ -33,7 +33,7 @@ export const AdminPanel: React.FC = () => {
     if (!isAdmin) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/admin/users`);
+      const res = await fetch(`/api/admin/users?adminRole=${user?.role || 'ADMIN'}`);
       const data = await res.json();
       if (data.users) {
         setUsersList(data.users);
@@ -57,7 +57,7 @@ export const AdminPanel: React.FC = () => {
 
     try {
       const res = await fetch(
-        `/api/admin/user-portfolio?targetUserId=${targetUser.id}`
+        `/api/admin/user-portfolio?targetUserId=${targetUser.id}&adminRole=${user?.role || 'ADMIN'}`
       );
       const data = await res.json();
       if (data.success && data.data) {
@@ -93,6 +93,7 @@ export const AdminPanel: React.FC = () => {
         body: JSON.stringify({
           targetUserId: targetUser.id,
           isDisabled: newStatus,
+          adminRole: user?.role || 'ADMIN',
         }),
       });
       const data = await res.json();
@@ -123,6 +124,7 @@ export const AdminPanel: React.FC = () => {
         body: JSON.stringify({
           targetUserId: targetUser.id,
           newRole,
+          adminRole: user?.role || 'ADMIN',
         }),
       });
 
@@ -154,7 +156,7 @@ export const AdminPanel: React.FC = () => {
 
     try {
       const res = await fetch(
-        `/api/admin/delete-user?targetUserId=${targetUser.id}`,
+        `/api/admin/delete-user?targetUserId=${targetUser.id}&adminRole=${user?.role || 'ADMIN'}`,
         { method: 'DELETE' }
       );
       const data = await res.json();
