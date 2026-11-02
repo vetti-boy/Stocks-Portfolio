@@ -51,7 +51,7 @@ export const AuthModal: React.FC = () => {
             theme: 'filled_black',
             size: 'large',
             shape: 'pill',
-            width: 320,
+            width: Math.max(200, Math.min(320, window.innerWidth - 96)),
             text: 'continue_with',
           });
           setGisRendered(true);

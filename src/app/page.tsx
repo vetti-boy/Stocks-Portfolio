@@ -85,7 +85,7 @@ function DashboardContent() {
   }, [isMounted, user, isAdmin, activeTab]);
 
   return (
-    <div className="relative min-h-screen flex bg-[var(--app-bg)] text-[var(--text-primary)] transition-colors duration-200 font-sans">
+    <div className="relative min-h-dvh flex bg-[var(--app-bg)] text-[var(--text-primary)] transition-colors duration-200 font-sans">
       {/* Left Sidebar (3 Fixed Navigation Tabs) */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] text-[var(--sidebar-text)] transition-all duration-200 flex flex-col justify-between overflow-y-auto overflow-x-hidden hidden md:flex ${
@@ -221,48 +221,10 @@ function DashboardContent() {
           <Navbar
             onLockScreen={() => setIsLocked(true)}
           />
-
-          {/* Mobile Tab Switcher */}
-          <div className="md:hidden border-t border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 flex gap-1.5 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => changeTab('portfolio')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
-                activeTab === 'portfolio' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
-              }`}
-            >
-              Portfolio
-            </button>
-            <button
-              onClick={() => changeTab('calculator')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
-                activeTab === 'calculator' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
-              }`}
-            >
-              Tax Engine
-            </button>
-            <button
-              onClick={() => changeTab('history')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
-                activeTab === 'history' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
-              }`}
-            >
-              History
-            </button>
-            {isAdmin && (
-              <button
-                onClick={() => changeTab('admin')}
-                className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition ${
-                  activeTab === 'admin' ? 'bg-[var(--surface-muted)] text-[var(--brand-primary)] border border-[var(--border)] font-bold' : 'text-[var(--text-secondary)]'
-                }`}
-              >
-                Admin
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Main Workspace Area (The 3 Tab Components) */}
-        <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-5 sm:px-6 lg:px-8 space-y-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
+        <main className="flex-1 mx-auto w-full max-w-[1920px] px-3 py-3 sm:px-6 sm:py-5 lg:px-8 space-y-4 sm:space-y-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-8">
           {activeTab === 'portfolio' && (
             <PortfolioTab onOpenInCalculator={() => changeTab('calculator')} />
           )}
@@ -272,10 +234,10 @@ function DashboardContent() {
         </main>
 
         {/* Fixed Mobile Bottom Navigation Bar (iOS & Android Smartphone Native Experience) */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--surface)]/95 backdrop-blur-lg border-t border-[var(--border)] px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex items-center justify-around shadow-2xl">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[var(--surface)]/95 backdrop-blur-lg border-t border-[var(--border)] px-2 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] flex items-stretch justify-around shadow-2xl">
           <button
             onClick={() => changeTab('portfolio')}
-            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+            className={`flex flex-1 min-w-0 flex-col items-center gap-0.5 text-[10px] font-semibold transition ${
               activeTab === 'portfolio' ? 'text-[var(--brand-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -287,7 +249,7 @@ function DashboardContent() {
 
           <button
             onClick={() => changeTab('calculator')}
-            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+            className={`flex flex-1 min-w-0 flex-col items-center gap-0.5 text-[10px] font-semibold transition ${
               activeTab === 'calculator' ? 'text-[var(--positive)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -299,7 +261,7 @@ function DashboardContent() {
 
           <button
             onClick={() => changeTab('history')}
-            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+            className={`flex flex-1 min-w-0 flex-col items-center gap-0.5 text-[10px] font-semibold transition ${
               activeTab === 'history' ? 'text-[var(--brand-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -312,7 +274,7 @@ function DashboardContent() {
           {isAdmin && (
             <button
               onClick={() => changeTab('admin')}
-              className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${
+              className={`flex flex-1 min-w-0 flex-col items-center gap-0.5 text-[10px] font-semibold transition ${
                 activeTab === 'admin' ? 'text-[var(--brand-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >

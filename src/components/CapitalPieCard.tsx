@@ -147,7 +147,7 @@ export const CapitalPieCard: React.FC<CapitalPieCardProps> = ({ breakdown: b, mo
         ) : (
           <div className="grid items-center gap-6 lg:grid-cols-[minmax(300px,380px)_1fr]">
             {/* Donut */}
-            <div className="relative mx-auto h-[290px] w-full max-w-[380px]">
+            <div className="relative mx-auto h-[250px] sm:h-[290px] w-full max-w-[380px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 34, right: 8, bottom: 20, left: 8 }}>
                   <Pie
@@ -181,8 +181,8 @@ export const CapitalPieCard: React.FC<CapitalPieCardProps> = ({ breakdown: b, mo
             </div>
 
             {/* Breakdown */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className={tile}>
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className={`${tile} col-span-2 sm:col-span-1`}>
                 <div className={tileLabel}>Total money deployed</div>
                 <div className="mt-1.5 font-mono text-xl font-extrabold text-[var(--text-primary)]">₹{money(b.invested)}</div>
                 <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">my money + MTF fund · {b.count} {realized ? 'trade' : 'holding'}{b.count === 1 ? '' : 's'}</p>
@@ -200,7 +200,7 @@ export const CapitalPieCard: React.FC<CapitalPieCardProps> = ({ breakdown: b, mo
                 <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{b.mtf > 0 ? `${mtfPct.toFixed(1)}% of total money` : 'No MTF used — all of it is your money'}</p>
               </div>
 
-              <div className={tile}>
+              <div className={`${tile} col-span-2 sm:col-span-1`}>
                 <div className={tileLabel}><Dot color={isProfit ? C_WIN : C_LOSS} /> {profitName} (after charges{b.mtf > 0 ? ' & interest' : ''})</div>
                 <div className={`mt-1.5 font-mono text-xl font-extrabold ${isProfit ? 'text-[var(--positive)]' : 'text-[var(--negative)]'}`}>{signedMoney(b.profit)}</div>
                 <div className="mt-1 space-y-0.5 text-[11px]">
@@ -215,7 +215,7 @@ export const CapitalPieCard: React.FC<CapitalPieCardProps> = ({ breakdown: b, mo
                 </div>
               </div>
 
-              <div className={`${tile} sm:col-span-2`}>
+              <div className={`${tile} col-span-2`}>
                 <div className={tileLabel}>My money after {realized ? (isProfit ? 'profit' : 'loss') : isProfit ? 'unrealized profit' : 'unrealized loss'}</div>
                 <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="font-mono text-xl font-extrabold text-[var(--text-primary)]">₹{money(b.ownPlusProfit)}</span>

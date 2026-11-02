@@ -54,9 +54,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen }) => {
 
   return (
     <header className="w-full bg-[var(--surface)] border-b border-[var(--border)] transition-colors duration-200">
-      <div className="mx-auto flex max-w-[1920px] items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1920px] items-center justify-between px-3 py-2 sm:px-6 sm:py-2.5 lg:px-8 pt-[max(0.5rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]">
         {/* Market Status & Brand (Deduplicated on Desktop) */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {/* Mobile-only Brand (shown only when left sidebar is hidden) */}
           <div className="flex md:hidden items-center gap-2">
             <img
@@ -77,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen }) => {
         </div>
 
         {/* Action Controls & Auth Profile Dropdown */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           {/* Lock Screen Security Button */}
           {onLockScreen && (
             <button
@@ -124,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onLockScreen }) => {
             {/* Profile & Settings Dropdown Menu */}
             {isDropdownOpen && (
               <div
-                className="absolute right-0 mt-2 w-72 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xl p-3.5 space-y-3 z-50 animate-in fade-in zoom-in-95 duration-150"
+                className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-xl p-3.5 space-y-3 z-50 animate-in fade-in zoom-in-95 duration-150"
                 role="menu"
                 aria-orientation="vertical"
               >

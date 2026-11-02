@@ -534,23 +534,23 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <PortfolioMascot netPnL={totalNetPnL} pnlPercent={totalPnLPercent} hasHoldings={holdings.length > 0} />
 
       {/* Top Stat Cards Grid (Double-Bezel Architecture) */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-6 lg:grid-cols-4">
         {/* Card 1: Total Invested */}
         <div className="glass-shell">
-          <div className="glass-core p-6 relative overflow-hidden">
+          <div className="glass-core p-3 sm:p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono leading-tight">
                 TOTAL INVESTED CAPITAL
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500/10 border border-indigo-500/20">
+              <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full sm:flex bg-indigo-500/10 border border-indigo-500/20">
                 <Briefcase className="h-4 w-4 text-indigo-400" />
               </div>
             </div>
-            <div className="mt-4 text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight">
+            <div className="mt-2 sm:mt-4 text-lg sm:text-3xl font-extrabold font-mono text-white tracking-tight">
               ₹{totalInvested.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="mt-2 text-xs text-slate-400 tracking-wide">Combined cost of all active holdings</p>
@@ -559,16 +559,16 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
         {/* Card 2: Current Market Value */}
         <div className="glass-shell">
-          <div className="glass-core p-6 relative overflow-hidden">
+          <div className="glass-core p-3 sm:p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 CURRENT MARKET VALUE
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/10 border border-cyan-500/20">
+              <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full sm:flex bg-cyan-500/10 border border-cyan-500/20">
                 <IndianRupee className="h-4 w-4 text-cyan-400" />
               </div>
             </div>
-            <div className="mt-4 text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight">
+            <div className="mt-2 sm:mt-4 text-lg sm:text-3xl font-extrabold font-mono text-white tracking-tight">
               ₹{currentVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="mt-2 text-xs text-slate-400 tracking-wide">Live updated 15s quote valuation</p>
@@ -577,12 +577,12 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
         {/* Card 3: Unrealized Net P&L */}
         <div className={`glass-shell ${totalNetPnL >= 0 ? 'glass-shell-profit' : 'glass-shell-loss'}`}>
-          <div className="glass-core p-6 relative overflow-hidden">
+          <div className="glass-core p-3 sm:p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 UNREALIZED NET P&L
               </span>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full ${totalNetPnL >= 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-rose-500/10 border border-rose-500/20'}`}>
+              <div className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-full sm:flex ${totalNetPnL >= 0 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-rose-500/10 border border-rose-500/20'}`}>
                 {totalNetPnL >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-emerald-400" />
                 ) : (
@@ -591,14 +591,14 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
               </div>
             </div>
             <div
-              className={`mt-4 text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${
+              className={`mt-2 sm:mt-4 text-lg sm:text-3xl font-extrabold font-mono tracking-tight ${
                 totalNetPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'
               }`}
             >
               {totalNetPnL >= 0 ? '+' : '-'}₹
               {Math.abs(totalNetPnL).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div className="mt-2 flex items-center justify-between font-mono">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-mono">
               <div className="flex items-center gap-2">
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
@@ -619,18 +619,18 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
 
         {/* Card 4: Top Performer */}
         <div className="glass-shell">
-          <div className="glass-core p-6 relative overflow-hidden">
+          <div className="glass-core p-3 sm:p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                 TOP PERFORMING ASSET
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20">
+              <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full sm:flex bg-amber-500/10 border border-amber-500/20">
                 <PieChart className="h-4 w-4 text-amber-400" />
               </div>
             </div>
             {bestPerformer ? (
-              <div className="mt-4">
-                <div className="flex items-baseline gap-2.5">
+              <div className="mt-2 sm:mt-4">
+                <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                   <span className="text-xl sm:text-2xl font-bold text-white font-mono">{bestPerformer.symbol}</span>
                   <span
                     className={`text-xs font-bold font-mono rounded-full px-2 py-0.5 border ${
@@ -649,7 +649,7 @@ export const PortfolioTab: React.FC<PortfolioTabProps> = ({ onOpenInCalculator }
                 </p>
               </div>
             ) : (
-              <div className="mt-4 text-sm text-slate-400">No stocks in portfolio</div>
+              <div className="mt-2 sm:mt-4 text-sm text-slate-400">No stocks in portfolio</div>
             )}
           </div>
         </div>
